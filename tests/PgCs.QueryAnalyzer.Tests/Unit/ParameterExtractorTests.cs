@@ -1,6 +1,6 @@
 namespace PgCs.QueryAnalyzer.Tests.Unit;
 
-using PgCs.QueryAnalyzer.Parsing;
+using Parsing;
 
 public sealed class ParameterExtractorTests
 {

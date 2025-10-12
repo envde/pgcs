@@ -57,7 +57,7 @@ public sealed class QueryAnalyzerTests
         var sql = TestDataBuilder.BuildQuery(
             name: "UpdateUser",
             cardinality: "execrows",
-            sqlBody: "UPDATE users SET email = $1 WHERE id = $2 RETURNING id, updated_at;"
+            sqlBody: "UPDATE users SET email = @email::string WHERE id = @id::int RETURNING id, updated_at;"
         );
 
         // Act

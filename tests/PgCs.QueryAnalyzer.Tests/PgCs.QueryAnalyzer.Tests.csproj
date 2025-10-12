@@ -24,4 +24,10 @@
       <ProjectReference Include="..\..\src\PgCs.QueryAnalyzer\PgCs.QueryAnalyzer.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="TestData\Queries.sql">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>
