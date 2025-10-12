@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PgCs.Cli/PgCs.Cli.csproj" />
+    <Project Path="src/PgCs.Common/PgCs.Common.csproj" />
+    <Project Path="src/PgCs.Core/PgCs.Core.csproj" />
+  </Folder>
+</Solution>
