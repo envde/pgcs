@@ -3,5 +3,9 @@
     <Project Path="src/PgCs.Cli/PgCs.Cli.csproj" />
     <Project Path="src/PgCs.Common/PgCs.Common.csproj" />
     <Project Path="src/PgCs.Core/PgCs.Core.csproj" />
+    <Project Path="src/PgCs.QueryAnalyzer/PgCs.QueryAnalyzer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests\PgCs.QueryAnalyzer.Tests\PgCs.QueryAnalyzer.Tests.csproj" Type="Classic C#" />
   </Folder>
 </Solution>
