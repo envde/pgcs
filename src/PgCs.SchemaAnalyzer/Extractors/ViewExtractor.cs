@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using PgCs.Common.SchemaAnalyzer;
+using PgCs.Common.SchemaAnalyzer.Models;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 

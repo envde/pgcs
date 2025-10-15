@@ -1,5 +1,6 @@
 ﻿using System.Collections.Frozen;
 using PgCs.Common.SchemaAnalyzer;
+using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.SchemaAnalyzer.Extractors;
 using PgCs.SchemaAnalyzer.Utils;
 

@@ -1,3 +1,5 @@
+using PgCs.Common.QueryAnalyzer.Models;
+
 namespace PgCs.QueryAnalyzer.Parsing;
 
 using System.Text.RegularExpressions;

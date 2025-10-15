@@ -1,3 +1,5 @@
+using PgCs.Common.QueryAnalyzer.Models.Enums;
+
 namespace PgCs.QueryAnalyzer.Tests.Unit;
 
 using Helpers;

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using PgCs.Common.SchemaAnalyzer;
+using PgCs.Common.SchemaAnalyzer.Models;
+using PgCs.Common.SchemaAnalyzer.Models.Enums;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 

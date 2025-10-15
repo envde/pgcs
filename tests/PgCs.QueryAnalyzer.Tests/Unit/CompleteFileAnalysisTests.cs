@@ -1,3 +1,4 @@
+using PgCs.Common.QueryAnalyzer.Models.Enums;
 using PgCs.QueryAnalyzer.Tests.Helpers;
 using Xunit.Abstractions;
 

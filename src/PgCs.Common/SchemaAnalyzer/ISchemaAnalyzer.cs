@@ -1,3 +1,5 @@
+using PgCs.Common.SchemaAnalyzer.Models;
+
 namespace PgCs.Common.SchemaAnalyzer;
 
 public interface ISchemaAnalyzer

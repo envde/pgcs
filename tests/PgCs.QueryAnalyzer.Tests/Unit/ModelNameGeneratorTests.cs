@@ -1,3 +1,5 @@
+using PgCs.Common.QueryAnalyzer.Models;
+
 namespace PgCs.QueryAnalyzer.Tests.Unit;
 
 using Parsing;

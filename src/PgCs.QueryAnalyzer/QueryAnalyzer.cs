@@ -1,5 +1,7 @@
 
 using PgCs.Common.QueryAnalyzer;
+using PgCs.Common.QueryAnalyzer.Models;
+using PgCs.Common.QueryAnalyzer.Models.Enums;
 using PgCs.QueryAnalyzer.Parsing;
 
 namespace PgCs.QueryAnalyzer;

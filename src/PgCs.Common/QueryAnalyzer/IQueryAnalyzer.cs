@@ -1,4 +1,6 @@
-﻿namespace PgCs.Common.QueryAnalyzer;
+﻿using PgCs.Common.QueryAnalyzer.Models;
+
+namespace PgCs.Common.QueryAnalyzer;
 
 public interface IQueryAnalyzer
 {

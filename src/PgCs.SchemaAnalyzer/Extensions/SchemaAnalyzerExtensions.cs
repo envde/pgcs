@@ -1,4 +1,6 @@
 using PgCs.Common.SchemaAnalyzer;
+using PgCs.Common.SchemaAnalyzer.Models;
+using PgCs.Common.SchemaAnalyzer.Models.Enums;
 
 namespace PgCs.SchemaAnalyzer.Extensions;
 

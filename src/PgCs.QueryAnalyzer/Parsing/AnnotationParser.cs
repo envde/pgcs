@@ -1,7 +1,9 @@
+using PgCs.Common.QueryAnalyzer.Models;
+using PgCs.Common.QueryAnalyzer.Models.Enums;
+
 namespace PgCs.QueryAnalyzer.Parsing;
 
 using System.Text.RegularExpressions;
-using PgCs.Common.QueryAnalyzer;
 
 internal static partial class AnnotationParser
 {
