@@ -1,60 +1,74 @@
 namespace PgCs.Common.SchemaAnalyzer;
 
-/// <summary>
-/// Анализирует структуру PostgreSQL базы данных
-/// </summary>
 public interface ISchemaAnalyzer
 {
     /// <summary>
-    /// Анализирует полную схему базы данных
+    /// Анализирует SQL файл схемы и извлекает все объекты базы данных
     /// </summary>
-    /// <param name="connectionString">Строка подключения к PostgreSQL</param>
-    /// <param name="schemaName">Имя схемы (по умолчанию "public")</param>
-    /// <returns>Полная информация о схеме</returns>
-    Task<DatabaseSchema> AnalyzeSchemaAsync(string connectionString, string schemaName = "public");
+    /// <param name="schemaFilePath">Путь к SQL файлу со схемой</param>
+    /// <returns>Метаданные схемы базы данных</returns>
+    ValueTask<SchemaMetadata> AnalyzeFileAsync(string schemaFilePath);
 
     /// <summary>
-    /// Получает список всех таблиц в схеме
+    /// Анализирует папку с SQL файлами схемы и объединяет их в единую схему
     /// </summary>
-    Task<IReadOnlyList<TableInfo>> GetTablesAsync(string connectionString, string schemaName = "public");
+    /// <param name="schemaDirectoryPath">Путь к папке с SQL файлами</param>
+    /// <returns>Объединённые метаданные схемы базы данных</returns>
+    ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath);
 
     /// <summary>
-    /// Получает детальную информацию о конкретной таблице
+    /// Анализирует отдельный SQL скрипт с определениями объектов БД
     /// </summary>
-    Task<TableInfo> GetTableInfoAsync(string connectionString, string schemaName, string tableName);
+    /// <param name="sqlScript">SQL скрипт с определениями</param>
+    /// <returns>Метаданные схемы</returns>
+    SchemaMetadata AnalyzeScript(string sqlScript);
 
     /// <summary>
-    /// Получает все связи (foreign keys) между таблицами
+    /// Извлекает определения таблиц из SQL скрипта
     /// </summary>
-    Task<IReadOnlyList<ForeignKeyInfo>> GetForeignKeysAsync(string connectionString, string schemaName = "public");
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений таблиц</returns>
+    IReadOnlyList<TableDefinition> ExtractTables(string sqlScript);
 
     /// <summary>
-    /// Получает пользовательские типы (ENUMs, композитные типы)
+    /// Извлекает определения представлений из SQL скрипта
     /// </summary>
-    Task<IReadOnlyList<CustomTypeInfo>> GetCustomTypesAsync(string connectionString, string schemaName = "public");
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений представлений</returns>
+    IReadOnlyList<ViewDefinition> ExtractViews(string sqlScript);
 
     /// <summary>
-    /// Получает все ENUM типы
+    /// Извлекает определения пользовательских типов (ENUM, DOMAIN, COMPOSITE)
     /// </summary>
-    Task<IReadOnlyList<EnumTypeInfo>> GetEnumsAsync(string connectionString, string schemaName = "public");
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений типов</returns>
+    IReadOnlyList<TypeDefinition> ExtractTypes(string sqlScript);
 
     /// <summary>
-    /// Получает индексы для таблицы
+    /// Извлекает определения функций и процедур
     /// </summary>
-    Task<IReadOnlyList<IndexInfo>> GetIndexesAsync(string connectionString, string schemaName, string tableName);
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений функций</returns>
+    IReadOnlyList<FunctionDefinition> ExtractFunctions(string sqlScript);
 
     /// <summary>
-    /// Получает constraints (проверки) для таблицы
+    /// Извлекает определения индексов
     /// </summary>
-    Task<IReadOnlyList<ConstraintInfo>> GetConstraintsAsync(string connectionString, string schemaName, string tableName);
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений индексов</returns>
+    IReadOnlyList<IndexDefinition> ExtractIndexes(string sqlScript);
 
     /// <summary>
-    /// Получает представления (views)
+    /// Извлекает определения триггеров
     /// </summary>
-    Task<IReadOnlyList<ViewInfo>> GetViewsAsync(string connectionString, string schemaName = "public");
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений триггеров</returns>
+    IReadOnlyList<TriggerDefinition> ExtractTriggers(string sqlScript);
 
     /// <summary>
-    /// Получает хранимые процедуры и функции
+    /// Извлекает ограничения (constraints) из таблиц
     /// </summary>
-    Task<IReadOnlyList<FunctionInfo>> GetFunctionsAsync(string connectionString, string schemaName = "public");
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений ограничений</returns>
+    IReadOnlyList<ConstraintDefinition> ExtractConstraints(string sqlScript);
 }
