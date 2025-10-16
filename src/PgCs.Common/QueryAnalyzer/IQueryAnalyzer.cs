@@ -1,4 +1,7 @@
-﻿using PgCs.Common.QueryAnalyzer.Models;
+﻿using PgCs.Common.QueryAnalyzer.Models.Annotations;
+using PgCs.Common.QueryAnalyzer.Models.Metadata;
+using PgCs.Common.QueryAnalyzer.Models.Parameters;
+using PgCs.Common.QueryAnalyzer.Models.Results;
 
 namespace PgCs.Common.QueryAnalyzer;
 

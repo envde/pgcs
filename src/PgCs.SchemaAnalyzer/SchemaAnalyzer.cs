@@ -1,6 +1,12 @@
 ﻿using System.Collections.Frozen;
 using PgCs.Common.SchemaAnalyzer;
 using PgCs.Common.SchemaAnalyzer.Models;
+using PgCs.Common.SchemaAnalyzer.Models.Functions;
+using PgCs.Common.SchemaAnalyzer.Models.Indexes;
+using PgCs.Common.SchemaAnalyzer.Models.Tables;
+using PgCs.Common.SchemaAnalyzer.Models.Triggers;
+using PgCs.Common.SchemaAnalyzer.Models.Types;
+using PgCs.Common.SchemaAnalyzer.Models.Views;
 using PgCs.SchemaAnalyzer.Extractors;
 using PgCs.SchemaAnalyzer.Utils;
 

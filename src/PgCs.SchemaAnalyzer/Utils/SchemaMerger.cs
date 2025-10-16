@@ -1,4 +1,10 @@
 using PgCs.Common.SchemaAnalyzer.Models;
+using PgCs.Common.SchemaAnalyzer.Models.Functions;
+using PgCs.Common.SchemaAnalyzer.Models.Indexes;
+using PgCs.Common.SchemaAnalyzer.Models.Tables;
+using PgCs.Common.SchemaAnalyzer.Models.Triggers;
+using PgCs.Common.SchemaAnalyzer.Models.Types;
+using PgCs.Common.SchemaAnalyzer.Models.Views;
 
 namespace PgCs.SchemaAnalyzer.Utils;
 

@@ -1,8 +1,8 @@
-using PgCs.Common.QueryAnalyzer.Models.Enums;
-
 namespace PgCs.QueryAnalyzer.Tests.Unit;
 
 using Helpers;
+using PgCs.Common.QueryAnalyzer.Models.Metadata;
+using PgCs.Common.QueryAnalyzer.Models.Results;
 
 public sealed class QueryAnalyzerTests
 {
@@ -22,14 +22,13 @@ public sealed class QueryAnalyzerTests
         var result = _sut.AnalyzeQuery(sql);
 
         // Assert
-        using var _ = new AssertionScope();
-        result.MethodName.Should().Be("GetUser");
-        result.QueryType.Should().Be(QueryType.Select);
-        result.ReturnCardinality.Should().Be(ReturnCardinality.One);
-        result.SqlQuery.Should().Contain("SELECT id, username, email");
-        result.Parameters.Should().HaveCount(1);
-        result.ReturnType.Should().NotBeNull();
-        result.ReturnType!.Columns.Should().HaveCount(3);
+        Assert.Equal("GetUser", result.MethodName);
+        Assert.Equal(QueryType.Select, result.QueryType);
+        Assert.Equal(ReturnCardinality.One, result.ReturnCardinality);
+        Assert.Contains("SELECT id, username, email", result.SqlQuery);
+        Assert.Single(result.Parameters);
+        Assert.NotNull(result.ReturnType);
+        Assert.Equal(3, result.ReturnType!.Columns.Count);
     }
 
     [Fact]
@@ -46,10 +45,10 @@ public sealed class QueryAnalyzerTests
         var result = _sut.AnalyzeQuery(sql);
 
         // Assert
-        result.QueryType.Should().Be(QueryType.Insert);
-        result.ReturnCardinality.Should().Be(ReturnCardinality.Exec);
-        result.ReturnType.Should().BeNull();
-        result.Parameters.Should().HaveCount(2);
+        Assert.Equal(QueryType.Insert, result.QueryType);
+        Assert.Equal(ReturnCardinality.Exec, result.ReturnCardinality);
+        Assert.Null(result.ReturnType);
+        Assert.Equal(2, result.Parameters.Count);
     }
 
     [Fact]
@@ -66,10 +65,10 @@ public sealed class QueryAnalyzerTests
         var result = _sut.AnalyzeQuery(sql);
 
         // Assert
-        result.QueryType.Should().Be(QueryType.Update);
-        result.ReturnCardinality.Should().Be(ReturnCardinality.ExecRows);
-        result.ReturnType.Should().NotBeNull();
-        result.ReturnType!.Columns.Should().HaveCount(2);
+        Assert.Equal(QueryType.Update, result.QueryType);
+        Assert.Equal(ReturnCardinality.ExecRows, result.ReturnCardinality);
+        Assert.NotNull(result.ReturnType);
+        Assert.Equal(2, result.ReturnType!.Columns.Count);
     }
 
     [Fact]
@@ -86,7 +85,7 @@ public sealed class QueryAnalyzerTests
         var result = _sut.AnalyzeQuery(sql);
 
         // Assert
-        result.QueryType.Should().Be(QueryType.Delete);
+        Assert.Equal(QueryType.Delete, result.QueryType);
     }
 
     [Fact]
@@ -105,8 +104,8 @@ public sealed class QueryAnalyzerTests
         var result = _sut.AnalyzeQuery(sql);
 
         // Assert
-        result.QueryType.Should().Be(QueryType.Select);
-        result.ReturnCardinality.Should().Be(ReturnCardinality.Many);
+        Assert.Equal(QueryType.Select, result.QueryType);
+        Assert.Equal(ReturnCardinality.Many, result.ReturnCardinality);
     }
 
     [Theory]
@@ -115,11 +114,8 @@ public sealed class QueryAnalyzerTests
     [InlineData(null)]
     public void AnalyzeQuery_WithInvalidInput_ThrowsArgumentException(string? input)
     {
-        // Act
-        var act = () => _sut.AnalyzeQuery(input!);
-
-        // Assert
-        act.Should().Throw<ArgumentException>();
+    // Act & Assert
+    Assert.ThrowsAny<ArgumentException>(() => _sut.AnalyzeQuery(input!));
     }
 
     [Fact]
@@ -132,8 +128,10 @@ public sealed class QueryAnalyzerTests
         var result = _sut.ExtractParameters(sql);
 
         // Assert
-        result.Should().HaveCount(3);
-        result.Select(p => p.Name).Should().BeEquivalentTo(["id", "email", "status"]);
+        Assert.Equal(3, result.Count);
+        var names = result.Select(p => p.Name).OrderBy(n => n).ToList();
+        var expectedNames = new[] { "email", "id", "status" }.OrderBy(n => n).ToList();
+        Assert.Equal(expectedNames, names);
     }
 
     [Fact]
@@ -146,8 +144,8 @@ public sealed class QueryAnalyzerTests
         var result = _sut.ExtractParameters(sql);
 
         // Assert
-        result.Should().HaveCount(1);
-        result.First().Name.Should().Be("param");
+        Assert.Single(result);
+        Assert.Equal("param", result.First().Name);
     }
 
     [Fact]
@@ -160,9 +158,9 @@ public sealed class QueryAnalyzerTests
         var result = _sut.InferReturnType(sql);
 
         // Assert
-        result.ModelName.Should().Be("void");
-        result.Columns.Should().BeEmpty();
-        result.RequiresCustomModel.Should().BeFalse();
+        Assert.Equal("void", result.ModelName);
+        Assert.Empty(result.Columns);
+        Assert.False(result.RequiresCustomModel);
     }
 
     [Fact]
@@ -175,9 +173,9 @@ public sealed class QueryAnalyzerTests
         var result = _sut.InferReturnType(sql);
 
         // Assert
-        result.ModelName.Should().NotBe("void");
-        result.Columns.Should().HaveCount(3);
-        result.RequiresCustomModel.Should().BeTrue();
+        Assert.NotEqual("void", result.ModelName);
+        Assert.Equal(3, result.Columns.Count);
+        Assert.True(result.RequiresCustomModel);
     }
 
     [Fact]
@@ -190,8 +188,8 @@ public sealed class QueryAnalyzerTests
         var result = _sut.ParseAnnotations(comments);
 
         // Assert
-        result.Name.Should().Be("GetUser");
-        result.Cardinality.Should().Be(ReturnCardinality.One);
+        Assert.Equal("GetUser", result.Name);
+        Assert.Equal(ReturnCardinality.One, result.Cardinality);
     }
 
     [Theory]
@@ -206,8 +204,8 @@ public sealed class QueryAnalyzerTests
         var result = _sut.ParseAnnotations(comment);
 
         // Assert
-        result.Name.Should().Be(expectedName);
-        result.Cardinality.Should().Be(expectedCardinality);
+        Assert.Equal(expectedName, result.Name);
+        Assert.Equal(expectedCardinality, result.Cardinality);
     }
 
     [Fact]
@@ -216,11 +214,8 @@ public sealed class QueryAnalyzerTests
         // Arrange
         var nonExistentPath = "/tmp/nonexistent_file_12345.sql";
 
-        // Act
-        var act = async () => await _sut.AnalyzeFileAsync(nonExistentPath);
-
-        // Assert
-        await act.Should().ThrowAsync<FileNotFoundException>();
+        // Act & Assert
+        await Assert.ThrowsAsync<FileNotFoundException>(async () => await _sut.AnalyzeFileAsync(nonExistentPath));
     }
 
     [Fact]
@@ -239,11 +234,13 @@ public sealed class QueryAnalyzerTests
         """);
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(tempFile.Path);
+        var result = (await _sut.AnalyzeFileAsync(tempFile.Path)).ToList();
 
         // Assert
-        result.Should().HaveCount(3);
-        result.Select(q => q.MethodName).Should().BeEquivalentTo(["Q1", "Q2", "Q3"]);
+        Assert.Equal(3, result.Count);
+        var methodNames = result.Select(q => q.MethodName).OrderBy(n => n).ToList();
+        var expectedMethodNames = new[] { "Q1", "Q2", "Q3" }.OrderBy(n => n).ToList();
+        Assert.Equal(expectedMethodNames, methodNames);
     }
 
     [Fact]
@@ -262,10 +259,12 @@ public sealed class QueryAnalyzerTests
         """);
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(tempFile.Path);
+        var result = (await _sut.AnalyzeFileAsync(tempFile.Path)).ToList();
 
         // Assert
-        result.Should().HaveCount(2);
-        result.Select(q => q.MethodName).Should().BeEquivalentTo(["Valid", "AlsoValid"]);
+        Assert.Equal(2, result.Count);
+        var methodNames = result.Select(q => q.MethodName).OrderBy(n => n).ToList();
+        var expectedMethodNames = new[] { "AlsoValid", "Valid" }.OrderBy(n => n).ToList();
+        Assert.Equal(expectedMethodNames, methodNames);
     }
 }

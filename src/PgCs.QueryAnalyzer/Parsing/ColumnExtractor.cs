@@ -1,4 +1,4 @@
-using PgCs.Common.QueryAnalyzer.Models;
+using PgCs.Common.QueryAnalyzer.Models.Results;
 
 namespace PgCs.QueryAnalyzer.Parsing;
 

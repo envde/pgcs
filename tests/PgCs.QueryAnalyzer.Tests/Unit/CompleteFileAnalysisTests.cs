@@ -1,4 +1,5 @@
-using PgCs.Common.QueryAnalyzer.Models.Enums;
+using PgCs.Common.QueryAnalyzer.Models.Metadata;
+using PgCs.Common.QueryAnalyzer.Models.Results;
 using PgCs.QueryAnalyzer.Tests.Helpers;
 using Xunit.Abstractions;
 
@@ -21,11 +22,11 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        result.Should().NotBeEmpty("файл содержит множество запросов с аннотациями");
-        result.Should().HaveCountGreaterThan(30, "в Queries.sql более 30 запросов");
+        Assert.True(result.Count > 0, "файл содержит множество запросов с аннотациями");
+        Assert.True(result.Count > 30, "в Queries.sql более 30 запросов");
     }
 
     [Fact]
@@ -35,10 +36,10 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        result.Should().OnlyContain(q => !string.IsNullOrWhiteSpace(q.MethodName));
+        Assert.All(result, q => Assert.False(string.IsNullOrWhiteSpace(q.MethodName)));
     }
 
     [Fact]
@@ -57,11 +58,11 @@ public class CompleteFileAnalysisTests
         };
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var methodNames = result.Select(q => q.MethodName).ToList();
-        methodNames.Should().Contain(expectedQueries);
+        Assert.All(expectedQueries, expected => Assert.Contains(expected, methodNames));
     }
 
     [Fact]
@@ -71,20 +72,18 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        using var _ = new AssertionScope();
-        
         var selectQueries = result.Where(q => q.QueryType == QueryType.Select).ToList();
         var insertQueries = result.Where(q => q.QueryType == QueryType.Insert).ToList();
         var updateQueries = result.Where(q => q.QueryType == QueryType.Update).ToList();
         var deleteQueries = result.Where(q => q.QueryType == QueryType.Delete).ToList();
 
-        selectQueries.Should().NotBeEmpty("файл содержит SELECT запросы");
-        insertQueries.Should().NotBeEmpty("файл содержит INSERT запросы");
-        updateQueries.Should().NotBeEmpty("файл содержит UPDATE запросы");
-        deleteQueries.Should().NotBeEmpty("файл содержит DELETE запросы");
+        Assert.True(selectQueries.Any(), "файл содержит SELECT запросы");
+        Assert.True(insertQueries.Any(), "файл содержит INSERT запросы");
+        Assert.True(updateQueries.Any(), "файл содержит UPDATE запросы");
+        Assert.True(deleteQueries.Any(), "файл содержит DELETE запросы");
     }
 
     [Theory]
@@ -102,13 +101,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var query = result.FirstOrDefault(q => q.MethodName == methodName);
-        query.Should().NotBeNull($"запрос {methodName} должен существовать");
-        query.QueryType.Should().Be(expectedType);
-        query.ReturnCardinality.Should().Be(expectedCardinality);
+        Assert.NotNull(query);
+        var nonNullQuery = query!;
+        Assert.Equal(expectedType, nonNullQuery.QueryType);
+        Assert.Equal(expectedCardinality, nonNullQuery.ReturnCardinality);
     }
 
     [Fact]
@@ -118,20 +118,20 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var query = result.FirstOrDefault(q => q.MethodName == "GetUserById");
-        query.Should().NotBeNull();
-        
-        using var _ = new AssertionScope();
-        query.MethodName.Should().Be("GetUserById");
-        query.QueryType.Should().Be(QueryType.Select);
-        query.ReturnCardinality.Should().Be(ReturnCardinality.One);
-        query.Parameters.Should().HaveCount(1);
-        query.Parameters.First().Position.Should().Be(1);
-        query.ReturnType.Should().NotBeNull();
-        query.ReturnType!.Columns.Should().NotBeEmpty();
+        Assert.NotNull(query);
+        var nonNullQuery = query!;
+        Assert.Equal("GetUserById", nonNullQuery.MethodName);
+        Assert.Equal(QueryType.Select, nonNullQuery.QueryType);
+        Assert.Equal(ReturnCardinality.One, nonNullQuery.ReturnCardinality);
+        Assert.Single(nonNullQuery.Parameters);
+        Assert.Equal(1, nonNullQuery.Parameters[0].Position);
+        var returnType = nonNullQuery.ReturnType;
+        Assert.NotNull(returnType);
+        Assert.NotEmpty(returnType!.Columns);
     }
 
     [Fact]
@@ -141,17 +141,17 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var query = result.FirstOrDefault(q => q.MethodName == "CreateUser");
-        query.Should().NotBeNull();
-        
-        using var _ = new AssertionScope();
-        query.ReturnCardinality.Should().Be(ReturnCardinality.One);
-        query.ReturnType.Should().NotBeNull();
-        query.ReturnType!.Columns.Should().Contain(c => c.Name == "id");
-        query.Parameters.Should().HaveCountGreaterThan(3);
+        Assert.NotNull(query);
+        var nonNullQuery = query!;
+        Assert.Equal(ReturnCardinality.One, nonNullQuery.ReturnCardinality);
+        var returnType = nonNullQuery.ReturnType;
+        Assert.NotNull(returnType);
+        Assert.Contains(returnType!.Columns, c => c.Name == "id");
+        Assert.True(nonNullQuery.Parameters.Count > 3);
     }
 
     [Fact]
@@ -161,13 +161,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var query = result.FirstOrDefault(q => q.MethodName == "ListUsers");
-        query.Should().NotBeNull();
-        query.ReturnCardinality.Should().Be(ReturnCardinality.Many);
-        query.ReturnType.Should().NotBeNull();
+        Assert.NotNull(query);
+        var nonNullQuery = query!;
+        Assert.Equal(ReturnCardinality.Many, nonNullQuery.ReturnCardinality);
+        Assert.NotNull(nonNullQuery.ReturnType);
     }
 
     [Fact]
@@ -177,12 +178,12 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var execQueries = result.Where(q => q.ReturnCardinality == ReturnCardinality.Exec).ToList();
-        execQueries.Should().NotBeEmpty();
-        execQueries.Should().OnlyContain(q => q.ReturnType == null);
+        Assert.NotEmpty(execQueries);
+        Assert.All(execQueries, q => Assert.Null(q.ReturnType));
     }
 
     [Fact]
@@ -192,14 +193,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var execRowsQueries = result.Where(q => q.ReturnCardinality == ReturnCardinality.ExecRows).ToList();
-        execRowsQueries.Should().NotBeEmpty();
-        
+        Assert.NotEmpty(execRowsQueries);
+
         // Некоторые могут иметь RETURNING, некоторые нет
-        execRowsQueries.Should().Contain(q => q.ReturnType != null, "некоторые ExecRows запросы имеют RETURNING");
+        Assert.True(execRowsQueries.Any(q => q.ReturnType != null), "некоторые ExecRows запросы имеют RETURNING");
     }
 
     [Fact]
@@ -209,14 +210,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        var cteQueries = result.Where(q => 
+        var cteQueries = result.Where(q =>
             q.SqlQuery.Contains("WITH", StringComparison.OrdinalIgnoreCase)).ToList();
-        
-        cteQueries.Should().NotBeEmpty("файл содержит CTE запросы");
-        cteQueries.Should().OnlyContain(q => q.QueryType == QueryType.Select);
+
+        Assert.NotEmpty(cteQueries);
+        Assert.All(cteQueries, q => Assert.Equal(QueryType.Select, q.QueryType));
     }
 
     [Fact]
@@ -226,14 +227,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        var joinQueries = result.Where(q => 
+        var joinQueries = result.Where(q =>
             q.SqlQuery.Contains("JOIN", StringComparison.OrdinalIgnoreCase)).ToList();
-        
-        joinQueries.Should().NotBeEmpty("файл содержит JOIN запросы");
-        joinQueries.Should().OnlyContain(q => q.ReturnType != null || q.ReturnCardinality == ReturnCardinality.Exec);
+
+        Assert.NotEmpty(joinQueries);
+        Assert.All(joinQueries, q => Assert.True(q.ReturnType != null || q.ReturnCardinality == ReturnCardinality.Exec));
     }
 
     [Fact]
@@ -243,13 +244,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var query = result.FirstOrDefault(q => q.MethodName == "GetOrderWithUser");
-        query.Should().NotBeNull();
-        query.SqlQuery.Should().Contain("JOIN");
-        query.ReturnType.Should().NotBeNull();
+        Assert.NotNull(query);
+        var nonNullQuery = query!;
+        Assert.Contains("JOIN", nonNullQuery.SqlQuery, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(nonNullQuery.ReturnType);
     }
 
     [Fact]
@@ -259,14 +261,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        var windowQueries = result.Where(q => 
+        var windowQueries = result.Where(q =>
             q.SqlQuery.Contains("OVER (", StringComparison.OrdinalIgnoreCase)).ToList();
-        
-        windowQueries.Should().NotBeEmpty("файл содержит оконные функции");
-        windowQueries.Should().OnlyContain(q => q.QueryType == QueryType.Select);
+
+        Assert.NotEmpty(windowQueries);
+        Assert.All(windowQueries, q => Assert.Equal(QueryType.Select, q.QueryType));
     }
 
     [Fact]
@@ -276,14 +278,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        var arrayQueries = result.Where(q => 
+        var arrayQueries = result.Where(q =>
             q.SqlQuery.Contains("ANY (", StringComparison.OrdinalIgnoreCase) ||
             q.SqlQuery.Contains("@>", StringComparison.OrdinalIgnoreCase)).ToList();
-        
-        arrayQueries.Should().NotBeEmpty("файл содержит операции с массивами");
+
+        Assert.NotEmpty(arrayQueries);
     }
 
     [Fact]
@@ -293,14 +295,14 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        var jsonbQueries = result.Where(q => 
+        var jsonbQueries = result.Where(q =>
             q.SqlQuery.Contains("jsonb", StringComparison.OrdinalIgnoreCase) ||
             q.SqlQuery.Contains("->", StringComparison.OrdinalIgnoreCase)).ToList();
-        
-        jsonbQueries.Should().NotBeEmpty("файл содержит операции с JSONB");
+
+        Assert.NotEmpty(jsonbQueries);
     }
 
     [Fact]
@@ -310,11 +312,11 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        result.Should().OnlyContain(q => !string.IsNullOrWhiteSpace(q.SqlQuery));
-        result.Should().OnlyContain(q => q.SqlQuery.Length > 10, "SQL не должен быть слишком коротким");
+        Assert.All(result, q => Assert.False(string.IsNullOrWhiteSpace(q.SqlQuery)));
+        Assert.True(result.All(q => q.SqlQuery.Length > 10), "SQL не должен быть слишком коротким");
     }
 
     [Fact]
@@ -324,11 +326,11 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var methodNames = result.Select(q => q.MethodName).ToList();
-        methodNames.Should().OnlyHaveUniqueItems("имена методов должны быть уникальными");
+        Assert.True(methodNames.Distinct().Count() == methodNames.Count, "имена методов должны быть уникальными");
     }
 
     [Fact]
@@ -338,14 +340,16 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         foreach (var query in result.Where(q => q.Parameters.Count > 0))
         {
-            var positions = query.Parameters.Select(p => p.Position).OrderBy(p => p).ToList();
-            positions.Should().BeInAscendingOrder();
-            positions.First().Should().Be(1, $"первый параметр в {query.MethodName} должен иметь позицию 1");
+            var positions = query.Parameters.Select(p => p.Position).ToList();
+            var orderedPositions = positions.OrderBy(p => p).ToList();
+
+            Assert.Equal(orderedPositions, positions);
+            Assert.True(orderedPositions.First() == 1, $"первый параметр в {query.MethodName} должен иметь позицию 1");
         }
     }
 
@@ -356,18 +360,18 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        var selectQueries = result.Where(q => 
-            q.QueryType == QueryType.Select && 
+        var selectQueries = result.Where(q =>
+            q.QueryType == QueryType.Select &&
             q.ReturnCardinality != ReturnCardinality.Exec).ToList();
-        
-        selectQueries.Should().NotBeEmpty();
-        
+
+        Assert.NotEmpty(selectQueries);
+
         // Должны иметь ReturnType (кроме SELECT *)
         var queriesWithReturnType = selectQueries.Where(q => q.ReturnType != null).ToList();
-        queriesWithReturnType.Should().NotBeEmpty();
+        Assert.NotEmpty(queriesWithReturnType);
     }
 
     [Fact]
@@ -377,12 +381,17 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
         var queriesWithReturnType = result.Where(q => q.ReturnType != null).ToList();
-        queriesWithReturnType.Should().NotBeEmpty();
-        queriesWithReturnType.Should().OnlyContain(q => !string.IsNullOrWhiteSpace(q.ReturnType!.ModelName));
+        Assert.NotEmpty(queriesWithReturnType);
+        Assert.All(queriesWithReturnType, q =>
+        {
+            var returnType = q.ReturnType;
+            Assert.NotNull(returnType);
+            Assert.False(string.IsNullOrWhiteSpace(returnType!.ModelName));
+        });
     }
 
     [Fact]
@@ -392,11 +401,9 @@ public class CompleteFileAnalysisTests
         var filePath = TestFileHelper.GetTestDataPath("Queries.sql");
 
         // Act
-        var result = await _sut.AnalyzeFileAsync(filePath);
+        var result = (await _sut.AnalyzeFileAsync(filePath)).ToList();
 
         // Assert
-        using var _ = new AssertionScope();
-        
         var statistics = new
         {
             Total = result.Count,
@@ -413,16 +420,16 @@ public class CompleteFileAnalysisTests
         };
 
         // Выводим статистику для информации
-        _testOutputHelper.WriteLine($"=== Статистика анализа Queries.sql ===");
+        _testOutputHelper.WriteLine("=== Статистика анализа Queries.sql ===");
         _testOutputHelper.WriteLine($"Всего запросов: {statistics.Total}");
         _testOutputHelper.WriteLine($"SELECT: {statistics.Select}, INSERT: {statistics.Insert}, UPDATE: {statistics.Update}, DELETE: {statistics.Delete}");
         _testOutputHelper.WriteLine($":one: {statistics.One}, :many: {statistics.Many}, :exec: {statistics.Exec}, :execrows: {statistics.ExecRows}");
         _testOutputHelper.WriteLine($"С параметрами: {statistics.WithParameters}");
         _testOutputHelper.WriteLine($"С возвращаемым типом: {statistics.WithReturnType}");
-        
-        statistics.Total.Should().BeGreaterThan(30);
-        statistics.Select.Should().BeGreaterThan(10);
-        statistics.Insert.Should().BeGreaterThan(3);
-        statistics.Update.Should().BeGreaterThan(3);
+
+        Assert.True(statistics.Total > 30);
+        Assert.True(statistics.Select > 10);
+        Assert.True(statistics.Insert > 3);
+        Assert.True(statistics.Update > 3);
     }
 }

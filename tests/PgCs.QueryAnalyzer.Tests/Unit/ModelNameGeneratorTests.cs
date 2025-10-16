@@ -1,9 +1,9 @@
-using PgCs.Common.QueryAnalyzer.Models;
+using PgCs.Common.QueryAnalyzer.Models.Results;
 
 namespace PgCs.QueryAnalyzer.Tests.Unit;
 
-using Parsing;
 using Helpers;
+using Parsing;
 
 public sealed class ModelNameGeneratorTests
 {
@@ -17,7 +17,7 @@ public sealed class ModelNameGeneratorTests
         var result = ModelNameGenerator.Generate(columns);
 
         // Assert
-        result.Should().Be("void");
+        Assert.Equal("void", result);
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public sealed class ModelNameGeneratorTests
         var result = ModelNameGenerator.Generate(columns);
 
         // Assert
-        result.Should().Be("UserIdResult");
+        Assert.Equal("UserIdResult", result);
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class ModelNameGeneratorTests
         var result = ModelNameGenerator.Generate(columns);
 
         // Assert
-        result.Should().Be("IdUsernameEmailResult");
+        Assert.Equal("IdUsernameEmailResult", result);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class ModelNameGeneratorTests
         var result = ModelNameGenerator.Generate(columns);
 
         // Assert
-        result.Should().Be("IdNameEmailResult");
+        Assert.Equal("IdNameEmailResult", result);
     }
 
     [Theory]
@@ -88,7 +88,7 @@ public sealed class ModelNameGeneratorTests
         var result = ModelNameGenerator.Generate(columns);
 
         // Assert
-        result.Should().Be(expected);
+        Assert.Equal(expected, result);
     }
 
     [Theory]
@@ -104,16 +104,13 @@ public sealed class ModelNameGeneratorTests
         var result = ModelNameGenerator.Generate(columns);
 
         // Assert
-        result.Should().Be(expected);
+        Assert.Equal(expected, result);
     }
 
     [Fact]
     public void Generate_NullColumns_ThrowsArgumentNullException()
     {
-        // Act
-        var act = () => ModelNameGenerator.Generate(null!);
-
-        // Assert
-        act.Should().Throw<ArgumentNullException>();
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => ModelNameGenerator.Generate(null!));
     }
 }

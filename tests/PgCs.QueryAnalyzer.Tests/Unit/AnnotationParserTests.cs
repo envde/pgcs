@@ -1,8 +1,9 @@
-using PgCs.Common.QueryAnalyzer.Models.Enums;
+
 
 namespace PgCs.QueryAnalyzer.Tests.Unit;
 
 using Parsing;
+using PgCs.Common.QueryAnalyzer.Models.Results;
 
 public sealed class AnnotationParserTests
 {
@@ -15,11 +16,11 @@ public sealed class AnnotationParserTests
         string comment, string expectedName, ReturnCardinality expectedCardinality)
     {
         // Act
-        var result = AnnotationParser.Parse(comment);
+    var result = AnnotationParser.Parse(comment);
 
-        // Assert
-        result.Name.Should().Be(expectedName);
-        result.Cardinality.Should().Be(expectedCardinality);
+    // Assert
+    Assert.Equal(expectedName, result.Name);
+    Assert.Equal(expectedCardinality, result.Cardinality);
     }
 
     [Fact]
@@ -33,11 +34,11 @@ public sealed class AnnotationParserTests
         """;
 
         // Act
-        var result = AnnotationParser.Parse(comments);
+    var result = AnnotationParser.Parse(comments);
 
-        // Assert
-        result.Name.Should().Be("GetUser");
-        result.Cardinality.Should().Be(ReturnCardinality.One);
+    // Assert
+    Assert.Equal("GetUser", result.Name);
+    Assert.Equal(ReturnCardinality.One, result.Cardinality);
     }
 
     [Theory]
@@ -46,10 +47,8 @@ public sealed class AnnotationParserTests
     public void Parse_EmptyOrWhitespace_ThrowsArgumentException(string comment)
     {
         // Act
-        var act = () => AnnotationParser.Parse(comment);
-
-        // Assert
-        act.Should().Throw<ArgumentException>();
+    // Assert
+    Assert.Throws<ArgumentException>(() => AnnotationParser.Parse(comment));
     }
 
     [Theory]
@@ -59,11 +58,9 @@ public sealed class AnnotationParserTests
     public void Parse_InvalidFormat_ThrowsInvalidOperationException(string comment)
     {
         // Act
-        var act = () => AnnotationParser.Parse(comment);
-
         // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*аннотация формата*");
+        var ex = Assert.Throws<InvalidOperationException>(() => AnnotationParser.Parse(comment));
+        Assert.Contains("аннотация формата", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -73,11 +70,9 @@ public sealed class AnnotationParserTests
     public void Parse_InvalidCardinality_ThrowsInvalidOperationException(string comment)
     {
         // Act
-        var act = () => AnnotationParser.Parse(comment);
-
         // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Неизвестная кардинальность*");
+        var ex = Assert.Throws<InvalidOperationException>(() => AnnotationParser.Parse(comment));
+        Assert.Contains("Неизвестная кардинальность", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -89,10 +84,10 @@ public sealed class AnnotationParserTests
     public void HasAnnotation_VariousInputs_ReturnsCorrectResult(string text, bool expected)
     {
         // Act
-        var result = AnnotationParser.HasAnnotation(text);
+    var result = AnnotationParser.HasAnnotation(text);
 
-        // Assert
-        result.Should().Be(expected);
+    // Assert
+    Assert.Equal(expected, result);
     }
 
     [Fact]
@@ -113,7 +108,7 @@ public sealed class AnnotationParserTests
             var result = AnnotationParser.Parse(comment);
 
             // Assert
-            result.Cardinality.Should().Be(expected);
+            Assert.Equal(expected, result.Cardinality);
         }
     }
 }

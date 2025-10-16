@@ -1,5 +1,6 @@
 namespace PgCs.QueryAnalyzer.Tests.Unit;
 
+using System.Linq;
 using Parsing;
 
 public sealed class ParameterExtractorTests
@@ -14,9 +15,9 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(2);
-        result.Should().ContainSingle(p => p.Name == "id" && p.Position == 1);
-        result.Should().ContainSingle(p => p.Name == "email" && p.Position == 2);
+        Assert.Equal(2, result.Count);
+        Assert.Single(result, p => p.Name == "id" && p.Position == 1);
+        Assert.Single(result, p => p.Name == "email" && p.Position == 2);
     }
 
     [Fact]
@@ -29,8 +30,8 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(2);
-        result.Select(p => p.Name).Should().BeEquivalentTo(["status", "id"]);
+        Assert.Equal(2, result.Count);
+        Assert.Equal(["status", "id"], result.Select(p => p.Name).ToList());
     }
 
     [Fact]
@@ -43,8 +44,8 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(3);
-        result.Select(p => p.Name).Should().BeEquivalentTo(["param1", "param2", "param3"]);
+        Assert.Equal(3, result.Count);
+        Assert.Equal(["param1", "param2", "param3"], result.Select(p => p.Name).ToList());
     }
 
     [Fact]
@@ -60,9 +61,10 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(1);
-        result.First().Name.Should().Be("id");
-        result.First().Position.Should().Be(1);
+        Assert.Single(result);
+        var parameter = result.First();
+        Assert.Equal("id", parameter.Name);
+        Assert.Equal(1, parameter.Position);
     }
 
     [Fact]
@@ -80,19 +82,19 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(3);
-        
+        Assert.Equal(3, result.Count);
+
         var idParam = result.First(p => p.Name == "id");
-        idParam.PostgresType.Should().Be("uuid");
-        idParam.CSharpType.Should().Be("Guid");
-        
+        Assert.Equal("uuid", idParam.PostgresType);
+        Assert.Equal("Guid", idParam.CSharpType);
+
         var ageParam = result.First(p => p.Name == "age");
-        ageParam.PostgresType.Should().Be("integer");
-        ageParam.CSharpType.Should().Be("int");
-        
+        Assert.Equal("integer", ageParam.PostgresType);
+        Assert.Equal("int", ageParam.CSharpType);
+
         var activeParam = result.First(p => p.Name == "active");
-        activeParam.PostgresType.Should().Be("boolean");
-        activeParam.CSharpType.Should().Be("bool");
+        Assert.Equal("boolean", activeParam.PostgresType);
+        Assert.Equal("bool", activeParam.CSharpType);
     }
 
     [Theory]
@@ -107,9 +109,10 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(1);
-        result.First().PostgresType.Should().Be(expectedPgType);
-        result.First().CSharpType.Should().Be(expectedCsType);
+        Assert.Single(result);
+        var parameter = result.First();
+        Assert.Equal(expectedPgType, parameter.PostgresType);
+        Assert.Equal(expectedCsType, parameter.CSharpType);
     }
 
     [Fact]
@@ -122,9 +125,10 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(1);
-        result.First().PostgresType.Should().Be("text");
-        result.First().CSharpType.Should().Be("string");
+        Assert.Single(result);
+        var parameter = result.First();
+        Assert.Equal("text", parameter.PostgresType);
+        Assert.Equal("string", parameter.CSharpType);
     }
 
     [Fact]
@@ -137,7 +141,7 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().BeEmpty();
+        Assert.Empty(result);
     }
 
     [Theory]
@@ -146,11 +150,8 @@ public sealed class ParameterExtractorTests
     [InlineData(null)]
     public void Extract_InvalidInput_ThrowsArgumentException(string? sql)
     {
-        // Act
-        var act = () => ParameterExtractor.Extract(sql!);
-
-        // Assert
-        act.Should().Throw<ArgumentException>();
+        // Act & Assert
+        Assert.ThrowsAny<ArgumentException>(() => ParameterExtractor.Extract(sql!));
     }
 
     [Fact]
@@ -167,9 +168,11 @@ public sealed class ParameterExtractorTests
         var result = ParameterExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(4);
-        result.Should().BeInAscendingOrder(p => p.Position);
-        result[0].Position.Should().Be(1);
-        result[3].Position.Should().Be(4);
+        Assert.Equal(4, result.Count);
+        var orderedPositions = result.Select(p => p.Position).ToList();
+        var expectedPositions = result.Select(p => p.Position).OrderBy(p => p).ToList();
+        Assert.Equal(expectedPositions, orderedPositions);
+        Assert.Equal(1, result[0].Position);
+        Assert.Equal(4, result[3].Position);
     }
 }

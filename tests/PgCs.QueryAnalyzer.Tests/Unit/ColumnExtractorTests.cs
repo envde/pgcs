@@ -13,9 +13,9 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().HaveCount(3);
-        result.Select(c => c.Name).Should().BeEquivalentTo(["id", "username", "email"]);
+    // Assert
+    Assert.Equal(3, result.Count);
+    Assert.Equal(["id", "username", "email"], result.Select(c => c.Name).ToList());
     }
 
     [Fact]
@@ -27,9 +27,9 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().HaveCount(2);
-        result.Select(c => c.Name).Should().BeEquivalentTo(["user_id", "user_email"]);
+    // Assert
+    Assert.Equal(2, result.Count);
+    Assert.Equal(["user_id", "user_email"], result.Select(c => c.Name).ToList());
     }
 
     [Fact]
@@ -41,10 +41,10 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().HaveCount(2);
-        result.Should().ContainSingle(c => c.Name == "total");
-        result.Should().ContainSingle(c => c.Name == "total_amount");
+    // Assert
+    Assert.Equal(2, result.Count);
+    Assert.Single(result, c => c.Name == "total");
+    Assert.Single(result, c => c.Name == "total_amount");
     }
 
     [Fact]
@@ -56,9 +56,9 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().HaveCount(1);
-        result.First().Name.Should().Be("last_date");
+    // Assert
+    Assert.Single(result);
+    Assert.Equal("last_date", result.First().Name);
     }
 
     [Fact]
@@ -74,9 +74,9 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().HaveCount(2);
-        result.Select(c => c.Name).Should().BeEquivalentTo(["id", "created_at"]);
+    // Assert
+    Assert.Equal(2, result.Count);
+    Assert.Equal(["id", "created_at"], result.Select(c => c.Name).ToList());
     }
 
     [Fact]
@@ -88,8 +88,8 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().BeEmpty();
+    // Assert
+    Assert.Empty(result);
     }
 
     [Fact]
@@ -107,18 +107,18 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().HaveCount(3);
-        
-        var total = result.First(c => c.Name == "total");
-        total.PostgresType.Should().Be("bigint");
-        total.CSharpType.Should().Be("long");
-        
-        var currentTime = result.First(c => c.Name == "current_time");
-        currentTime.CSharpType.Should().Be("DateTime");
-        
-        var userId = result.First(c => c.Name == "user_id");
-        userId.CSharpType.Should().Be("int");
+    // Assert
+    Assert.Equal(3, result.Count);
+
+    var total = result.First(c => c.Name == "total");
+    Assert.Equal("bigint", total.PostgresType);
+    Assert.Equal("long", total.CSharpType);
+
+    var currentTime = result.First(c => c.Name == "current_time");
+    Assert.Equal("DateTime", currentTime.CSharpType);
+
+    var userId = result.First(c => c.Name == "user_id");
+    Assert.Equal("int", userId.CSharpType);
     }
 
     [Theory]
@@ -131,10 +131,11 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().HaveCount(1);
-        result.First().PostgresType.Should().Be(expectedPgType);
-        result.First().CSharpType.Should().Be(expectedCsType);
+    // Assert
+    Assert.Single(result);
+    var column = result.First();
+    Assert.Equal(expectedPgType, column.PostgresType);
+    Assert.Equal(expectedCsType, column.CSharpType);
     }
 
     [Fact]
@@ -146,8 +147,8 @@ public sealed class ColumnExtractorTests
         // Act
         var result = ColumnExtractor.Extract(sql);
 
-        // Assert
-        result.Should().BeEmpty();
+    // Assert
+    Assert.Empty(result);
     }
 
     [Fact]
@@ -167,8 +168,8 @@ public sealed class ColumnExtractorTests
         var result = ColumnExtractor.Extract(sql);
 
         // Assert
-        result.Should().HaveCount(1);
-        result.First().Name.Should().Be("is_active");
+        Assert.Single(result);
+        Assert.Equal("is_active", result.First().Name);
     }
 
     [Theory]
@@ -177,11 +178,8 @@ public sealed class ColumnExtractorTests
     [InlineData(null)]
     public void Extract_InvalidInput_ThrowsArgumentException(string? sql)
     {
-        // Act
-        var act = () => ColumnExtractor.Extract(sql!);
-
-        // Assert
-        act.Should().Throw<ArgumentException>();
+        // Act & Assert
+        Assert.ThrowsAny<ArgumentException>(() => ColumnExtractor.Extract(sql!));
     }
 
     [Fact]
@@ -194,6 +192,6 @@ public sealed class ColumnExtractorTests
         var result = ColumnExtractor.Extract(sql);
 
         // Assert
-        result.Should().OnlyContain(c => c.IsNullable == true);
+        Assert.All(result, c => Assert.True(c.IsNullable));
     }
 }

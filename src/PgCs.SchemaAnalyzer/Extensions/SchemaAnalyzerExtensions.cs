@@ -1,6 +1,9 @@
-using PgCs.Common.SchemaAnalyzer;
 using PgCs.Common.SchemaAnalyzer.Models;
-using PgCs.Common.SchemaAnalyzer.Models.Enums;
+using PgCs.Common.SchemaAnalyzer.Models.Indexes;
+using PgCs.Common.SchemaAnalyzer.Models.Tables;
+using PgCs.Common.SchemaAnalyzer.Models.Triggers;
+using PgCs.Common.SchemaAnalyzer.Models.Types;
+using PgCs.Common.SchemaAnalyzer.Models.Views;
 
 namespace PgCs.SchemaAnalyzer.Extensions;
 
