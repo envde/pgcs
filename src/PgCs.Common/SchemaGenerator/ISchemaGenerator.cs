@@ -1,70 +1,76 @@
+using PgCs.Common.CodeGeneration;
 using PgCs.Common.SchemaAnalyzer.Models;
-using PgCs.Common.SchemaGenerator.Models;
+using PgCs.Common.SchemaGenerator.Models.Options;
+using PgCs.Common.SchemaGenerator.Models.Results;
 
 namespace PgCs.Common.SchemaGenerator;
 
 /// <summary>
-/// Интерфейс генератора моделей на основе схемы базы данных
+/// Генератор C# кода на основе схемы PostgreSQL базы данных
 /// </summary>
 public interface ISchemaGenerator
 {
     /// <summary>
-    /// Генерирует C# модели на основе метаданных схемы
+    /// Генерирует все C# модели на основе метаданных схемы базы данных
     /// </summary>
-    /// <param name="schemaMetadata">Метаданные проанализированной схемы</param>
+    /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Результат генерации с информацией о созданных файлах</returns>
+    /// <returns>Результаты генерации с информацией о созданных файлах</returns>
     ValueTask<SchemaGenerationResult> GenerateAsync(
-        SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions? options = null);
+        SchemaMetadata schemaMetadata, 
+        SchemaGenerationOptions options);
 
     /// <summary>
-    /// Генерирует модели только для таблиц
+    /// Генерирует модели для таблиц базы данных
     /// </summary>
-    /// <param name="schemaMetadata">Метаданные схемы</param>
+    /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Список сгенерированных моделей таблиц</returns>
-    ValueTask<IReadOnlyList<GeneratedModel>> GenerateTableModelsAsync(
+    /// <returns>Результаты генерации моделей таблиц</returns>
+    ValueTask<GeneratedModelsResult> GenerateTableModelsAsync(
         SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions? options = null);
+        SchemaGenerationOptions options);
 
     /// <summary>
-    /// Генерирует модели только для представлений
+    /// Генерирует модели для представлений (views) базы данных
     /// </summary>
-    /// <param name="schemaMetadata">Метаданные схемы</param>
+    /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Список сгенерированных моделей представлений</returns>
-    ValueTask<IReadOnlyList<GeneratedModel>> GenerateViewModelsAsync(
+    /// <returns>Результаты генерации моделей представлений</returns>
+    ValueTask<GeneratedModelsResult> GenerateViewModelsAsync(
         SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions? options = null);
+        SchemaGenerationOptions options);
 
     /// <summary>
-    /// Генерирует модели для пользовательских типов (ENUM, DOMAIN, COMPOSITE)
+    /// Генерирует C# типы для пользовательских типов PostgreSQL (ENUM, DOMAIN, COMPOSITE)
     /// </summary>
-    /// <param name="schemaMetadata">Метаданные схемы</param>
+    /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Список сгенерированных типов</returns>
-    ValueTask<IReadOnlyList<GeneratedModel>> GenerateTypeModelsAsync(
+    /// <returns>Результаты генерации пользовательских типов</returns>
+    ValueTask<GeneratedTypesResult> GenerateCustomTypesAsync(
         SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions? options = null);
+        SchemaGenerationOptions options);
 
     /// <summary>
-    /// Генерирует параметры для функций и процедур
+    /// Генерирует методы для функций и процедур базы данных
     /// </summary>
-    /// <param name="schemaMetadata">Метаданные схемы</param>
+    /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Список сгенерированных моделей параметров функций</returns>
-    ValueTask<IReadOnlyList<GeneratedModel>> GenerateFunctionParameterModelsAsync(
+    /// <returns>Результаты генерации методов для функций</returns>
+    ValueTask<GeneratedFunctionsResult> GenerateFunctionMethodsAsync(
         SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions? options = null);
+        SchemaGenerationOptions options);
 
     /// <summary>
-    /// Проверяет, нужна ли регенерация на основе изменений схемы
+    /// Проверяет корректность метаданных схемы перед генерацией
     /// </summary>
-    /// <param name="schemaMetadata">Текущие метаданные схемы</param>
-    /// <param name="existingFiles">Пути к существующим сгенерированным файлам</param>
-    /// <returns>True, если требуется регенерация</returns>
-    ValueTask<bool> RequiresRegenerationAsync(
-        SchemaMetadata schemaMetadata,
-        IReadOnlyList<string> existingFiles);
+    /// <param name="schemaMetadata">Метаданные схемы БД</param>
+    /// <returns>Список предупреждений и ошибок валидации</returns>
+    IReadOnlyList<ValidationIssue> ValidateSchema(SchemaMetadata schemaMetadata);
+
+    /// <summary>
+    /// Форматирует сгенерированный C# код с использованием Roslyn
+    /// </summary>
+    /// <param name="sourceCode">Исходный код для форматирования</param>
+    /// <returns>Отформатированный код</returns>
+    ValueTask<string> FormatCodeAsync(string sourceCode);
 }
