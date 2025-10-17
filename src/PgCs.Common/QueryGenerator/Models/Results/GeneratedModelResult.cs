@@ -18,9 +18,9 @@ public sealed record GeneratedModelResult
     public required string ModelName { get; init; }
 
     /// <summary>
-    /// Сгенерированный файл с моделью
+    /// Сгенерированный код модели
     /// </summary>
-    public required GeneratedFile File { get; init; }
+    public required GeneratedCode Code { get; init; }
 
     /// <summary>
     /// Количество свойств в модели

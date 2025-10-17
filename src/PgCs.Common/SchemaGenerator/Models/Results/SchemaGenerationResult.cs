@@ -8,24 +8,24 @@ namespace PgCs.Common.SchemaGenerator.Models.Results;
 public sealed record SchemaGenerationResult : CodeGenerationResult
 {
     /// <summary>
-    /// Результаты генерации моделей таблиц
+    /// Сгенерированные модели таблиц
     /// </summary>
-    public GeneratedModelsResult? TableModels { get; init; }
+    public IReadOnlyList<GeneratedCode> TableModels { get; init; } = [];
 
     /// <summary>
-    /// Результаты генерации моделей представлений
+    /// Сгенерированные модели представлений
     /// </summary>
-    public GeneratedModelsResult? ViewModels { get; init; }
+    public IReadOnlyList<GeneratedCode> ViewModels { get; init; } = [];
 
     /// <summary>
     /// Результаты генерации пользовательских типов
     /// </summary>
-    public GeneratedTypesResult? CustomTypes { get; init; }
+    public IReadOnlyList<GeneratedCode> CustomTypes { get; init; } = [];
 
     /// <summary>
-    /// Результаты генерации методов для функций
+    /// Сгенерированные методы для функций
     /// </summary>
-    public GeneratedFunctionsResult? Functions { get; init; }
+    public IReadOnlyList<GeneratedCode> Functions { get; init; } = [];
 
     /// <summary>
     /// Статистика генерации

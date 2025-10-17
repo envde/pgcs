@@ -18,9 +18,9 @@ public sealed record GeneratedInterfaceResult
     public required string InterfaceName { get; init; }
 
     /// <summary>
-    /// Сгенерированный файл с интерфейсом
+    /// Сгенерированный код интерфейса
     /// </summary>
-    public required GeneratedFile File { get; init; }
+    public required GeneratedCode Code { get; init; }
 
     /// <summary>
     /// Количество методов в интерфейсе

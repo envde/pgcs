@@ -1,22 +1,17 @@
 namespace PgCs.Common.CodeGeneration;
 
 /// <summary>
-/// Информация о сгенерированном файле
+/// Информация о сгенерированном коде
 /// </summary>
-public sealed record GeneratedFile
+public sealed record GeneratedCode
 {
-    /// <summary>
-    /// Абсолютный путь к сгенерированному файлу
-    /// </summary>
-    public required string FilePath { get; init; }
-
     /// <summary>
     /// Сгенерированный исходный код
     /// </summary>
     public required string SourceCode { get; init; }
 
     /// <summary>
-    /// Имя основного типа в файле (класс, интерфейс, enum)
+    /// Имя основного типа (класс, интерфейс, enum, record)
     /// </summary>
     public required string TypeName { get; init; }
 
@@ -26,9 +21,14 @@ public sealed record GeneratedFile
     public required string Namespace { get; init; }
 
     /// <summary>
-    /// Размер файла в байтах
+    /// Тип сгенерированного кода
     /// </summary>
-    public long SizeInBytes { get; init; }
+    public GeneratedFileType CodeType { get; init; }
+
+    /// <summary>
+    /// Размер кода в байтах
+    /// </summary>
+    public long SizeInBytes => System.Text.Encoding.UTF8.GetByteCount(SourceCode);
 
     /// <summary>
     /// Время генерации
@@ -36,7 +36,7 @@ public sealed record GeneratedFile
     public DateTime GeneratedAt { get; init; } = DateTime.UtcNow;
 
     /// <summary>
-    /// Тип сгенерированного файла
+    /// Рекомендуемое имя файла (без пути)
     /// </summary>
-    public GeneratedFileType FileType { get; init; }
+    public string SuggestedFileName => $"{TypeName}.cs";
 }

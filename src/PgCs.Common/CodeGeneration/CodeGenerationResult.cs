@@ -11,9 +11,9 @@ public abstract record CodeGenerationResult
     public required bool IsSuccess { get; init; }
 
     /// <summary>
-    /// Все сгенерированные файлы
+    /// Весь сгенерированный код
     /// </summary>
-    public required IReadOnlyList<GeneratedFile> GeneratedFiles { get; init; }
+    public required IReadOnlyList<GeneratedCode> GeneratedCode { get; init; }
 
     /// <summary>
     /// Проблемы валидации и предупреждения

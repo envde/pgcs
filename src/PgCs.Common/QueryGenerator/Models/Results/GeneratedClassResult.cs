@@ -18,9 +18,9 @@ public sealed record GeneratedClassResult
     public required string ClassName { get; init; }
 
     /// <summary>
-    /// Сгенерированный файл с классом
+    /// Сгенерированный код класса
     /// </summary>
-    public required GeneratedFile File { get; init; }
+    public required GeneratedCode Code { get; init; }
 
     /// <summary>
     /// Количество методов в классе

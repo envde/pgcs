@@ -28,9 +28,9 @@ public sealed record GeneratedMethodResult
     public required string SourceCode { get; init; }
 
     /// <summary>
-    /// Сгенерированный файл (если метод в отдельном файле)
+    /// Сгенерированный код (если метод в отдельном файле)
     /// </summary>
-    public GeneratedFile? File { get; init; }
+    public GeneratedCode? Code { get; init; }
 
     /// <summary>
     /// Модель результата, связанная с этим методом

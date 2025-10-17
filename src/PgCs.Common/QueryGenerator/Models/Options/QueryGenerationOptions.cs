@@ -96,4 +96,14 @@ public sealed record QueryGenerationOptions : CodeGenerationOptions
     /// Генерировать prepared statements
     /// </summary>
     public bool UsePreparedStatements { get; init; } = true;
+
+    /// <summary>
+    /// Генерировать поддержку транзакций (параметр NpgsqlTransaction?)
+    /// </summary>
+    public bool GenerateTransactionSupport { get; init; } = true;
+
+    /// <summary>
+    /// Использовать NpgsqlDataSource для управления соединениями
+    /// </summary>
+    public bool UseNpgsqlDataSource { get; init; } = true;
 }

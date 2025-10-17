@@ -15,7 +15,7 @@ public interface ISchemaGenerator
     /// </summary>
     /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Результаты генерации с информацией о созданных файлах</returns>
+    /// <returns>Результаты генерации со списком сгенерированных файлов (код)</returns>
     ValueTask<SchemaGenerationResult> GenerateAsync(
         SchemaMetadata schemaMetadata, 
         SchemaGenerationOptions options);
@@ -25,8 +25,8 @@ public interface ISchemaGenerator
     /// </summary>
     /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Результаты генерации моделей таблиц</returns>
-    ValueTask<GeneratedModelsResult> GenerateTableModelsAsync(
+    /// <returns>Список сгенерированного кода моделей таблиц</returns>
+    ValueTask<IReadOnlyList<GeneratedCode>> GenerateTableModelsAsync(
         SchemaMetadata schemaMetadata,
         SchemaGenerationOptions options);
 
@@ -35,8 +35,8 @@ public interface ISchemaGenerator
     /// </summary>
     /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Результаты генерации моделей представлений</returns>
-    ValueTask<GeneratedModelsResult> GenerateViewModelsAsync(
+    /// <returns>Список сгенерированного кода моделей представлений</returns>
+    ValueTask<IReadOnlyList<GeneratedCode>> GenerateViewModelsAsync(
         SchemaMetadata schemaMetadata,
         SchemaGenerationOptions options);
 
@@ -45,8 +45,8 @@ public interface ISchemaGenerator
     /// </summary>
     /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Результаты генерации пользовательских типов</returns>
-    ValueTask<GeneratedTypesResult> GenerateCustomTypesAsync(
+    /// <returns>Результаты генерации пользовательских типов с статистикой</returns>
+    ValueTask<IReadOnlyList<GeneratedCode>> GenerateCustomTypesAsync(
         SchemaMetadata schemaMetadata,
         SchemaGenerationOptions options);
 
@@ -55,8 +55,8 @@ public interface ISchemaGenerator
     /// </summary>
     /// <param name="schemaMetadata">Метаданные схемы БД</param>
     /// <param name="options">Опции генерации</param>
-    /// <returns>Результаты генерации методов для функций</returns>
-    ValueTask<GeneratedFunctionsResult> GenerateFunctionMethodsAsync(
+    /// <returns>Список сгенерированного кода методов для функций</returns>
+    ValueTask<IReadOnlyList<GeneratedCode>> GenerateFunctionMethodsAsync(
         SchemaMetadata schemaMetadata,
         SchemaGenerationOptions options);
 
