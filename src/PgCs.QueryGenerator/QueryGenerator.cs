@@ -46,9 +46,9 @@ public sealed class QueryGenerator : IQueryGenerator
         var sqlBuilder = new NpgsqlCommandBuilder();
         var syntaxBuilder = new QuerySyntaxBuilder(typeMapper, nameConverter);
         
-        var methodGenerator = new QueryMethodGenerator(syntaxBuilder, sqlBuilder);
+        var methodGenerator = new QueryMethodGenerator(syntaxBuilder, sqlBuilder, nameConverter);
         var modelGenerator = new QueryModelGenerator(syntaxBuilder, typeMapper, nameConverter);
-        var repositoryGenerator = new RepositoryGenerator(syntaxBuilder);
+        var repositoryGenerator = new RepositoryGenerator(syntaxBuilder, methodGenerator);
         var validator = new QueryValidator();
 
         return new QueryGenerator(

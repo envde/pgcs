@@ -58,5 +58,10 @@ public enum GeneratedFileType
     /// <summary>
     /// Реализация репозитория
     /// </summary>
-    RepositoryImplementation
+    RepositoryImplementation,
+
+    /// <summary>
+    /// Класс репозитория (для функций БД и т.д.)
+    /// </summary>
+    RepositoryClass
 }

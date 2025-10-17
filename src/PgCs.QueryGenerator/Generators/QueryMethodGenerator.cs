@@ -1,11 +1,14 @@
-using System.Text;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PgCs.Common.CodeGeneration;
 using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryAnalyzer.Models.Results;
 using PgCs.Common.QueryGenerator.Models.Options;
 using PgCs.Common.QueryGenerator.Models.Results;
+using PgCs.Common.Services;
 using PgCs.QueryGenerator.Services;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace PgCs.QueryGenerator.Generators;
 
@@ -16,22 +19,24 @@ public sealed class QueryMethodGenerator : IQueryMethodGenerator
 {
     private readonly QuerySyntaxBuilder _syntaxBuilder;
     private readonly INpgsqlCommandBuilder _commandBuilder;
+    private readonly INameConverter _nameConverter;
 
     public QueryMethodGenerator(
         QuerySyntaxBuilder syntaxBuilder,
-        INpgsqlCommandBuilder commandBuilder)
+        INpgsqlCommandBuilder commandBuilder,
+        INameConverter nameConverter)
     {
         _syntaxBuilder = syntaxBuilder;
         _commandBuilder = commandBuilder;
+        _nameConverter = nameConverter;
     }
 
     public ValueTask<GeneratedMethodResult> GenerateAsync(
         QueryMetadata queryMetadata,
         QueryGenerationOptions options)
     {
-        // Генерируем код метода через string builder (упрощённая версия для компиляции)
-        // TODO: Полная реализация через Roslyn SyntaxFactory
-        var sourceCode = GenerateMethodCode(queryMetadata, options);
+        var method = BuildQueryMethod(queryMetadata, options);
+        var sourceCode = method.NormalizeWhitespace().ToFullString();
 
         return ValueTask.FromResult(new GeneratedMethodResult
         {
@@ -44,116 +49,337 @@ public sealed class QueryMethodGenerator : IQueryMethodGenerator
     }
 
     /// <summary>
-    /// Генерирует код метода (упрощённая версия)
+    /// Строит метод запроса с использованием Roslyn
     /// </summary>
-    private string GenerateMethodCode(QueryMetadata queryMetadata, QueryGenerationOptions options)
+    private MethodDeclarationSyntax BuildQueryMethod(
+        QueryMetadata queryMetadata,
+        QueryGenerationOptions options)
     {
-        var sb = new StringBuilder();
+        var returnType = GetReturnType(queryMetadata);
+        var parameters = BuildParameters(queryMetadata, options);
+        var body = BuildMethodBody(queryMetadata, options);
 
-        // XML комментарий
-        sb.AppendLine($"    /// <summary>");
-        sb.AppendLine($"    /// Выполняет запрос: {queryMetadata.MethodName}");
-        sb.AppendLine($"    /// </summary>");
-        if (options.IncludeSqlInDocumentation)
-        {
-            sb.AppendLine($"    /// <remarks>SQL: {queryMetadata.SqlQuery}</remarks>");
-        }
+        var method = MethodDeclaration(ParseTypeName(returnType), queryMetadata.MethodName + "Async")
+            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
+            .AddParameterListParameters(parameters.ToArray())
+            .WithBody(body)
+            .WithLeadingTrivia(_syntaxBuilder.CreateXmlComment(
+                $"Выполняет запрос: {queryMetadata.MethodName}",
+                options.IncludeSqlInDocumentation ? queryMetadata.SqlQuery : null));
 
-        // Сигнатура метода
-        sb.AppendLine($"    {GetMethodSignature(queryMetadata, options)}");
-        sb.AppendLine("    {");
-
-        // Получение соединения
-        if (options.GenerateTransactionSupport)
-        {
-            sb.AppendLine("        await using var connection = transaction?.Connection ?? await _dataSource.OpenConnectionAsync(cancellationToken);");
-        }
-        else
-        {
-            sb.AppendLine("        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);");
-        }
-
-        // Создание команды
-        sb.AppendLine($"        await using var cmd = new NpgsqlCommand(@\"{queryMetadata.SqlQuery}\", connection");
-        if (options.GenerateTransactionSupport)
-        {
-            sb.AppendLine(", transaction);");
-        }
-        else
-        {
-            sb.AppendLine(");");
-        }
-
-        // Добавление параметров
-        foreach (var param in queryMetadata.Parameters)
-        {
-            var paramName = ConvertParameterName(param.Name);
-            sb.AppendLine($"        cmd.Parameters.AddWithValue(\"{param.Name}\", {paramName});");
-        }
-
-        // Выполнение запроса
-        switch (queryMetadata.QueryType)
-        {
-            case QueryType.Select when queryMetadata.ReturnType != null:
-                GenerateSelectCode(sb, queryMetadata, options);
-                break;
-
-            case QueryType.Insert:
-            case QueryType.Update:
-            case QueryType.Delete:
-                sb.AppendLine("        return await cmd.ExecuteNonQueryAsync(cancellationToken);");
-                break;
-
-            default:
-                sb.AppendLine("        await cmd.ExecuteNonQueryAsync(cancellationToken);");
-                break;
-        }
-
-        sb.AppendLine("    }");
-
-        return sb.ToString();
+        return method;
     }
 
     /// <summary>
-    /// Генерирует код для SELECT запроса
+    /// Строит тело метода
     /// </summary>
-    private void GenerateSelectCode(StringBuilder sb, QueryMetadata queryMetadata, QueryGenerationOptions options)
+    private BlockSyntax BuildMethodBody(QueryMetadata queryMetadata, QueryGenerationOptions options)
     {
-        sb.AppendLine("        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);");
+        var statements = new List<StatementSyntax>();
+
+        // 1. Получение соединения
+        statements.Add(BuildConnectionStatement(options));
+
+        // 2. Создание команды
+        statements.Add(BuildCommandStatement(queryMetadata, options));
+
+        // 3. Добавление параметров
+        statements.AddRange(BuildParameterStatements(queryMetadata));
+
+        // 4. Выполнение запроса
+        statements.AddRange(BuildExecutionStatements(queryMetadata, options));
+
+        return Block(statements);
+    }
+
+    /// <summary>
+    /// Создаёт statement для получения соединения
+    /// </summary>
+    private LocalDeclarationStatementSyntax BuildConnectionStatement(QueryGenerationOptions options)
+    {
+        ExpressionSyntax initializer;
+
+        if (options.GenerateTransactionSupport)
+        {
+            // transaction?.Connection ?? await _dataSource.OpenConnectionAsync(cancellationToken)
+            initializer = BinaryExpression(
+                SyntaxKind.CoalesceExpression,
+                ConditionalAccessExpression(
+                    IdentifierName("transaction"),
+                    MemberBindingExpression(IdentifierName("Connection"))),
+                AwaitExpression(
+                    InvocationExpression(
+                        MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            IdentifierName("_dataSource"),
+                            IdentifierName("OpenConnectionAsync")))
+                        .AddArgumentListArguments(
+                            Argument(IdentifierName("cancellationToken")))));
+        }
+        else
+        {
+            // await _dataSource.OpenConnectionAsync(cancellationToken)
+            initializer = AwaitExpression(
+                InvocationExpression(
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        IdentifierName("_dataSource"),
+                        IdentifierName("OpenConnectionAsync")))
+                    .AddArgumentListArguments(
+                        Argument(IdentifierName("cancellationToken"))));
+        }
+
+        return LocalDeclarationStatement(
+            VariableDeclaration(IdentifierName("var"))
+                .AddVariables(
+                    VariableDeclarator("connection")
+                        .WithInitializer(EqualsValueClause(initializer))))
+            .WithAwaitKeyword(Token(SyntaxKind.AwaitKeyword))
+            .WithUsingKeyword(Token(SyntaxKind.UsingKeyword));
+    }
+
+    /// <summary>
+    /// Создаёт statement для создания команды
+    /// </summary>
+    private LocalDeclarationStatementSyntax BuildCommandStatement(
+        QueryMetadata queryMetadata,
+        QueryGenerationOptions options)
+    {
+        var arguments = new List<ArgumentSyntax>
+        {
+            Argument(LiteralExpression(
+                SyntaxKind.StringLiteralExpression,
+                Literal(queryMetadata.SqlQuery))),
+            Argument(IdentifierName("connection"))
+        };
+
+        if (options.GenerateTransactionSupport)
+        {
+            arguments.Add(Argument(IdentifierName("transaction")));
+        }
+
+        var initializer = ObjectCreationExpression(ParseTypeName("NpgsqlCommand"))
+            .WithArgumentList(ArgumentList(SeparatedList(arguments)));
+
+        return LocalDeclarationStatement(
+            VariableDeclaration(IdentifierName("var"))
+                .AddVariables(
+                    VariableDeclarator("cmd")
+                        .WithInitializer(EqualsValueClause(initializer))))
+            .WithAwaitKeyword(Token(SyntaxKind.AwaitKeyword))
+            .WithUsingKeyword(Token(SyntaxKind.UsingKeyword));
+    }
+
+    /// <summary>
+    /// Создаёт statements для добавления параметров
+    /// </summary>
+    private IEnumerable<StatementSyntax> BuildParameterStatements(QueryMetadata queryMetadata)
+    {
+        foreach (var param in queryMetadata.Parameters)
+        {
+            var paramName = _nameConverter.ToParameterName(param.Name);
+            
+            yield return ExpressionStatement(
+                InvocationExpression(
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            IdentifierName("cmd"),
+                            IdentifierName("Parameters")),
+                        IdentifierName("AddWithValue")))
+                    .AddArgumentListArguments(
+                        Argument(LiteralExpression(
+                            SyntaxKind.StringLiteralExpression,
+                            Literal(param.Name))),
+                        Argument(IdentifierName(paramName))));
+        }
+    }
+
+    /// <summary>
+    /// Создаёт statements для выполнения запроса
+    /// </summary>
+    private IEnumerable<StatementSyntax> BuildExecutionStatements(
+        QueryMetadata queryMetadata,
+        QueryGenerationOptions options)
+    {
+        return queryMetadata.QueryType switch
+        {
+            QueryType.Select when queryMetadata.ReturnType != null =>
+                BuildSelectStatements(queryMetadata, options),
+            QueryType.Insert or QueryType.Update or QueryType.Delete =>
+                BuildModificationStatements(),
+            _ => BuildVoidStatements()
+        };
+    }
+
+    /// <summary>
+    /// Создаёт statements для SELECT запроса
+    /// </summary>
+    private IEnumerable<StatementSyntax> BuildSelectStatements(
+        QueryMetadata queryMetadata,
+        QueryGenerationOptions options)
+    {
+        // await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        yield return LocalDeclarationStatement(
+            VariableDeclaration(IdentifierName("var"))
+                .AddVariables(
+                    VariableDeclarator("reader")
+                        .WithInitializer(EqualsValueClause(
+                            AwaitExpression(
+                                InvocationExpression(
+                                    MemberAccessExpression(
+                                        SyntaxKind.SimpleMemberAccessExpression,
+                                        IdentifierName("cmd"),
+                                        IdentifierName("ExecuteReaderAsync")))
+                                    .AddArgumentListArguments(
+                                        Argument(IdentifierName("cancellationToken"))))))))
+            .WithAwaitKeyword(Token(SyntaxKind.AwaitKeyword))
+            .WithUsingKeyword(Token(SyntaxKind.UsingKeyword));
 
         if (queryMetadata.ReturnCardinality == ReturnCardinality.One)
         {
-            // Один результат
-            sb.AppendLine("        if (!await reader.ReadAsync(cancellationToken)) return null;");
-            sb.AppendLine($"        return MapTo{queryMetadata.ReturnType!.ModelName}(reader);");
+            // if (!await reader.ReadAsync(cancellationToken)) return null;
+            yield return IfStatement(
+                PrefixUnaryExpression(
+                    SyntaxKind.LogicalNotExpression,
+                    AwaitExpression(
+                        InvocationExpression(
+                            MemberAccessExpression(
+                                SyntaxKind.SimpleMemberAccessExpression,
+                                IdentifierName("reader"),
+                                IdentifierName("ReadAsync")))
+                            .AddArgumentListArguments(
+                                Argument(IdentifierName("cancellationToken"))))),
+                ReturnStatement(LiteralExpression(SyntaxKind.NullLiteralExpression)));
+
+            // return MapResult(reader);
+            yield return ReturnStatement(
+                InvocationExpression(IdentifierName($"MapTo{queryMetadata.ReturnType!.ModelName}"))
+                    .AddArgumentListArguments(Argument(IdentifierName("reader"))));
         }
         else
         {
-            // Множество результатов
-            sb.AppendLine($"        var result = new List<{queryMetadata.ReturnType!.ModelName}>();");
-            sb.AppendLine("        while (await reader.ReadAsync(cancellationToken))");
-            sb.AppendLine("        {");
-            sb.AppendLine($"            result.Add(MapTo{queryMetadata.ReturnType.ModelName}(reader));");
-            sb.AppendLine("        }");
-            sb.AppendLine("        return result;");
+            // var result = new List<Model>();
+            yield return LocalDeclarationStatement(
+                VariableDeclaration(IdentifierName("var"))
+                    .AddVariables(
+                        VariableDeclarator("result")
+                            .WithInitializer(EqualsValueClause(
+                                ObjectCreationExpression(
+                                    GenericName("List")
+                                        .AddTypeArgumentListArguments(
+                                            IdentifierName(queryMetadata.ReturnType!.ModelName)))
+                                    .WithArgumentList(ArgumentList())))));
+
+            // while (await reader.ReadAsync(cancellationToken)) { result.Add(...); }
+            yield return WhileStatement(
+                AwaitExpression(
+                    InvocationExpression(
+                        MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            IdentifierName("reader"),
+                            IdentifierName("ReadAsync")))
+                        .AddArgumentListArguments(
+                            Argument(IdentifierName("cancellationToken")))),
+                Block(
+                    ExpressionStatement(
+                        InvocationExpression(
+                            MemberAccessExpression(
+                                SyntaxKind.SimpleMemberAccessExpression,
+                                IdentifierName("result"),
+                                IdentifierName("Add")))
+                            .AddArgumentListArguments(
+                                Argument(
+                                    InvocationExpression(
+                                        IdentifierName($"MapTo{queryMetadata.ReturnType.ModelName}"))
+                                        .AddArgumentListArguments(
+                                            Argument(IdentifierName("reader"))))))));
+
+            // return result;
+            yield return ReturnStatement(IdentifierName("result"));
         }
     }
 
     /// <summary>
-    /// Получает сигнатуру метода
+    /// Создаёт statements для INSERT/UPDATE/DELETE
     /// </summary>
-    private string GetMethodSignature(QueryMetadata queryMetadata, QueryGenerationOptions options)
+    private IEnumerable<StatementSyntax> BuildModificationStatements()
     {
-        var returnType = GetReturnTypeString(queryMetadata);
-        var parameters = GetParametersString(queryMetadata, options);
-
-        return $"public async {returnType} {queryMetadata.MethodName}Async({parameters})";
+        // return await cmd.ExecuteNonQueryAsync(cancellationToken);
+        yield return ReturnStatement(
+            AwaitExpression(
+                InvocationExpression(
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        IdentifierName("cmd"),
+                        IdentifierName("ExecuteNonQueryAsync")))
+                    .AddArgumentListArguments(
+                        Argument(IdentifierName("cancellationToken")))));
     }
 
     /// <summary>
-    /// Получает строку типа возврата
+    /// Создаёт statements для void запросов
     /// </summary>
-    private string GetReturnTypeString(QueryMetadata queryMetadata)
+    private IEnumerable<StatementSyntax> BuildVoidStatements()
+    {
+        // await cmd.ExecuteNonQueryAsync(cancellationToken);
+        yield return ExpressionStatement(
+            AwaitExpression(
+                InvocationExpression(
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        IdentifierName("cmd"),
+                        IdentifierName("ExecuteNonQueryAsync")))
+                    .AddArgumentListArguments(
+                        Argument(IdentifierName("cancellationToken")))));
+    }
+
+    /// <summary>
+    /// Строит список параметров метода
+    /// </summary>
+    private List<ParameterSyntax> BuildParameters(
+        QueryMetadata queryMetadata,
+        QueryGenerationOptions options)
+    {
+        var parameters = new List<ParameterSyntax>();
+
+        // Параметры запроса
+        foreach (var param in queryMetadata.Parameters)
+        {
+            var paramName = _nameConverter.ToParameterName(param.Name);
+            parameters.Add(
+                Parameter(Identifier(paramName))
+                    .WithType(ParseTypeName(param.CSharpType)));
+        }
+
+        // Транзакция (опциональная)
+        if (options.GenerateTransactionSupport)
+        {
+            parameters.Add(
+                Parameter(Identifier("transaction"))
+                    .WithType(ParseTypeName("NpgsqlTransaction?"))
+                    .WithDefault(EqualsValueClause(
+                        LiteralExpression(SyntaxKind.NullLiteralExpression))));
+        }
+
+        // CancellationToken
+        if (options.SupportCancellation)
+        {
+            parameters.Add(
+                Parameter(Identifier("cancellationToken"))
+                    .WithType(ParseTypeName("CancellationToken"))
+                    .WithDefault(EqualsValueClause(
+                        LiteralExpression(SyntaxKind.DefaultLiteralExpression))));
+        }
+
+        return parameters;
+    }
+
+    /// <summary>
+    /// Получает тип возврата метода
+    /// </summary>
+    private string GetReturnType(QueryMetadata queryMetadata)
     {
         return queryMetadata.QueryType switch
         {
@@ -167,65 +393,15 @@ public sealed class QueryMethodGenerator : IQueryMethodGenerator
     }
 
     /// <summary>
-    /// Получает строку параметров метода
+    /// Получает сигнатуру метода для отображения
     /// </summary>
-    private string GetParametersString(QueryMetadata queryMetadata, QueryGenerationOptions options)
+    private string GetMethodSignature(QueryMetadata queryMetadata, QueryGenerationOptions options)
     {
-        var parameters = new List<string>();
+        var returnType = GetReturnType(queryMetadata);
+        var parameters = BuildParameters(queryMetadata, options);
+        var paramStrings = parameters.Select(p => $"{p.Type} {p.Identifier}").ToList();
 
-        // Параметры запроса
-        if (options.GenerateParameterModels && 
-            queryMetadata.Parameters.Count >= options.ParameterModelThreshold)
-        {
-            var paramModelName = $"{queryMetadata.MethodName}Params";
-            parameters.Add($"{paramModelName} params");
-        }
-        else
-        {
-            foreach (var param in queryMetadata.Parameters)
-            {
-                var paramName = ConvertParameterName(param.Name);
-                parameters.Add($"{param.CSharpType} {paramName}");
-            }
-        }
-
-        // Транзакция
-        if (options.GenerateTransactionSupport)
-        {
-            parameters.Add("NpgsqlTransaction? transaction = null");
-        }
-
-        // CancellationToken
-        if (options.SupportCancellation)
-        {
-            parameters.Add("CancellationToken cancellationToken = default");
-        }
-
-        return string.Join(", ", parameters);
-    }
-
-    /// <summary>
-    /// Конвертирует имя параметра из SQL в C# стиль
-    /// </summary>
-    private string ConvertParameterName(string sqlName)
-    {
-        // Убираем префиксы @ и $
-        var name = sqlName.TrimStart('@', '$');
-        
-        // Конвертируем snake_case в camelCase
-        var parts = name.Split('_');
-        if (parts.Length == 1)
-            return char.ToLower(name[0]) + name.Substring(1);
-
-        var result = parts[0].ToLower();
-        for (int i = 1; i < parts.Length; i++)
-        {
-            if (parts[i].Length > 0)
-            {
-                result += char.ToUpper(parts[i][0]) + parts[i].Substring(1).ToLower();
-            }
-        }
-
-        return result;
+        return $"public async {returnType} {queryMetadata.MethodName}Async({string.Join(", ", paramStrings)})";
     }
 }
+

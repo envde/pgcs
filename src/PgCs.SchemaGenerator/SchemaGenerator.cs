@@ -51,7 +51,7 @@ public sealed class SchemaGenerator : ISchemaGenerator
         var tableGenerator = new TableModelGenerator(syntaxBuilder);
         var viewGenerator = new ViewModelGenerator(syntaxBuilder);
         var typeGenerator = new CustomTypeGenerator(syntaxBuilder);
-        var functionGenerator = new FunctionMethodGenerator(syntaxBuilder);
+        var functionGenerator = new FunctionMethodGenerator(typeMapper, nameConverter);
         var validator = new SchemaValidator();
 
         return new SchemaGenerator(
