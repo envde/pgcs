@@ -1,4 +1,5 @@
 using PgCs.Common.CodeGeneration;
+using PgCs.Common.Writer.Models;
 
 namespace PgCs.Common.Writer;
 
@@ -13,7 +14,7 @@ public interface IWriter
     /// <param name="code">Список сгенерированного кода</param>
     /// <param name="options">Опции записи</param>
     /// <returns>Результат записи файлов</returns>
-    ValueTask<WriteResult> WriteAsync(
+    ValueTask<WriteResult> WriteManyAsync(
         IReadOnlyList<GeneratedCode> code,
         WriteOptions options);
 
@@ -23,7 +24,7 @@ public interface IWriter
     /// <param name="code">Сгенерированный код</param>
     /// <param name="options">Опции записи</param>
     /// <returns>Результат записи файла</returns>
-    ValueTask<WriteResult> WriteFileAsync(
+    ValueTask<WriteResult> WriteOneAsync(
         GeneratedCode code,
         WriteOptions options);
 

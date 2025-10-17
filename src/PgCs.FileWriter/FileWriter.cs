@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using PgCs.Common.CodeGeneration;
 using PgCs.Common.Writer;
+using PgCs.Common.Writer.Models;
 
 namespace PgCs.FileWriter;
 
@@ -18,7 +19,7 @@ public sealed class FileWriter : IWriter
     /// <summary>
     /// Записывает сгенерированный код на диск
     /// </summary>
-    public async ValueTask<WriteResult> WriteAsync(
+    public async ValueTask<WriteResult> WriteManyAsync(
         IReadOnlyList<GeneratedCode> code,
         WriteOptions options)
     {
@@ -53,7 +54,7 @@ public sealed class FileWriter : IWriter
         {
             try
             {
-                var result = await WriteFileAsync(item, options);
+                var result = await WriteOneAsync(item, options);
                 
                 if (result.IsSuccess)
                 {
@@ -94,7 +95,7 @@ public sealed class FileWriter : IWriter
     /// <summary>
     /// Записывает один элемент сгенерированного кода на диск
     /// </summary>
-    public async ValueTask<WriteResult> WriteFileAsync(
+    public async ValueTask<WriteResult> WriteOneAsync(
         GeneratedCode code,
         WriteOptions options)
     {

@@ -1,3 +1,5 @@
+using PgCs.Common.Writer.Models;
+
 namespace PgCs.Common.Writer;
 
 /// <summary>

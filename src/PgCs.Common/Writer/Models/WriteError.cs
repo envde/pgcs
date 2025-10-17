@@ -1,4 +1,4 @@
-namespace PgCs.Common.Writer;
+namespace PgCs.Common.Writer.Models;
 
 /// <summary>
 /// Ошибка записи файла
