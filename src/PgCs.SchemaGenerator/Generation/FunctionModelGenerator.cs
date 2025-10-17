@@ -73,7 +73,7 @@ internal sealed class FunctionModelGenerator : IFunctionModelGenerator
             // Параметр считается обязательным, если у него нет значения по умолчанию
             var isParameterRequired = string.IsNullOrEmpty(parameter.DefaultValue);
 
-            var csharpType = PostgresTypeMapper.MapToCSharpType(
+            var csharpType = TypeMapper.MapToCSharpType(
                 parameter.DataType,
                 isNullable: !isParameterRequired || !options.UseNullableReferenceTypes,
                 isArray: false);
@@ -161,7 +161,7 @@ internal sealed class FunctionModelGenerator : IFunctionModelGenerator
 
         foreach (var parameter in parameters)
         {
-            var requiredNamespace = PostgresTypeMapper.GetRequiredNamespace(parameter.DataType);
+            var requiredNamespace = TypeMapper.GetRequiredNamespace(parameter.DataType);
             if (requiredNamespace != null && !usings.Contains(requiredNamespace))
             {
                 usings.Add(requiredNamespace);

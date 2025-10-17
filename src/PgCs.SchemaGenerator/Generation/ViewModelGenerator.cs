@@ -71,7 +71,7 @@ internal sealed class ViewModelGenerator : IViewModelGenerator
             var propertyName = NamingHelper.ConvertName(column.Name, options.NamingStrategy);
             propertyName = NamingHelper.EscapeIfKeyword(propertyName);
 
-            var csharpType = PostgresTypeMapper.MapToCSharpType(
+            var csharpType = TypeMapper.MapToCSharpType(
                 column.DataType,
                 column.IsNullable || !options.UseNullableReferenceTypes,
                 column.IsArray);
@@ -146,7 +146,7 @@ internal sealed class ViewModelGenerator : IViewModelGenerator
         // Проверяем специальные типы в колонках
         foreach (var column in view.Columns)
         {
-            var requiredNamespace = PostgresTypeMapper.GetRequiredNamespace(column.DataType);
+            var requiredNamespace = TypeMapper.GetRequiredNamespace(column.DataType);
             if (requiredNamespace != null && !usings.Contains(requiredNamespace))
             {
                 usings.Add(requiredNamespace);

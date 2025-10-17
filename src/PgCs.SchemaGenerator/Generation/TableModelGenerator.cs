@@ -106,7 +106,7 @@ internal sealed class TableModelGenerator : ITableModelGenerator
         var propertyName = NamingHelper.ConvertName(column.Name, options.NamingStrategy);
         propertyName = NamingHelper.EscapeIfKeyword(propertyName);
 
-        var csharpType = PostgresTypeMapper.MapToCSharpType(
+        var csharpType = TypeMapper.MapToCSharpType(
             column.DataType,
             column.IsNullable || !options.UseNullableReferenceTypes,
             column.IsArray);
@@ -255,7 +255,7 @@ internal sealed class TableModelGenerator : ITableModelGenerator
         // Проверяем, используются ли специальные типы
         foreach (var column in table.Columns)
         {
-            var requiredNamespace = PostgresTypeMapper.GetRequiredNamespace(column.DataType);
+            var requiredNamespace = TypeMapper.GetRequiredNamespace(column.DataType);
             if (requiredNamespace != null && !usings.Contains(requiredNamespace))
             {
                 usings.Add(requiredNamespace);

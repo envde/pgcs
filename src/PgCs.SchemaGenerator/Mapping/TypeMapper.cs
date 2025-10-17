@@ -3,7 +3,7 @@ namespace PgCs.SchemaGenerator.Mapping;
 /// <summary>
 /// Маппер типов данных PostgreSQL в C# типы
 /// </summary>
-internal static class PostgresTypeMapper
+internal static class TypeMapper
 {
     /// <summary>
     /// Маппинг типов PostgreSQL на C# типы
@@ -172,7 +172,7 @@ internal static class PostgresTypeMapper
     }
 
     /// <summary>
-    /// Получает namespace для специальных типов (например, NpgsqlTypes)
+    /// Получает namespace для специальных типов
     /// </summary>
     public static string? GetRequiredNamespace(string postgresType)
     {

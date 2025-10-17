@@ -95,7 +95,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
         var usings = new List<string>();
         foreach (var attr in type.CompositeAttributes)
         {
-            var ns = PostgresTypeMapper.GetRequiredNamespace(attr.DataType);
+            var ns = TypeMapper.GetRequiredNamespace(attr.DataType);
             if (ns != null && !usings.Contains(ns))
             {
                 usings.Add(ns);
@@ -129,7 +129,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
             var propertyName = NamingHelper.ConvertName(attr.Name, options.NamingStrategy);
             propertyName = NamingHelper.EscapeIfKeyword(propertyName);
 
-            var csharpType = PostgresTypeMapper.MapToCSharpType(
+            var csharpType = TypeMapper.MapToCSharpType(
                 attr.DataType,
                 isNullable: true, // Композитные типы обычно nullable
                 isArray: false);
@@ -216,7 +216,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
             isPartial: false);
 
         var baseType = type.DomainInfo?.BaseType ?? "text";
-        var csharpType = PostgresTypeMapper.MapToCSharpType(baseType, isNullable: false, isArray: false);
+        var csharpType = TypeMapper.MapToCSharpType(baseType, isNullable: false, isArray: false);
 
         code.AppendXmlSummary("Значение доменного типа");
         code.AppendProperty(
