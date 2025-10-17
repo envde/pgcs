@@ -4,9 +4,10 @@
     <Project Path="src/PgCs.Common/PgCs.Common.csproj" />
     <Project Path="src/PgCs.Core/PgCs.Core.csproj" />
     <Project Path="src/PgCs.QueryAnalyzer/PgCs.QueryAnalyzer.csproj" />
-    <Project Path="src\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" Type="Classic C#" />
+    <Project Path="src/PgCs.SchemaGenerator/PgCs.SchemaGenerator.csproj" />
+    <Project Path="src\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" Type="C#" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests\PgCs.QueryAnalyzer.Tests\PgCs.QueryAnalyzer.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\PgCs.QueryAnalyzer.Tests\PgCs.QueryAnalyzer.Tests.csproj" Type="C#" />
   </Folder>
 </Solution>
