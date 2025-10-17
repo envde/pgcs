@@ -1,7 +1,8 @@
 using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryAnalyzer.Models.Results;
+using PgCs.Common.Formatting;
+using PgCs.Common.Generation.Models;
 using PgCs.Common.QueryGenerator.Models;
-using PgCs.QueryGenerator.Formatting;
 
 namespace PgCs.QueryGenerator.Generation;
 
@@ -54,7 +55,7 @@ internal sealed class ClassGenerator : IClassGenerator
             methods.Add(method);
         }
 
-        var code = new QueryCodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
         var interfaceName = $"I{className}";
 
         // Using директивы
@@ -99,7 +100,7 @@ internal sealed class ClassGenerator : IClassGenerator
     /// <summary>
     /// Генерирует модели результатов
     /// </summary>
-    private static void GenerateModels(QueryCodeBuilder code, IReadOnlyList<GeneratedModel> models, QueryGenerationOptions options)
+    private static void GenerateModels(CodeBuilder code, IReadOnlyList<GeneratedModel> models, QueryGenerationOptions options)
     {
         foreach (var model in models)
         {
@@ -133,7 +134,7 @@ internal sealed class ClassGenerator : IClassGenerator
     /// Генерирует интерфейс
     /// </summary>
     private static void GenerateInterface(
-        QueryCodeBuilder code,
+        CodeBuilder code,
         string interfaceName,
         IReadOnlyList<GeneratedMethod> methods,
         QueryGenerationOptions options)
@@ -159,7 +160,7 @@ internal sealed class ClassGenerator : IClassGenerator
     /// <summary>
     /// Генерирует сигнатуру метода в интерфейсе
     /// </summary>
-    private static void GenerateInterfaceMethod(QueryCodeBuilder code, GeneratedMethod method, QueryGenerationOptions options)
+    private static void GenerateInterfaceMethod(CodeBuilder code, GeneratedMethod method, QueryGenerationOptions options)
     {
         if (options.GenerateXmlDocumentation)
         {
@@ -182,7 +183,7 @@ internal sealed class ClassGenerator : IClassGenerator
     /// Генерирует класс
     /// </summary>
     private static void GenerateClass(
-        QueryCodeBuilder code,
+        CodeBuilder code,
         string className,
         string interfaceName,
         IReadOnlyList<GeneratedMethod> methods,

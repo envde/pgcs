@@ -1,8 +1,9 @@
+using PgCs.Common.Formatting;
+using PgCs.Common.Generation.Models;
+using PgCs.Common.Mapping;
 using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryAnalyzer.Models.Results;
 using PgCs.Common.QueryGenerator.Models;
-using PgCs.QueryGenerator.Formatting;
-using PgCs.QueryGenerator.Mapping;
 
 namespace PgCs.QueryGenerator.Generation;
 
@@ -17,7 +18,7 @@ internal sealed class MethodGenerator : IMethodGenerator
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(options);
 
-        var code = new QueryCodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
         var methodName = query.MethodName + (options.GenerateAsyncMethods ? options.MethodSuffix : "");
 
         // Определяем возвращаемый тип
@@ -143,7 +144,7 @@ internal sealed class MethodGenerator : IMethodGenerator
     /// Генерирует сигнатуру метода
     /// </summary>
     private static void GenerateMethodSignature(
-        QueryCodeBuilder code,
+        CodeBuilder code,
         string methodName,
         string returnType,
         List<(string name, string type, string doc)> parameters,
@@ -184,7 +185,7 @@ internal sealed class MethodGenerator : IMethodGenerator
     /// <summary>
     /// Генерирует тело метода
     /// </summary>
-    private static void GenerateMethodBody(QueryCodeBuilder code, QueryMetadata query, QueryGenerationOptions options)
+    private static void GenerateMethodBody(CodeBuilder code, QueryMetadata query, QueryGenerationOptions options)
     {
         // SQL запрос как константа
         code.AppendLine("const string sql = @\"");
@@ -224,7 +225,7 @@ internal sealed class MethodGenerator : IMethodGenerator
     /// <summary>
     /// Генерирует код выполнения запроса
     /// </summary>
-    private static void GenerateExecutionCode(QueryCodeBuilder code, QueryMetadata query, QueryGenerationOptions options)
+    private static void GenerateExecutionCode(CodeBuilder code, QueryMetadata query, QueryGenerationOptions options)
     {
         var cancellationToken = options.SupportCancellation ? "cancellationToken" : "default";
 
@@ -251,7 +252,7 @@ internal sealed class MethodGenerator : IMethodGenerator
     /// <summary>
     /// Генерирует код для возврата одного результата
     /// </summary>
-    private static void GenerateOneResultExecution(QueryCodeBuilder code, QueryMetadata query, string cancellationToken)
+    private static void GenerateOneResultExecution(CodeBuilder code, QueryMetadata query, string cancellationToken)
     {
         code.AppendLine($"await using var reader = await cmd.ExecuteReaderAsync({cancellationToken});");
         code.AppendLine();
@@ -295,7 +296,7 @@ internal sealed class MethodGenerator : IMethodGenerator
     /// <summary>
     /// Генерирует код для возврата множества результатов
     /// </summary>
-    private static void GenerateManyResultsExecution(QueryCodeBuilder code, QueryMetadata query, string cancellationToken)
+    private static void GenerateManyResultsExecution(CodeBuilder code, QueryMetadata query, string cancellationToken)
     {
         var modelName = GetModelName(query);
         code.AppendLine($"await using var reader = await cmd.ExecuteReaderAsync({cancellationToken});");

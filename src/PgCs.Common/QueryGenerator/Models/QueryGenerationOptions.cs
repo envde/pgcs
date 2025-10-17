@@ -1,20 +1,12 @@
+using PgCs.Common.Generation.Models;
+
 namespace PgCs.Common.QueryGenerator.Models;
 
 /// <summary>
 /// Опции генерации методов запросов
 /// </summary>
-public sealed record QueryGenerationOptions
+public sealed record QueryGenerationOptions : GenerationOptions
 {
-    /// <summary>
-    /// Путь к выходной директории для генерации файлов
-    /// </summary>
-    public required string OutputDirectory { get; init; }
-
-    /// <summary>
-    /// Namespace для генерируемых классов и методов
-    /// </summary>
-    public required string Namespace { get; init; }
-
     /// <summary>
     /// Имя класса для группировки методов (если не указано, используется "Queries")
     /// </summary>
@@ -36,11 +28,6 @@ public sealed record QueryGenerationOptions
     public bool UseValueTask { get; init; } = true;
 
     /// <summary>
-    /// Генерировать XML документацию
-    /// </summary>
-    public bool GenerateXmlDocumentation { get; init; } = true;
-
-    /// <summary>
     /// Генерировать отдельные модели для результатов запросов
     /// </summary>
     public bool GenerateResultModels { get; init; } = true;
@@ -56,19 +43,9 @@ public sealed record QueryGenerationOptions
     public bool UseRecordsForResults { get; init; } = true;
 
     /// <summary>
-    /// Использовать nullable reference types
-    /// </summary>
-    public bool UseNullableReferenceTypes { get; init; } = true;
-
-    /// <summary>
     /// Тип подключения к БД (Npgsql, Dapper и т.д.)
     /// </summary>
     public DatabaseProvider DatabaseProvider { get; init; } = DatabaseProvider.Npgsql;
-
-    /// <summary>
-    /// Генерировать методы расширения
-    /// </summary>
-    public bool GenerateExtensionMethods { get; init; } = false;
 
     /// <summary>
     /// Генерировать интерфейс для класса запросов
@@ -101,29 +78,9 @@ public sealed record QueryGenerationOptions
     public string MethodSuffix { get; init; } = "Async";
 
     /// <summary>
-    /// Формат отступов
-    /// </summary>
-    public IndentationStyle IndentationStyle { get; init; } = IndentationStyle.Spaces;
-
-    /// <summary>
-    /// Размер отступа
-    /// </summary>
-    public int IndentationSize { get; init; } = 4;
-
-    /// <summary>
     /// Дополнительные using директивы
     /// </summary>
-    public IReadOnlyList<string> AdditionalUsings { get; init; } = Array.Empty<string>();
-
-    /// <summary>
-    /// Перезаписывать существующие файлы
-    /// </summary>
-    public bool OverwriteExistingFiles { get; init; } = true;
-
-    /// <summary>
-    /// Генерировать partial классы
-    /// </summary>
-    public bool GeneratePartialClasses { get; init; } = true;
+    public new IReadOnlyList<string> AdditionalUsings { get; init; } = [];
 
     /// <summary>
     /// Генерировать логирование
@@ -181,20 +138,4 @@ public enum MethodNamingStrategy
     /// Без изменений (сохранить имя из аннотации)
     /// </summary>
     AsIs
-}
-
-/// <summary>
-/// Стиль отступов
-/// </summary>
-public enum IndentationStyle
-{
-    /// <summary>
-    /// Пробелы
-    /// </summary>
-    Spaces,
-
-    /// <summary>
-    /// Табуляция
-    /// </summary>
-    Tabs
 }

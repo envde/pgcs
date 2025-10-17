@@ -1,3 +1,5 @@
+using PgCs.Common.Generation.Models;
+
 namespace PgCs.Common.QueryGenerator.Models;
 
 /// <summary>
@@ -184,59 +186,4 @@ public sealed record GeneratedModel
     public int SizeInBytes => System.Text.Encoding.UTF8.GetByteCount(SourceCode);
 }
 
-/// <summary>
-/// Тип модели
-/// </summary>
-public enum ModelType
-{
-    /// <summary>
-    /// Модель результата запроса
-    /// </summary>
-    QueryResult,
 
-    /// <summary>
-    /// Модель параметров запроса
-    /// </summary>
-    QueryParameters
-}
-
-/// <summary>
-/// Свойство модели
-/// </summary>
-public sealed record ModelProperty
-{
-    /// <summary>
-    /// Имя свойства
-    /// </summary>
-    public required string Name { get; init; }
-
-    /// <summary>
-    /// Тип C#
-    /// </summary>
-    public required string CSharpType { get; init; }
-
-    /// <summary>
-    /// Является nullable
-    /// </summary>
-    public bool IsNullable { get; init; }
-
-    /// <summary>
-    /// Является обязательным (required)
-    /// </summary>
-    public bool IsRequired { get; init; }
-
-    /// <summary>
-    /// Документация свойства
-    /// </summary>
-    public string? Documentation { get; init; }
-
-    /// <summary>
-    /// Исходная колонка из результата запроса
-    /// </summary>
-    public string? SourceColumnName { get; init; }
-
-    /// <summary>
-    /// Тип PostgreSQL
-    /// </summary>
-    public string? PostgresType { get; init; }
-}

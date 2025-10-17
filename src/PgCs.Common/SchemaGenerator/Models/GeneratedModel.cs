@@ -1,3 +1,5 @@
+using PgCs.Common.Generation.Models;
+
 namespace PgCs.Common.SchemaGenerator.Models;
 
 /// <summary>
@@ -61,94 +63,4 @@ public sealed record GeneratedModel
     public int SizeInBytes => System.Text.Encoding.UTF8.GetByteCount(SourceCode);
 }
 
-/// <summary>
-/// Тип модели
-/// </summary>
-public enum ModelType
-{
-    /// <summary>
-    /// Модель таблицы
-    /// </summary>
-    Table,
 
-    /// <summary>
-    /// Модель представления
-    /// </summary>
-    View,
-
-    /// <summary>
-    /// Перечисление (ENUM)
-    /// </summary>
-    Enum,
-
-    /// <summary>
-    /// Пользовательский тип (DOMAIN, COMPOSITE)
-    /// </summary>
-    CustomType,
-
-    /// <summary>
-    /// Параметры функции/процедуры
-    /// </summary>
-    FunctionParameters,
-
-    /// <summary>
-    /// Результат запроса
-    /// </summary>
-    QueryResult,
-
-    /// <summary>
-    /// Параметры запроса
-    /// </summary>
-    QueryParameters
-}
-
-/// <summary>
-/// Свойство модели
-/// </summary>
-public sealed record ModelProperty
-{
-    /// <summary>
-    /// Имя свойства
-    /// </summary>
-    public required string Name { get; init; }
-
-    /// <summary>
-    /// Тип C#
-    /// </summary>
-    public required string CSharpType { get; init; }
-
-    /// <summary>
-    /// Является nullable
-    /// </summary>
-    public bool IsNullable { get; init; }
-
-    /// <summary>
-    /// Является обязательным (required)
-    /// </summary>
-    public bool IsRequired { get; init; }
-
-    /// <summary>
-    /// Значение по умолчанию
-    /// </summary>
-    public string? DefaultValue { get; init; }
-
-    /// <summary>
-    /// Документация свойства
-    /// </summary>
-    public string? Documentation { get; init; }
-
-    /// <summary>
-    /// Атрибуты свойства
-    /// </summary>
-    public IReadOnlyList<string> Attributes { get; init; } = Array.Empty<string>();
-
-    /// <summary>
-    /// Исходная колонка базы данных
-    /// </summary>
-    public string? SourceColumnName { get; init; }
-
-    /// <summary>
-    /// Тип PostgreSQL
-    /// </summary>
-    public string? PostgresType { get; init; }
-}

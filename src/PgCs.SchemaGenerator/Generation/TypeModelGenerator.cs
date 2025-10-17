@@ -1,7 +1,9 @@
+using PgCs.Common.Formatting;
+using PgCs.Common.Generation.Models;
+using PgCs.Common.Mapping;
+using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaAnalyzer.Models.Types;
 using PgCs.Common.SchemaGenerator.Models;
-using PgCs.SchemaGenerator.Formatting;
-using PgCs.SchemaGenerator.Mapping;
 
 namespace PgCs.SchemaGenerator.Generation;
 
@@ -37,7 +39,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
             options.ModelPrefix,
             options.ModelSuffix);
 
-        var code = new CodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
 
         code.AppendNamespaceStart(options.Namespace);
 
@@ -61,7 +63,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
             var isLast = i == type.EnumValues.Count - 1;
 
             var comment = $"Значение '{value}'";
-            code.AppendEnumValue(valueName, comment, isLast);
+            code.AppendEnumValue(valueName, null, comment, isLast);
         }
 
         code.AppendTypeEnd();
@@ -89,7 +91,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
             options.ModelPrefix,
             options.ModelSuffix);
 
-        var code = new CodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
 
         // Собираем using директивы
         var usings = new List<string>();
@@ -131,8 +133,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
 
             var csharpType = TypeMapper.MapToCSharpType(
                 attr.DataType,
-                isNullable: true, // Композитные типы обычно nullable
-                isArray: false);
+                isNullable: true); // Композитные типы обычно nullable
 
             if (options.GenerateXmlDocumentation)
             {
@@ -184,7 +185,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
             options.ModelPrefix,
             options.ModelSuffix);
 
-        var code = new CodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
 
         code.AppendNamespaceStart(options.Namespace);
 
@@ -216,7 +217,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
             isPartial: false);
 
         var baseType = type.DomainInfo?.BaseType ?? "text";
-        var csharpType = TypeMapper.MapToCSharpType(baseType, isNullable: false, isArray: false);
+        var csharpType = TypeMapper.MapToCSharpType(baseType, isNullable: false);
 
         code.AppendXmlSummary("Значение доменного типа");
         code.AppendProperty(
@@ -264,7 +265,7 @@ internal sealed class TypeModelGenerator : ITypeModelGenerator
             options.ModelPrefix,
             options.ModelSuffix);
 
-        var code = new CodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
 
         code.AppendNamespaceStart(options.Namespace);
 

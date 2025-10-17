@@ -1,7 +1,9 @@
+using PgCs.Common.Formatting;
+using PgCs.Common.Generation.Models;
+using PgCs.Common.Mapping;
+using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaAnalyzer.Models.Functions;
 using PgCs.Common.SchemaGenerator.Models;
-using PgCs.SchemaGenerator.Formatting;
-using PgCs.SchemaGenerator.Mapping;
 
 namespace PgCs.SchemaGenerator.Generation;
 
@@ -36,9 +38,9 @@ internal sealed class FunctionModelGenerator : IFunctionModelGenerator
             $"{function.Name}Parameters",
             options.NamingStrategy,
             options.ModelPrefix,
-            options.ModelSuffix);
+            $"{options.ModelSuffix}Parameters");
 
-        var code = new CodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
 
         // Собираем using директивы
         var usings = CollectUsings(inputParameters, options);
@@ -75,8 +77,7 @@ internal sealed class FunctionModelGenerator : IFunctionModelGenerator
 
             var csharpType = TypeMapper.MapToCSharpType(
                 parameter.DataType,
-                isNullable: !isParameterRequired || !options.UseNullableReferenceTypes,
-                isArray: false);
+                isNullable: !isParameterRequired || !options.UseNullableReferenceTypes);
 
             // XML документация
             if (options.GenerateXmlDocumentation)

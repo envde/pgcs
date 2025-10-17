@@ -1,6 +1,9 @@
+using PgCs.Common.Formatting;
+using PgCs.Common.Generation.Models;
+using PgCs.Common.QueryAnalyzer.Models;
 using PgCs.Common.QueryAnalyzer.Models.Metadata;
+using PgCs.Common.QueryAnalyzer.Models.Parameters;
 using PgCs.Common.QueryGenerator.Models;
-using PgCs.QueryGenerator.Formatting;
 
 namespace PgCs.QueryGenerator.Generation;
 
@@ -102,7 +105,7 @@ internal sealed class ParameterModelGenerator : IParameterModelGenerator
     /// </summary>
     private static string GenerateModelCode(string modelName, IReadOnlyList<ModelProperty> properties, QueryGenerationOptions options)
     {
-        var code = new QueryCodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
 
         if (options.GenerateXmlDocumentation)
         {

@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using PgCs.Common.Formatting;
+using PgCs.Common.Generation.Models;
+using PgCs.Common.SchemaAnalyzer;
 using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaGenerator;
 using PgCs.Common.SchemaGenerator.Models;

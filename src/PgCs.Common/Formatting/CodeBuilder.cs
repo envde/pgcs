@@ -1,24 +1,22 @@
 using System.Text;
-using PgCs.Common.SchemaGenerator.Models;
+using PgCs.Common.Generation.Models;
 
-namespace PgCs.SchemaGenerator.Formatting;
+namespace PgCs.Common.Formatting;
 
 /// <summary>
-/// Построитель C# кода с поддержкой отступов и форматирования
+/// Универсальный построитель C# кода с поддержкой отступов и форматирования
 /// </summary>
-internal sealed class CodeBuilder
+public sealed class CodeBuilder
 {
     private readonly StringBuilder _sb = new();
     private readonly string _indentString;
     private int _indentLevel;
 
-    public CodeBuilder(SchemaGenerationOptions options)
+    public CodeBuilder(IndentationStyle indentationStyle = IndentationStyle.Spaces, int indentationSize = 4)
     {
-        ArgumentNullException.ThrowIfNull(options);
-
-        _indentString = options.IndentationStyle == IndentationStyle.Tabs
+        _indentString = indentationStyle == IndentationStyle.Tabs
             ? "\t"
-            : new string(' ', options.IndentationSize);
+            : new string(' ', indentationSize);
     }
 
     /// <summary>
@@ -62,6 +60,15 @@ internal sealed class CodeBuilder
     }
 
     /// <summary>
+    /// Добавляет сырой код без форматирования
+    /// </summary>
+    public CodeBuilder AppendRaw(string code)
+    {
+        _sb.Append(code);
+        return this;
+    }
+
+    /// <summary>
     /// Увеличивает уровень отступа
     /// </summary>
     public CodeBuilder Indent()
@@ -94,10 +101,9 @@ internal sealed class CodeBuilder
         }
 
         AppendLine("/// <summary>");
-        
+
         // Разбиваем длинные строки
-        var lines = WrapText(summary, 100);
-        foreach (var line in lines)
+        foreach (var line in WrapText(summary, 100))
         {
             AppendLine($"/// {line}");
         }
@@ -118,9 +124,8 @@ internal sealed class CodeBuilder
         }
 
         AppendLine("/// <remarks>");
-        
-        var lines = WrapText(remarks, 100);
-        foreach (var line in lines)
+
+        foreach (var line in WrapText(remarks, 100))
         {
             AppendLine($"/// {line}");
         }
@@ -129,6 +134,30 @@ internal sealed class CodeBuilder
 
         return this;
     }
+
+    /// <summary>
+    /// Добавляет XML комментарий для параметра
+    /// </summary>
+    public CodeBuilder AppendXmlParam(string name, string description)
+    {
+        AppendLine($"/// <param name=\"{name}\">{description}</param>");
+        return this;
+    }
+
+    /// <summary>
+    /// Добавляет XML комментарий для возвращаемого значения
+    /// </summary>
+    public CodeBuilder AppendXmlReturns(string description)
+    {
+        AppendLine($"/// <returns>{description}</returns>");
+        return this;
+    }
+
+    /// <summary>
+    /// Добавляет блок using директив
+    /// </summary>
+    public CodeBuilder AppendUsings(params string[] usings) =>
+        AppendUsings((IEnumerable<string>)usings);
 
     /// <summary>
     /// Добавляет блок using директив
@@ -155,23 +184,34 @@ internal sealed class CodeBuilder
     }
 
     /// <summary>
-    /// Добавляет начало namespace
+    /// Добавляет file-scoped namespace
     /// </summary>
     public CodeBuilder AppendNamespaceStart(string namespaceName)
     {
-        AppendLineRaw($"namespace {namespaceName};");
-        AppendLineRaw("");
+        _sb.AppendLine($"namespace {namespaceName};");
+        _sb.AppendLine();
         return this;
     }
 
     /// <summary>
+    /// Заглушка для совместимости (file-scoped namespace не требует закрытия)
+    /// </summary>
+    public CodeBuilder AppendNamespaceEnd() => this;
+
+    /// <summary>
     /// Добавляет начало класса или record
     /// </summary>
-    public CodeBuilder AppendTypeStart(string typeName, bool isRecord, bool isSealed = true, bool isPartial = false)
+    public CodeBuilder AppendTypeStart(
+        string typeName,
+        bool isRecord = false,
+        bool isSealed = true,
+        bool isPartial = false,
+        string? baseType = null,
+        IEnumerable<string>? interfaces = null)
     {
-        var keywords = new List<string>();
-        
-        if (isSealed)
+        var keywords = new List<string> { "public" };
+
+        if (isSealed && !isRecord)
         {
             keywords.Add("sealed");
         }
@@ -182,8 +222,28 @@ internal sealed class CodeBuilder
         }
 
         keywords.Add(isRecord ? "record" : "class");
+        keywords.Add(typeName);
 
-        AppendLine($"public {string.Join(" ", keywords)} {typeName}");
+        var declaration = string.Join(" ", keywords);
+
+        // Добавляем наследование и интерфейсы
+        var inherits = new List<string>();
+        if (!string.IsNullOrWhiteSpace(baseType))
+        {
+            inherits.Add(baseType);
+        }
+
+        if (interfaces is not null)
+        {
+            inherits.AddRange(interfaces.Where(i => !string.IsNullOrWhiteSpace(i)));
+        }
+
+        if (inherits.Count > 0)
+        {
+            declaration += $" : {string.Join(", ", inherits)}";
+        }
+
+        AppendLine(declaration);
         AppendLine("{");
         Indent();
 
@@ -203,9 +263,15 @@ internal sealed class CodeBuilder
     /// <summary>
     /// Добавляет начало enum
     /// </summary>
-    public CodeBuilder AppendEnumStart(string enumName)
+    public CodeBuilder AppendEnumStart(string enumName, string? baseType = null)
     {
-        AppendLine($"public enum {enumName}");
+        var declaration = $"public enum {enumName}";
+        if (!string.IsNullOrWhiteSpace(baseType))
+        {
+            declaration += $" : {baseType}";
+        }
+
+        AppendLine(declaration);
         AppendLine("{");
         Indent();
         return this;
@@ -214,14 +280,15 @@ internal sealed class CodeBuilder
     /// <summary>
     /// Добавляет значение enum
     /// </summary>
-    public CodeBuilder AppendEnumValue(string name, string? comment = null, bool isLast = false)
+    public CodeBuilder AppendEnumValue(string name, int? value = null, string? comment = null, bool isLast = false)
     {
         if (!string.IsNullOrWhiteSpace(comment))
         {
             AppendXmlSummary(comment);
         }
 
-        AppendLine(isLast ? name : $"{name},");
+        var enumValue = value.HasValue ? $"{name} = {value}" : name;
+        AppendLine(isLast ? enumValue : $"{enumValue},");
 
         if (!isLast)
         {
@@ -240,8 +307,17 @@ internal sealed class CodeBuilder
         bool isRequired = false,
         bool hasInit = true,
         string? defaultValue = null,
-        string? comment = null)
+        string? comment = null,
+        IEnumerable<string>? attributes = null)
     {
+        if (attributes is not null)
+        {
+            foreach (var attribute in attributes.Where(a => !string.IsNullOrWhiteSpace(a)))
+            {
+                AppendLine($"[{attribute}]");
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(comment))
         {
             AppendXmlSummary(comment);
@@ -265,6 +341,24 @@ internal sealed class CodeBuilder
         AppendLine();
 
         return this;
+    }
+
+    /// <summary>
+    /// Добавляет атрибут
+    /// </summary>
+    public CodeBuilder AppendAttribute(string attribute)
+    {
+        AppendLine($"[{attribute}]");
+        return this;
+    }
+
+    /// <summary>
+    /// Очищает builder
+    /// </summary>
+    public void Clear()
+    {
+        _sb.Clear();
+        _indentLevel = 0;
     }
 
     /// <summary>

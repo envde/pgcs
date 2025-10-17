@@ -1,18 +1,22 @@
+using System.Collections.Frozen;
 using System.Text;
 using System.Text.RegularExpressions;
-using PgCs.Common.SchemaGenerator.Models;
 
-namespace PgCs.SchemaGenerator.Formatting;
+namespace PgCs.Common.Formatting;
 
 /// <summary>
 /// Утилита для преобразования имён в различные стили именования
 /// </summary>
-internal static partial class NamingHelper
+public static partial class NamingHelper
 {
     /// <summary>
     /// Преобразует имя в соответствии с заданной стратегией
     /// </summary>
-    public static string ConvertName(string name, NamingStrategy strategy, string? prefix = null, string? suffix = null)
+    public static string ConvertName(
+        string name,
+        NamingStrategy strategy,
+        string? prefix = null,
+        string? suffix = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -46,7 +50,6 @@ internal static partial class NamingHelper
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        // Разделяем по подчёркиваниям, дефисам и пробелам
         var words = SplitWords(name);
         var result = new StringBuilder();
 
@@ -71,7 +74,7 @@ internal static partial class NamingHelper
     public static string ToCamelCase(string name)
     {
         var pascalCase = ToPascalCase(name);
-        
+
         if (pascalCase.Length == 0)
         {
             return pascalCase;
@@ -98,23 +101,6 @@ internal static partial class NamingHelper
     }
 
     /// <summary>
-    /// Разбивает строку на слова
-    /// </summary>
-    private static string[] SplitWords(string name)
-    {
-        // Сначала заменяем разделители на пробелы
-        var normalized = name.Replace('_', ' ')
-                            .Replace('-', ' ')
-                            .Trim();
-
-        // Затем разбиваем по camelCase/PascalCase
-        normalized = CamelCaseRegex().Replace(normalized, " $1");
-
-        // Разделяем по пробелам и фильтруем пустые
-        return normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-    }
-
-    /// <summary>
     /// Делает первую букву строки заглавной
     /// </summary>
     public static string Capitalize(string value)
@@ -130,25 +116,21 @@ internal static partial class NamingHelper
     /// <summary>
     /// Проверяет, является ли имя зарезервированным ключевым словом C#
     /// </summary>
-    public static bool IsReservedKeyword(string name)
-    {
-        return ReservedKeywords.Contains(name);
-    }
+    public static bool IsReservedKeyword(string name) =>
+        ReservedKeywords.Contains(name);
 
     /// <summary>
     /// Экранирует имя, если оно является зарезервированным ключевым словом
     /// </summary>
-    public static string EscapeIfKeyword(string name)
-    {
-        return IsReservedKeyword(name) ? $"@{name}" : name;
-    }
+    public static string EscapeIfKeyword(string name) =>
+        IsReservedKeyword(name) ? $"@{name}" : name;
 
     /// <summary>
     /// Делает имя множественным (простая реализация)
     /// </summary>
     public static string Pluralize(string name)
     {
-        if (name.EndsWith("y", StringComparison.OrdinalIgnoreCase) && 
+        if (name.EndsWith("y", StringComparison.OrdinalIgnoreCase) &&
             !name.EndsWith("ay", StringComparison.OrdinalIgnoreCase) &&
             !name.EndsWith("ey", StringComparison.OrdinalIgnoreCase) &&
             !name.EndsWith("oy", StringComparison.OrdinalIgnoreCase) &&
@@ -170,6 +152,46 @@ internal static partial class NamingHelper
     }
 
     /// <summary>
+    /// Делает имя единственным (простая реализация)
+    /// </summary>
+    public static string Singularize(string name)
+    {
+        if (name.EndsWith("ies", StringComparison.OrdinalIgnoreCase))
+        {
+            return name[..^3] + "y";
+        }
+
+        if (name.EndsWith("es", StringComparison.OrdinalIgnoreCase))
+        {
+            return name[..^2];
+        }
+
+        if (name.EndsWith("s", StringComparison.OrdinalIgnoreCase))
+        {
+            return name[..^1];
+        }
+
+        return name;
+    }
+
+    /// <summary>
+    /// Разбивает строку на слова
+    /// </summary>
+    private static string[] SplitWords(string name)
+    {
+        // Заменяем разделители на пробелы
+        var normalized = name.Replace('_', ' ')
+                            .Replace('-', ' ')
+                            .Trim();
+
+        // Разбиваем по camelCase/PascalCase
+        normalized = CamelCaseRegex().Replace(normalized, " $1");
+
+        // Разделяем по пробелам и фильтруем пустые
+        return normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    /// <summary>
     /// Regex для определения snake_case
     /// </summary>
     [GeneratedRegex(@"^[a-z][a-z0-9_]*$")]
@@ -184,8 +206,8 @@ internal static partial class NamingHelper
     /// <summary>
     /// Зарезервированные ключевые слова C#
     /// </summary>
-    private static readonly HashSet<string> ReservedKeywords =
-    [
+    private static readonly FrozenSet<string> ReservedKeywords = new HashSet<string>
+    {
         "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked",
         "class", "const", "continue", "decimal", "default", "delegate", "do", "double", "else",
         "enum", "event", "explicit", "extern", "false", "finally", "fixed", "float", "for",
@@ -194,6 +216,33 @@ internal static partial class NamingHelper
         "private", "protected", "public", "readonly", "ref", "return", "sbyte", "sealed",
         "short", "sizeof", "stackalloc", "static", "string", "struct", "switch", "this", "throw",
         "true", "try", "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using",
-        "virtual", "void", "volatile", "while", "required", "init", "record", "and", "or", "not"
-    ];
+        "virtual", "void", "volatile", "while", "required", "init", "record", "and", "or", "not",
+        "file", "scoped"
+    }.ToFrozenSet();
+}
+
+/// <summary>
+/// Стратегия именования
+/// </summary>
+public enum NamingStrategy
+{
+    /// <summary>
+    /// PascalCase (MyClassName)
+    /// </summary>
+    PascalCase,
+
+    /// <summary>
+    /// camelCase (myClassName)
+    /// </summary>
+    CamelCase,
+
+    /// <summary>
+    /// snake_case (my_class_name)
+    /// </summary>
+    SnakeCase,
+
+    /// <summary>
+    /// Без изменений (сохранить исходное имя)
+    /// </summary>
+    AsIs
 }

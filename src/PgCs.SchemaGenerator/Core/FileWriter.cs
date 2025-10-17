@@ -1,4 +1,5 @@
 using System.Text;
+using PgCs.Common.Generation.Models;
 using PgCs.Common.SchemaGenerator.Models;
 
 namespace PgCs.SchemaGenerator.Core;

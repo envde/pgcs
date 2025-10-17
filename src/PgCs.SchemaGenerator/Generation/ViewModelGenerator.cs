@@ -1,7 +1,9 @@
+using PgCs.Common.Formatting;
+using PgCs.Common.Generation.Models;
+using PgCs.Common.Mapping;
+using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaAnalyzer.Models.Views;
 using PgCs.Common.SchemaGenerator.Models;
-using PgCs.SchemaGenerator.Formatting;
-using PgCs.SchemaGenerator.Mapping;
 
 namespace PgCs.SchemaGenerator.Generation;
 
@@ -22,7 +24,7 @@ internal sealed class ViewModelGenerator : IViewModelGenerator
             options.ModelPrefix,
             options.ModelSuffix);
 
-        var code = new CodeBuilder(options);
+        var code = new CodeBuilder(options.IndentationStyle, options.IndentationSize);
 
         // Собираем using директивы
         var usings = CollectUsings(view, options);
@@ -71,10 +73,11 @@ internal sealed class ViewModelGenerator : IViewModelGenerator
             var propertyName = NamingHelper.ConvertName(column.Name, options.NamingStrategy);
             propertyName = NamingHelper.EscapeIfKeyword(propertyName);
 
+            // Добавляем [] если это массив
+            var dataType = column.IsArray ? $"{column.DataType}[]" : column.DataType;
             var csharpType = TypeMapper.MapToCSharpType(
-                column.DataType,
-                column.IsNullable || !options.UseNullableReferenceTypes,
-                column.IsArray);
+                dataType,
+                column.IsNullable || !options.UseNullableReferenceTypes);
 
             // Views обычно read-only, поэтому required не нужен
             var isRequired = false;
