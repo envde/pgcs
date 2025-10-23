@@ -420,16 +420,16 @@ public class SchemaAnalyzerBuilder
             }
         }
 
-        // Удалить дубликаты
+        // Удалить дубликаты по ключевым полям
         if (_removeDuplicates)
         {
-            allTables = allTables.Distinct().ToList();
-            allViews = allViews.Distinct().ToList();
-            allTypes = allTypes.Distinct().ToList();
-            allFunctions = allFunctions.Distinct().ToList();
-            allIndexes = allIndexes.Distinct().ToList();
-            allTriggers = allTriggers.Distinct().ToList();
-            allConstraints = allConstraints.Distinct().ToList();
+            allTables = allTables.DistinctBy(t => new { t.Name, t.Schema }).ToList();
+            allViews = allViews.DistinctBy(v => new { v.Name, v.Schema }).ToList();
+            allTypes = allTypes.DistinctBy(t => new { t.Name, t.Schema }).ToList();
+            allFunctions = allFunctions.DistinctBy(f => new { f.Name, f.Schema }).ToList();
+            allIndexes = allIndexes.DistinctBy(i => new { i.Name, i.Schema, i.TableName }).ToList();
+            allTriggers = allTriggers.DistinctBy(t => new { t.Name, t.TableName, t.Schema }).ToList();
+            allConstraints = allConstraints.DistinctBy(c => new { c.Name, c.TableName, c.Schema }).ToList();
         }
 
         return new SchemaMetadata

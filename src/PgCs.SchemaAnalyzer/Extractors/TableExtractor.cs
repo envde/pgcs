@@ -18,9 +18,13 @@ internal sealed partial class TableExtractor : BaseExtractor<TableDefinition>
     protected override TableDefinition ParseMatch(Match match, string statement)
     {
         var fullTableName = match.Groups[1].Value.Trim();
-        var columnsBlock = match.Groups[2].Value;
-        var partitionStrategy = match.Groups[3].Value;
-        var partitionKeys = match.Groups[4].Value;
+        
+        // Извлекаем содержимое скобок с учетом вложенности
+        var columnsBlock = ExtractBalancedParentheses(statement);
+        
+        var partitionMatch = Regex.Match(statement, @"PARTITION\s+BY\s+(RANGE|LIST|HASH)\s*\((.*?)\)", RegexOptions.IgnoreCase);
+        var partitionStrategy = partitionMatch.Success ? partitionMatch.Groups[1].Value : string.Empty;
+        var partitionKeys = partitionMatch.Success ? partitionMatch.Groups[2].Value : string.Empty;
 
         var schema = ExtractSchemaName(fullTableName);
         var tableName = ExtractTableName(fullTableName);
@@ -48,6 +52,29 @@ internal sealed partial class TableExtractor : BaseExtractor<TableDefinition>
             PartitionInfo = partitionInfo,
             RawSql = statement
         };
+    }
+
+    private string ExtractBalancedParentheses(string statement)
+    {
+        var startIndex = statement.IndexOf('(');
+        if (startIndex == -1) return string.Empty;
+
+        var depth = 0;
+        var endIndex = startIndex;
+
+        for (var i = startIndex; i < statement.Length; i++)
+        {
+            if (statement[i] == '(') depth++;
+            else if (statement[i] == ')') depth--;
+
+            if (depth == 0)
+            {
+                endIndex = i;
+                break;
+            }
+        }
+
+        return statement.Substring(startIndex + 1, endIndex - startIndex - 1).Trim();
     }
 
     private IReadOnlyList<ColumnDefinition> ParseColumns(string columnsBlock)
@@ -102,15 +129,15 @@ internal sealed partial class TableExtractor : BaseExtractor<TableDefinition>
     private IReadOnlyList<ConstraintDefinition> ParseTableConstraints(string columnsBlock, string tableName)
     {
         var constraints = new List<ConstraintDefinition>();
-        var lines = columnsBlock.Split('\n');
+        var columns = SplitColumns(columnsBlock);
 
-        foreach (var line in lines)
+        foreach (var column in columns)
         {
-            var trimmedLine = line.Trim().Trim(',');
+            var trimmed = column.Trim();
             
-            if (trimmedLine.StartsWith("CONSTRAINT", StringComparison.OrdinalIgnoreCase))
+            if (trimmed.StartsWith("CONSTRAINT", StringComparison.OrdinalIgnoreCase))
             {
-                var constraint = ParseConstraint(trimmedLine, tableName);
+                var constraint = ParseConstraint(trimmed, tableName);
                 if (constraint is not null)
                 {
                     constraints.Add(constraint);

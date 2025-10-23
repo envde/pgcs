@@ -143,7 +143,14 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
 
-        var normalizedScript = SqlNormalizer.Normalize(sqlScript);
+        // Сначала разделяем на statements (ДО нормализации, чтобы сохранить переводы строк)
+        var statements = SqlStatementSplitter.Split(sqlScript);
+        
+        // Нормализуем каждый statement отдельно
+        var normalizedStatements = statements.Select(SqlNormalizer.Normalize).ToArray();
+        
+        // Объединяем обратно с точкой с запятой для extractors
+        var normalizedScript = string.Join("; ", normalizedStatements);
 
         var types = ExtractTypes(normalizedScript);
         var tables = ExtractTables(normalizedScript);
@@ -154,6 +161,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var constraints = ExtractConstraints(normalizedScript);
         var comments = _commentExtractor.ExtractComments(normalizedScript);
 
+        // Собрать constraints из таблиц
+        var allConstraints = new List<ConstraintDefinition>(constraints);
+        foreach (var table in tables)
+        {
+            allConstraints.AddRange(table.Constraints);
+        }
+
         return new SchemaMetadata
         {
             Tables = tables,
@@ -162,7 +176,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Functions = functions,
             Indexes = indexes,
             Triggers = triggers,
-            Constraints = constraints,
+            Constraints = allConstraints,
             Comments = comments,
             AnalyzedAt = DateTime.UtcNow
         };

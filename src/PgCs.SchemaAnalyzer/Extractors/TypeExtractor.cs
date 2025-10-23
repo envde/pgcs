@@ -25,7 +25,9 @@ internal sealed partial class TypeExtractor : BaseExtractor<TypeDefinition>
         // ENUM or COMPOSITE type
         var fullTypeName = match.Groups[1].Value.Trim();
         var typeKind = match.Groups[2].Value.Trim();
-        var typeBody = match.Groups[3].Value.Trim();
+        
+        // Извлекаем содержимое скобок с учетом вложенности
+        var typeBody = ExtractBalancedParentheses(statement);
 
         var schema = ExtractSchemaName(fullTypeName);
         var typeName = ExtractTableName(fullTypeName);
@@ -36,6 +38,29 @@ internal sealed partial class TypeExtractor : BaseExtractor<TypeDefinition>
         }
 
         return ParseCompositeType(typeName, schema, typeBody, statement);
+    }
+
+    private string ExtractBalancedParentheses(string statement)
+    {
+        var startIndex = statement.IndexOf('(');
+        if (startIndex == -1) return string.Empty;
+
+        var depth = 0;
+        var endIndex = startIndex;
+
+        for (var i = startIndex; i < statement.Length; i++)
+        {
+            if (statement[i] == '(') depth++;
+            else if (statement[i] == ')') depth--;
+
+            if (depth == 0)
+            {
+                endIndex = i;
+                break;
+            }
+        }
+
+        return statement.Substring(startIndex + 1, endIndex - startIndex - 1).Trim();
     }
 
     private TypeDefinition ParseEnumType(string name, string? schema, string enumValues, string rawSql)

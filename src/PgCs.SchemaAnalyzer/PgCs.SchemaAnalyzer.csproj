@@ -10,4 +10,8 @@
       <ProjectReference Include="..\PgCs.Common\PgCs.Common.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <InternalsVisibleTo Include="PgCs.SchemaAnalyzer.Tests" />
+    </ItemGroup>
+
 </Project>

@@ -8,7 +8,7 @@ namespace PgCs.SchemaAnalyzer.Extractors;
 /// </summary>
 internal sealed partial class IndexExtractor : BaseExtractor<IndexDefinition>
 {
-    [GeneratedRegex(@"CREATE\s+(UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s+ON\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s+(?:USING\s+([a-zA-Z]+)\s*)?\((.*?)\)(?:\s+WHERE\s+(.*))?", 
+    [GeneratedRegex(@"CREATE\s+(UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s+ON\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s*(?:USING\s+([a-zA-Z]+)\s*)?\((.*?)\)(?:\s+WHERE\s+(.*))?", 
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled)]
     private static partial Regex IndexPatternRegex();
 

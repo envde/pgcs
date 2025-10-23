@@ -10,5 +10,8 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests\PgCs.QueryAnalyzer.Tests\PgCs.QueryAnalyzer.Tests.csproj" />
+    <Project Path="tests\PgCs.QueryGenerator.Tests\PgCs.QueryGenerator.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\PgCs.SchemaAnalyzer.Tests\PgCs.SchemaAnalyzer.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\PgCs.SchemaGenerator.Tests\PgCs.SchemaGenerator.Tests.csproj" Type="Classic C#" />
   </Folder>
 </Solution>
