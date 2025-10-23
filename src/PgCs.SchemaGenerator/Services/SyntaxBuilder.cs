@@ -155,29 +155,27 @@ public sealed class SyntaxBuilder
     }
 
     /// <summary>
-    /// Создает XML комментарий для документации
+    /// Создает XML комментарий для документации используя Roslyn XML API
     /// </summary>
     private static SyntaxTriviaList CreateXmlComment(string comment)
     {
         var lines = comment.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        var triviaList = TriviaList();
-
-        triviaList = triviaList.Add(
-            Comment("/// <summary>"));
+        var summaryContent = new List<XmlNodeSyntax>();
 
         foreach (var line in lines)
         {
-            triviaList = triviaList.Add(
-                Comment($"/// {line.Trim()}"));
+            summaryContent.Add(XmlText(XmlTextLiteral(line.Trim())));
+            if (line != lines.Last())
+            {
+                summaryContent.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: false)));
+            }
         }
 
-        triviaList = triviaList.Add(
-            Comment("/// </summary>"));
-
-        triviaList = triviaList.Add(
-            CarriageReturnLineFeed);
-
-        return triviaList;
+        // Создаем DocumentationComment с <summary> элементом
+        return TriviaList(
+            Trivia(
+                DocumentationComment(
+                    XmlSummaryElement(summaryContent.ToArray()))));
     }
 
     /// <summary>

@@ -43,10 +43,9 @@ public sealed class QueryGenerator : IQueryGenerator
         var typeMapper = new PostgreSqlTypeMapper();
         var nameConverter = new NameConverter();
         var formatter = new RoslynFormatter();
-        var sqlBuilder = new NpgsqlCommandBuilder();
         var syntaxBuilder = new QuerySyntaxBuilder(typeMapper, nameConverter);
         
-        var methodGenerator = new QueryMethodGenerator(syntaxBuilder, sqlBuilder, nameConverter);
+        var methodGenerator = new QueryMethodGenerator(syntaxBuilder, nameConverter);
         var modelGenerator = new QueryModelGenerator(syntaxBuilder, typeMapper, nameConverter);
         var repositoryGenerator = new RepositoryGenerator(syntaxBuilder, methodGenerator);
         var validator = new QueryValidator();

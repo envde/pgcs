@@ -18,16 +18,13 @@ namespace PgCs.QueryGenerator.Generators;
 public sealed class QueryMethodGenerator : IQueryMethodGenerator
 {
     private readonly QuerySyntaxBuilder _syntaxBuilder;
-    private readonly INpgsqlCommandBuilder _commandBuilder;
     private readonly INameConverter _nameConverter;
 
     public QueryMethodGenerator(
         QuerySyntaxBuilder syntaxBuilder,
-        INpgsqlCommandBuilder commandBuilder,
         INameConverter nameConverter)
     {
         _syntaxBuilder = syntaxBuilder;
-        _commandBuilder = commandBuilder;
         _nameConverter = nameConverter;
     }
 

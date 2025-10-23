@@ -258,45 +258,46 @@ public sealed class QuerySyntaxBuilder
     }
 
     /// <summary>
-    /// Создает XML комментарий для документации
+    /// Создает XML комментарий для документации используя Roslyn XML API
     /// </summary>
     public SyntaxTriviaList CreateXmlComment(string summary, string? additionalInfo = null)
     {
-        var triviaList = TriviaList();
+        var documentationElements = new List<XmlNodeSyntax>();
 
-        // <summary>
-        triviaList = triviaList.Add(Comment("/// <summary>"));
-        triviaList = triviaList.Add(CarriageReturnLineFeed);
-
-        // Разбиваем summary на строки
+        // Создаем <summary> элемент используя Roslyn XML API
+        var summaryContent = new List<XmlNodeSyntax>();
         var summaryLines = summary.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        
         foreach (var line in summaryLines)
         {
-            triviaList = triviaList.Add(Comment($"/// {line.Trim()}"));
-            triviaList = triviaList.Add(CarriageReturnLineFeed);
+            summaryContent.Add(XmlText(XmlTextLiteral(line.Trim())));
+            if (line != summaryLines.Last())
+            {
+                summaryContent.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: false)));
+            }
         }
 
-        // </summary>
-        triviaList = triviaList.Add(Comment("/// </summary>"));
-        triviaList = triviaList.Add(CarriageReturnLineFeed);
+        documentationElements.Add(XmlSummaryElement(summaryContent.ToArray()));
 
-        // <remarks> (если есть дополнительная информация)
+        // Если есть дополнительная информация, добавляем <remarks>
         if (!string.IsNullOrWhiteSpace(additionalInfo))
         {
-            triviaList = triviaList.Add(Comment("/// <remarks>"));
-            triviaList = triviaList.Add(CarriageReturnLineFeed);
-
+            var remarksContent = new List<XmlNodeSyntax>();
             var remarksLines = additionalInfo.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            
             foreach (var line in remarksLines)
             {
-                triviaList = triviaList.Add(Comment($"/// {line.Trim()}"));
-                triviaList = triviaList.Add(CarriageReturnLineFeed);
+                remarksContent.Add(XmlText(XmlTextLiteral(line.Trim())));
+                if (line != remarksLines.Last())
+                {
+                    remarksContent.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: false)));
+                }
             }
 
-            triviaList = triviaList.Add(Comment("/// </remarks>"));
-            triviaList = triviaList.Add(CarriageReturnLineFeed);
+            documentationElements.Add(XmlRemarksElement(remarksContent.ToArray()));
         }
 
-        return triviaList;
+        // Создаем DocumentationComment trivia
+        return TriviaList(Trivia(DocumentationComment(documentationElements.ToArray())));
     }
 }
