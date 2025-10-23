@@ -56,7 +56,7 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
         return code;
     }
 
-    private async ValueTask<GeneratedCode> GenerateEnumCodeAsync(
+    private ValueTask<GeneratedCode> GenerateEnumCodeAsync(
         TypeDefinition enumType,
         SchemaGenerationOptions options)
     {
@@ -74,16 +74,16 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
         // Определяем имя enum
         var enumName = enumDeclaration.Identifier.Text;
 
-        return new GeneratedCode
+        return ValueTask.FromResult(new GeneratedCode
         {
             SourceCode = sourceCode,
             TypeName = enumName,
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.EnumType
-        };
+        });
     }
 
-    private async ValueTask<GeneratedCode> GenerateCompositeCodeAsync(
+    private ValueTask<GeneratedCode> GenerateCompositeCodeAsync(
         TypeDefinition compositeType,
         SchemaGenerationOptions options)
     {
@@ -139,12 +139,12 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
             _ => fileName
         };
 
-        return new GeneratedCode
+        return ValueTask.FromResult(new GeneratedCode
         {
             SourceCode = sourceCode,
             TypeName = className,
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.CompositeType
-        };
+        });
     }
 }

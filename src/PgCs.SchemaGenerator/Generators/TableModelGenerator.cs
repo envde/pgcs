@@ -34,7 +34,7 @@ public sealed class TableModelGenerator : ITableModelGenerator
         return code;
     }
 
-    private async ValueTask<GeneratedCode> GenerateTableCodeAsync(
+    private ValueTask<GeneratedCode> GenerateTableCodeAsync(
         TableDefinition table,
         SchemaGenerationOptions options)
     {
@@ -57,12 +57,12 @@ public sealed class TableModelGenerator : ITableModelGenerator
         var className = classDeclaration.Identifier.Text;
 
         // Создаем GeneratedCode
-        return new GeneratedCode
+        return ValueTask.FromResult(new GeneratedCode
         {
             SourceCode = sourceCode,
             TypeName = className,
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.TableModel
-        };
+        });
     }
 }

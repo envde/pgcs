@@ -27,7 +27,7 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
         _methodGenerator = methodGenerator;
     }
 
-    public async ValueTask<GeneratedInterfaceResult> GenerateInterfaceAsync(
+    public ValueTask<GeneratedInterfaceResult> GenerateInterfaceAsync(
         IReadOnlyList<QueryMetadata> queries,
         QueryGenerationOptions options)
     {
@@ -67,16 +67,16 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
             CodeType = GeneratedFileType.RepositoryInterface,
         };
 
-        return new GeneratedInterfaceResult
+        return ValueTask.FromResult(new GeneratedInterfaceResult
         {
             IsSuccess = true,
             InterfaceName = options.RepositoryInterfaceName,
             Code = code,
             MethodCount = queries.Count
-        };
+        });
     }
 
-    public async ValueTask<GeneratedClassResult> GenerateImplementationAsync(
+    public ValueTask<GeneratedClassResult> GenerateImplementationAsync(
         IReadOnlyList<QueryMetadata> queries,
         QueryGenerationOptions options)
     {
@@ -117,13 +117,13 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
             CodeType = GeneratedFileType.RepositoryClass,
         };
 
-        return new GeneratedClassResult
+        return ValueTask.FromResult(new GeneratedClassResult
         {
             IsSuccess = true,
             ClassName = options.RepositoryClassName,
             Code = code,
             MethodCount = queries.Count
-        };
+        });
     }
 
     /// <summary>

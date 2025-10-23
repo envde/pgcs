@@ -279,7 +279,7 @@ public sealed class FileWriter : IWriter
     /// <summary>
     /// Удаляет ранее созданные файлы
     /// </summary>
-    public async ValueTask<WriteResult> DeleteFilesAsync(IReadOnlyList<string> filePaths)
+    public ValueTask<WriteResult> DeleteFilesAsync(IReadOnlyList<string> filePaths)
     {
         var stopwatch = Stopwatch.StartNew();
         var deletedFiles = new List<string>();
@@ -319,13 +319,13 @@ public sealed class FileWriter : IWriter
 
         stopwatch.Stop();
 
-        return new WriteResult
+        return ValueTask.FromResult(new WriteResult
         {
             IsSuccess = errors.Count == 0,
             WrittenFiles = deletedFiles,
             Errors = errors,
             Duration = stopwatch.Elapsed
-        };
+        });
     }
 
     #region Private helpers

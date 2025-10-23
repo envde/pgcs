@@ -36,7 +36,7 @@ public sealed class ViewModelGenerator : IViewModelGenerator
         return code;
     }
 
-    private async ValueTask<GeneratedCode> GenerateViewCodeAsync(
+    private ValueTask<GeneratedCode> GenerateViewCodeAsync(
         ViewDefinition view,
         SchemaGenerationOptions options)
     {
@@ -70,12 +70,12 @@ public sealed class ViewModelGenerator : IViewModelGenerator
         var className = classDeclaration.Identifier.Text;
 
         // Создаем GeneratedCode
-        return new GeneratedCode
+        return ValueTask.FromResult(new GeneratedCode
         {
             SourceCode = sourceCode,
             TypeName = className,
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.ViewModel
-        };
+        });
     }
 }
