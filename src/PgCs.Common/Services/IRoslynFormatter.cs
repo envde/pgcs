@@ -8,5 +8,5 @@ public interface IRoslynFormatter
     /// <summary>
     /// Форматирует C# код согласно стилю
     /// </summary>
-    ValueTask<string> FormatAsync(string sourceCode);
+    string Format(string sourceCode);
 }

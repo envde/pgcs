@@ -13,28 +13,13 @@ namespace PgCs.QueryGenerator;
 /// <summary>
 /// Реализация генератора C# методов для SQL запросов
 /// </summary>
-public sealed class QueryGenerator : IQueryGenerator
+public sealed class QueryGenerator(
+    IQueryMethodGenerator methodGenerator,
+    IQueryModelGenerator modelGenerator,
+    IRepositoryGenerator repositoryGenerator,
+    IQueryValidator validator)
+    : IQueryGenerator
 {
-    private readonly IQueryMethodGenerator _methodGenerator;
-    private readonly IQueryModelGenerator _modelGenerator;
-    private readonly IRepositoryGenerator _repositoryGenerator;
-    private readonly IQueryValidator _validator;
-    private readonly IRoslynFormatter _formatter;
-
-    public QueryGenerator(
-        IQueryMethodGenerator methodGenerator,
-        IQueryModelGenerator modelGenerator,
-        IRepositoryGenerator repositoryGenerator,
-        IQueryValidator validator,
-        IRoslynFormatter formatter)
-    {
-        _methodGenerator = methodGenerator;
-        _modelGenerator = modelGenerator;
-        _repositoryGenerator = repositoryGenerator;
-        _validator = validator;
-        _formatter = formatter;
-    }
-
     /// <summary>
     /// Создает экземпляр QueryGenerator с зависимостями по умолчанию
     /// </summary>
@@ -42,7 +27,6 @@ public sealed class QueryGenerator : IQueryGenerator
     {
         var typeMapper = new PostgreSqlTypeMapper();
         var nameConverter = new NameConverter();
-        var formatter = new RoslynFormatter();
         var syntaxBuilder = new QuerySyntaxBuilder(typeMapper, nameConverter);
         
         var methodGenerator = new QueryMethodGenerator(syntaxBuilder, nameConverter);
@@ -54,13 +38,10 @@ public sealed class QueryGenerator : IQueryGenerator
             methodGenerator,
             modelGenerator,
             repositoryGenerator,
-            validator,
-            formatter);
+            validator);
     }
 
-    public async ValueTask<QueryGenerationResult> GenerateAsync(
-        IReadOnlyList<QueryMetadata> queries,
-        QueryGenerationOptions options)
+    public QueryGenerationResult Generate( IReadOnlyList<QueryMetadata> queries, QueryGenerationOptions options)
     {
         var stopwatch = Stopwatch.StartNew();
         var allCode = new List<GeneratedCode>();
@@ -87,7 +68,7 @@ public sealed class QueryGenerator : IQueryGenerator
         var methods = new List<GeneratedMethodResult>();
         foreach (var query in queries)
         {
-            var method = await GenerateMethodAsync(query, options);
+            var method = GenerateMethod(query, options);
             methods.Add(method);
         }
 
@@ -95,12 +76,9 @@ public sealed class QueryGenerator : IQueryGenerator
         var resultModels = new List<GeneratedModelResult>();
         foreach (var query in queries.Where(q => q.ReturnType != null))
         {
-            var model = await GenerateResultModelAsync(query, options);
-            if (model.Code != null)
-            {
-                resultModels.Add(model);
-                allCode.Add(model.Code);
-            }
+            var model = GenerateResultModel(query, options);
+            resultModels.Add(model);
+            allCode.Add(model.Code);
         }
 
         // Генерация моделей параметров (если требуется)
@@ -110,43 +88,33 @@ public sealed class QueryGenerator : IQueryGenerator
             foreach (var query in queries.Where(q => 
                 q.Parameters.Count >= options.ParameterModelThreshold))
             {
-                var model = await GenerateParameterModelAsync(query, options);
-                if (model.Code != null)
-                {
-                    parameterModels.Add(model);
-                    allCode.Add(model.Code);
-                }
+                var model = GenerateParameterModel(query, options);
+                parameterModels.Add(model);
+                allCode.Add(model.Code);
             }
         }
 
         // Генерация репозитория
-        GeneratedClassResult? repositoryClass = null;
         GeneratedInterfaceResult? repositoryInterface = null;
 
         if (options.GenerateInterface)
         {
-            repositoryInterface = await GenerateRepositoryInterfaceAsync(queries, options);
-            if (repositoryInterface.Code != null)
-            {
-                allCode.Add(repositoryInterface.Code);
-            }
+            repositoryInterface = GenerateRepositoryInterface(queries, options);
+            allCode.Add(repositoryInterface.Code);
         }
 
-        repositoryClass = await GenerateRepositoryImplementationAsync(queries, options);
-        if (repositoryClass.Code != null)
-        {
-            allCode.Add(repositoryClass.Code);
-        }
+        var repositoryClass = GenerateRepositoryImplementation(queries, options);
+        allCode.Add(repositoryClass.Code);
 
         stopwatch.Stop();
 
         return new QueryGenerationResult
         {
-            IsSuccess = !allIssues.Any(i => i.Severity == ValidationSeverity.Error),
+            IsSuccess = allIssues.All(i => i.Severity != ValidationSeverity.Error),
             GeneratedCode = allCode,
             ValidationIssues = allIssues,
             Duration = stopwatch.Elapsed,
-            Methods = methods, // ИСПРАВЛЕНО: теперь используем сгенерированные методы
+            Methods = methods,
             RepositoryInterface = repositoryInterface,
             RepositoryImplementation = repositoryClass,
             ResultModels = resultModels,
@@ -155,16 +123,12 @@ public sealed class QueryGenerator : IQueryGenerator
         };
     }
 
-    public async ValueTask<GeneratedMethodResult> GenerateMethodAsync(
-        QueryMetadata queryMetadata,
-        QueryGenerationOptions options)
+    public GeneratedMethodResult GenerateMethod( QueryMetadata queryMetadata, QueryGenerationOptions options)
     {
-        return await _methodGenerator.GenerateAsync(queryMetadata, options);
+        return methodGenerator.Generate(queryMetadata, options);
     }
 
-    public async ValueTask<GeneratedModelResult> GenerateResultModelAsync(
-        QueryMetadata queryMetadata,
-        QueryGenerationOptions options)
+    public GeneratedModelResult GenerateResultModel( QueryMetadata queryMetadata, QueryGenerationOptions options)
     {
         if (queryMetadata.ReturnType == null)
         {
@@ -176,12 +140,10 @@ public sealed class QueryGenerator : IQueryGenerator
             };
         }
 
-        return await _modelGenerator.GenerateResultModelAsync(queryMetadata, options);
+        return modelGenerator.GenerateResultModel(queryMetadata, options);
     }
 
-    public async ValueTask<GeneratedModelResult> GenerateParameterModelAsync(
-        QueryMetadata queryMetadata,
-        QueryGenerationOptions options)
+    public GeneratedModelResult GenerateParameterModel( QueryMetadata queryMetadata, QueryGenerationOptions options)
     {
         if (queryMetadata.Parameters.Count < options.ParameterModelThreshold)
         {
@@ -193,31 +155,22 @@ public sealed class QueryGenerator : IQueryGenerator
             };
         }
 
-        return await _modelGenerator.GenerateParameterModelAsync(queryMetadata, options);
+        return modelGenerator.GenerateParameterModel(queryMetadata, options);
     }
 
-    public async ValueTask<GeneratedInterfaceResult> GenerateRepositoryInterfaceAsync(
-        IReadOnlyList<QueryMetadata> queries,
-        QueryGenerationOptions options)
+    public GeneratedInterfaceResult GenerateRepositoryInterface( IReadOnlyList<QueryMetadata> queries, QueryGenerationOptions options)
     {
-        return await _repositoryGenerator.GenerateInterfaceAsync(queries, options);
+        return repositoryGenerator.GenerateInterface(queries, options);
     }
 
-    public async ValueTask<GeneratedClassResult> GenerateRepositoryImplementationAsync(
-        IReadOnlyList<QueryMetadata> queries,
-        QueryGenerationOptions options)
+    public GeneratedClassResult GenerateRepositoryImplementation( IReadOnlyList<QueryMetadata> queries, QueryGenerationOptions options)
     {
-        return await _repositoryGenerator.GenerateImplementationAsync(queries, options);
+        return repositoryGenerator.GenerateImplementation(queries, options);
     }
 
     public IReadOnlyList<ValidationIssue> ValidateQueries(IReadOnlyList<QueryMetadata> queries)
     {
-        return _validator.Validate(queries);
-    }
-
-    public async ValueTask<string> FormatCodeAsync(string sourceCode)
-    {
-        return await _formatter.FormatAsync(sourceCode);
+        return validator.Validate(queries);
     }
 
     private static QueryGenerationStatistics CalculateStatistics(

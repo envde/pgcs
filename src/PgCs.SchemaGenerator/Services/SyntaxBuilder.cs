@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
 using PgCs.Common.SchemaAnalyzer.Models.Types;
 using PgCs.Common.SchemaGenerator.Models.Options;
@@ -13,17 +12,8 @@ namespace PgCs.SchemaGenerator.Services;
 /// <summary>
 /// Строитель синтаксических деревьев C# с использованием Roslyn
 /// </summary>
-public sealed class SyntaxBuilder
+public sealed class SyntaxBuilder(ITypeMapper typeMapper, INameConverter nameConverter)
 {
-    private readonly ITypeMapper _typeMapper;
-    private readonly INameConverter _nameConverter;
-
-    public SyntaxBuilder(ITypeMapper typeMapper, INameConverter nameConverter)
-    {
-        _typeMapper = typeMapper;
-        _nameConverter = nameConverter;
-    }
-
     /// <summary>
     /// Создает compilation unit (файл) с namespace и классом
     /// </summary>
@@ -56,7 +46,7 @@ public sealed class SyntaxBuilder
         TableDefinition table,
         SchemaGenerationOptions options)
     {
-        var className = _nameConverter.ToClassName(table.Name);
+        var className = nameConverter.ToClassName(table.Name);
 
         var classDeclaration = ClassDeclaration(className)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
@@ -85,8 +75,8 @@ public sealed class SyntaxBuilder
     /// </summary>
     public PropertyDeclarationSyntax BuildProperty(ColumnDefinition column)
     {
-        var propertyName = _nameConverter.ToPropertyName(column.Name);
-        var propertyType = _typeMapper.MapType(column.DataType, column.IsNullable, column.IsArray);
+        var propertyName = nameConverter.ToPropertyName(column.Name);
+        var propertyType = typeMapper.MapType(column.DataType, column.IsNullable, column.IsArray);
 
         var property = PropertyDeclaration(
                 ParseTypeName(propertyType),
@@ -113,7 +103,7 @@ public sealed class SyntaxBuilder
     /// </summary>
     public EnumDeclarationSyntax BuildEnum(TypeDefinition enumType)
     {
-        var enumName = _nameConverter.ToClassName(enumType.Name);
+        var enumName = nameConverter.ToClassName(enumType.Name);
 
         var enumDeclaration = EnumDeclaration(enumName)
             .AddModifiers(Token(SyntaxKind.PublicKeyword));
@@ -126,17 +116,10 @@ public sealed class SyntaxBuilder
         }
 
         // Добавляем значения enum
-        if (enumType.EnumValues != null)
-        {
-            foreach (var value in enumType.EnumValues)
-            {
-                var memberName = _nameConverter.ToEnumMemberName(value);
-                var member = EnumMemberDeclaration(Identifier(memberName));
-                enumDeclaration = enumDeclaration.AddMembers(member);
-            }
-        }
 
-        return enumDeclaration;
+        return enumType.EnumValues.Select(nameConverter.ToEnumMemberName)
+            .Select(memberName => EnumMemberDeclaration(Identifier(memberName)))
+            .Aggregate(enumDeclaration, (current, member) => current.AddMembers(member));
     }
 
     /// <summary>
@@ -167,7 +150,8 @@ public sealed class SyntaxBuilder
             summaryContent.Add(XmlText(XmlTextLiteral(line.Trim())));
             if (line != lines.Last())
             {
-                summaryContent.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: false)));
+                summaryContent.Add(XmlText(XmlTextNewLine(Environment.NewLine,
+                    continueXmlDocumentationComment: false)));
             }
         }
 
@@ -187,7 +171,7 @@ public sealed class SyntaxBuilder
 
         foreach (var column in columns)
         {
-            var requiredNamespace = _typeMapper.GetRequiredNamespace(column.DataType);
+            var requiredNamespace = typeMapper.GetRequiredNamespace(column.DataType);
             if (requiredNamespace != null)
             {
                 usings.Add(requiredNamespace);

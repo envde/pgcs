@@ -11,7 +11,7 @@ public sealed class RoslynFormatter : IRoslynFormatter
 {
     private static readonly AdhocWorkspace Workspace = new();
 
-    public ValueTask<string> FormatAsync(string sourceCode)
+    public string Format(string sourceCode)
     {
         try
         {
@@ -24,12 +24,12 @@ public sealed class RoslynFormatter : IRoslynFormatter
 
             // Возвращаем отформатированный код
             var formattedCode = formattedRoot.ToFullString();
-            return ValueTask.FromResult(formattedCode);
+            return formattedCode;
         }
         catch
         {
             // Если форматирование не удалось, возвращаем исходный код
-            return ValueTask.FromResult(sourceCode);
+            return sourceCode;
         }
     }
 }

@@ -13,7 +13,5 @@ public interface ITableModelGenerator
     /// <summary>
     /// Генерирует C# классы на основе определений таблиц
     /// </summary>
-    ValueTask<IReadOnlyList<GeneratedCode>> GenerateAsync(
-        IReadOnlyList<TableDefinition> tables,
-        SchemaGenerationOptions options);
+    IReadOnlyList<GeneratedCode> Generate( IReadOnlyList<TableDefinition> tables, SchemaGenerationOptions options);
 }

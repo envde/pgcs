@@ -12,7 +12,5 @@ public interface IQueryMethodGenerator
     /// <summary>
     /// Генерирует C# метод для выполнения SQL запроса
     /// </summary>
-    ValueTask<GeneratedMethodResult> GenerateAsync(
-        QueryMetadata queryMetadata,
-        QueryGenerationOptions options);
+    GeneratedMethodResult Generate(QueryMetadata queryMetadata, QueryGenerationOptions options);
 }

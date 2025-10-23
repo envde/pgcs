@@ -29,11 +29,9 @@ internal static partial class ParameterExtractor
             var paramName = match.Groups[1].Value;
             
             // Пропускаем дубликаты
-            if (seen.ContainsKey(paramName))
+            if (!seen.TryAdd(paramName, position))
                 continue;
 
-            seen[paramName] = position;
-            
             var (postgresType, csharpType, isNullable) = TypeInference.InferParameterType(sqlQuery, paramName);
             
             parameters.Add(new QueryParameter

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using PgCs.Common.SchemaAnalyzer;
 using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaAnalyzer.Models.Functions;
 using PgCs.Common.SchemaAnalyzer.Models.Indexes;
@@ -7,7 +8,7 @@ using PgCs.Common.SchemaAnalyzer.Models.Triggers;
 using PgCs.Common.SchemaAnalyzer.Models.Types;
 using PgCs.Common.SchemaAnalyzer.Models.Views;
 
-namespace PgCs.Common.SchemaAnalyzer;
+namespace PgCs.SchemaAnalyzer;
 
 /// <summary>
 /// Fluent API для фильтрации метаданных схемы базы данных
@@ -38,12 +39,12 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Создаёт новый фильтр на основе метаданных схемы
     /// </summary>
-    public static SchemaFilter From(SchemaMetadata metadata) => new(metadata);
+    public static ISchemaFilter From(SchemaMetadata metadata) => new SchemaFilter(metadata);
 
     /// <summary>
     /// Исключить указанные схемы
     /// </summary>
-    public SchemaFilter ExcludeSchemas(params string[] schemas)
+    public ISchemaFilter ExcludeSchemas(params string[] schemas)
     {
         _excludedSchemas ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var schema in schemas)
@@ -56,7 +57,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Включить только указанные схемы
     /// </summary>
-    public SchemaFilter IncludeOnlySchemas(params string[] schemas)
+    public ISchemaFilter IncludeOnlySchemas(params string[] schemas)
     {
         _includedSchemas ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var schema in schemas)
@@ -69,7 +70,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Исключить таблицы по regex паттерну
     /// </summary>
-    public SchemaFilter ExcludeTables(string pattern)
+    public ISchemaFilter ExcludeTables(string pattern)
     {
         _excludeTablePatterns ??= new List<Regex>();
         _excludeTablePatterns.Add(new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled));
@@ -79,7 +80,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Исключить таблицы по нескольким паттернам
     /// </summary>
-    public SchemaFilter ExcludeTables(params string[] patterns)
+    public ISchemaFilter ExcludeTables(params string[] patterns)
     {
         foreach (var pattern in patterns)
         {
@@ -91,7 +92,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Включить только таблицы, соответствующие паттерну
     /// </summary>
-    public SchemaFilter IncludeOnlyTables(string pattern)
+    public ISchemaFilter IncludeOnlyTables(string pattern)
     {
         _includeTablePatterns ??= new List<Regex>();
         _includeTablePatterns.Add(new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled));
@@ -101,7 +102,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Включить только таблицы, соответствующие паттернам
     /// </summary>
-    public SchemaFilter IncludeOnlyTables(params string[] patterns)
+    public ISchemaFilter IncludeOnlyTables(params string[] patterns)
     {
         foreach (var pattern in patterns)
         {
@@ -113,7 +114,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Исключить представления по regex паттерну
     /// </summary>
-    public SchemaFilter ExcludeViews(string pattern)
+    public ISchemaFilter ExcludeViews(string pattern)
     {
         _excludeViewPatterns ??= new List<Regex>();
         _excludeViewPatterns.Add(new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled));
@@ -123,7 +124,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Включить только представления, соответствующие паттерну
     /// </summary>
-    public SchemaFilter IncludeOnlyViews(string pattern)
+    public ISchemaFilter IncludeOnlyViews(string pattern)
     {
         _includeViewPatterns ??= new List<Regex>();
         _includeViewPatterns.Add(new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled));
@@ -133,7 +134,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Включить только определённые виды типов
     /// </summary>
-    public SchemaFilter IncludeOnlyTypes(params TypeKind[] kinds)
+    public ISchemaFilter IncludeOnlyTypes(params TypeKind[] kinds)
     {
         _includeOnlyTypeKinds ??= new HashSet<TypeKind>();
         foreach (var kind in kinds)
@@ -146,7 +147,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Удалить системные объекты (pg_catalog, information_schema и т.д.)
     /// </summary>
-    public SchemaFilter RemoveSystemObjects()
+    public ISchemaFilter RemoveSystemObjects()
     {
         ExcludeSchemas("pg_catalog", "information_schema", "pg_toast");
         ExcludeTables("^pg_.*", "^sql_.*");
@@ -156,7 +157,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Удалить все таблицы
     /// </summary>
-    public SchemaFilter RemoveTables()
+    public ISchemaFilter RemoveTables()
     {
         _removeTables = true;
         return this;
@@ -165,7 +166,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Удалить все представления
     /// </summary>
-    public SchemaFilter RemoveViews()
+    public ISchemaFilter RemoveViews()
     {
         _removeViews = true;
         return this;
@@ -174,7 +175,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Удалить все пользовательские типы
     /// </summary>
-    public SchemaFilter RemoveTypes()
+    public ISchemaFilter RemoveTypes()
     {
         _removeTypes = true;
         return this;
@@ -183,7 +184,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Удалить все функции
     /// </summary>
-    public SchemaFilter RemoveFunctions()
+    public ISchemaFilter RemoveFunctions()
     {
         _removeFunctions = true;
         return this;
@@ -192,7 +193,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Удалить все индексы
     /// </summary>
-    public SchemaFilter RemoveIndexes()
+    public ISchemaFilter RemoveIndexes()
     {
         _removeIndexes = true;
         return this;
@@ -201,7 +202,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Удалить все триггеры
     /// </summary>
-    public SchemaFilter RemoveTriggers()
+    public ISchemaFilter RemoveTriggers()
     {
         _removeTriggers = true;
         return this;
@@ -210,7 +211,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Удалить все ограничения (constraints)
     /// </summary>
-    public SchemaFilter RemoveConstraints()
+    public ISchemaFilter RemoveConstraints()
     {
         _removeConstraints = true;
         return this;
@@ -219,7 +220,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Оставить только таблицы и представления
     /// </summary>
-    public SchemaFilter OnlyTablesAndViews()
+    public ISchemaFilter OnlyTablesAndViews()
     {
         _removeTypes = true;
         _removeFunctions = true;
@@ -231,7 +232,7 @@ public sealed class SchemaFilter : ISchemaFilter
     /// <summary>
     /// Оставить только таблицы
     /// </summary>
-    public SchemaFilter OnlyTables()
+    public ISchemaFilter OnlyTables()
     {
         _removeViews = true;
         _removeTypes = true;
@@ -271,7 +272,7 @@ public sealed class SchemaFilter : ISchemaFilter
 
     private IReadOnlyList<TableDefinition> FilterTables()
     {
-        if (_removeTables) return Array.Empty<TableDefinition>();
+        if (_removeTables) return [];
 
         return _sourceMetadata.Tables
             .Where(t => !IsSchemaExcluded(t.Schema))
@@ -283,7 +284,7 @@ public sealed class SchemaFilter : ISchemaFilter
 
     private IReadOnlyList<ViewDefinition> FilterViews()
     {
-        if (_removeViews) return Array.Empty<ViewDefinition>();
+        if (_removeViews) return [];
 
         return _sourceMetadata.Views
             .Where(v => !IsSchemaExcluded(v.Schema))
@@ -295,7 +296,7 @@ public sealed class SchemaFilter : ISchemaFilter
 
     private IReadOnlyList<TypeDefinition> FilterTypes()
     {
-        if (_removeTypes) return Array.Empty<TypeDefinition>();
+        if (_removeTypes) return [];
 
         var types = _sourceMetadata.Types
             .Where(t => !IsSchemaExcluded(t.Schema))
@@ -311,7 +312,7 @@ public sealed class SchemaFilter : ISchemaFilter
 
     private IReadOnlyList<FunctionDefinition> FilterFunctions()
     {
-        if (_removeFunctions) return Array.Empty<FunctionDefinition>();
+        if (_removeFunctions) return [];
 
         return _sourceMetadata.Functions
             .Where(f => !IsSchemaExcluded(f.Schema))
@@ -321,7 +322,7 @@ public sealed class SchemaFilter : ISchemaFilter
 
     private IReadOnlyList<IndexDefinition> FilterIndexes()
     {
-        if (_removeIndexes) return Array.Empty<IndexDefinition>();
+        if (_removeIndexes) return [];
 
         return _sourceMetadata.Indexes
             .Where(i => !IsSchemaExcluded(i.Schema))
@@ -331,7 +332,7 @@ public sealed class SchemaFilter : ISchemaFilter
 
     private IReadOnlyList<TriggerDefinition> FilterTriggers()
     {
-        if (_removeTriggers) return Array.Empty<TriggerDefinition>();
+        if (_removeTriggers) return [];
 
         return _sourceMetadata.Triggers
             .Where(t => !IsSchemaExcluded(t.Schema))
@@ -341,7 +342,7 @@ public sealed class SchemaFilter : ISchemaFilter
 
     private IReadOnlyList<ConstraintDefinition> FilterConstraints()
     {
-        if (_removeConstraints) return Array.Empty<ConstraintDefinition>();
+        if (_removeConstraints) return [];
 
         return _sourceMetadata.Constraints
             .Where(c => !IsSchemaExcluded(c.Schema))
@@ -358,8 +359,7 @@ public sealed class SchemaFilter : ISchemaFilter
     private bool IsSchemaIncluded(string? schema)
     {
         if (_includedSchemas == null) return true;
-        if (schema == null) return true; // public schema
-        return _includedSchemas.Contains(schema);
+        return schema == null || _includedSchemas.Contains(schema);
     }
 
     private bool IsTableExcluded(string tableName)

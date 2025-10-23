@@ -301,8 +301,8 @@ public class CodeGenerationPipeline
             if (_generateSchema && schemaMetadata != null)
             {
                 ReportProgress("Генерация C# моделей для схемы...");
-                var schemaGen = PgCs.SchemaGenerator.SchemaGenerator.Create();
-                schemaGenResult = await schemaGen.GenerateAsync(
+                var schemaGen = SchemaGenerator.SchemaGenerator.Create();
+                schemaGenResult = schemaGen.Generate(
                     schemaMetadata,
                     _schemaOptions ?? CreateDefaultSchemaOptions());
                 result.SchemaGenerationResult = schemaGenResult;
@@ -324,8 +324,8 @@ public class CodeGenerationPipeline
             if (_generateQueries && queries != null && queries.Any())
             {
                 ReportProgress("Генерация C# репозиториев для запросов...");
-                var queryGen = PgCs.QueryGenerator.QueryGenerator.Create();
-                queryGenResult = await queryGen.GenerateAsync(
+                var queryGen = QueryGenerator.QueryGenerator.Create();
+                queryGenResult = queryGen.Generate(
                     queries,
                     _queryOptions ?? CreateDefaultQueryOptions());
                 result.QueryGenerationResult = queryGenResult;

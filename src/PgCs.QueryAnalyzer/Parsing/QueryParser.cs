@@ -15,7 +15,7 @@ internal static class SqlQueryParser
     public static (string Comments, string Query) SplitCommentsAndQuery(ReadOnlySpan<char> sqlQuery)
     {
         Span<Range> lineRanges = stackalloc Range[128];
-        var lineCount = sqlQuery.Split(lineRanges, '\n', StringSplitOptions.None);
+        var lineCount = sqlQuery.Split(lineRanges, '\n');
         
         var commentLines = new List<string>(capacity: 4);
         var queryLines = new List<string>(capacity: 16);

@@ -13,31 +13,15 @@ namespace PgCs.SchemaGenerator;
 /// <summary>
 /// Реализация генератора C# кода на основе схемы PostgreSQL базы данных
 /// </summary>
-public sealed class SchemaGenerator : ISchemaGenerator
+public sealed class SchemaGenerator(
+    ITableModelGenerator tableGenerator,
+    IViewModelGenerator viewGenerator,
+    ICustomTypeGenerator typeGenerator,
+    IFunctionMethodGenerator functionGenerator,
+    ISchemaValidator validator,
+    IRoslynFormatter formatter)
+    : ISchemaGenerator
 {
-    private readonly ITableModelGenerator _tableGenerator;
-    private readonly IViewModelGenerator _viewGenerator;
-    private readonly ICustomTypeGenerator _typeGenerator;
-    private readonly IFunctionMethodGenerator _functionGenerator;
-    private readonly ISchemaValidator _validator;
-    private readonly IRoslynFormatter _formatter;
-
-    public SchemaGenerator(
-        ITableModelGenerator tableGenerator,
-        IViewModelGenerator viewGenerator,
-        ICustomTypeGenerator typeGenerator,
-        IFunctionMethodGenerator functionGenerator,
-        ISchemaValidator validator,
-        IRoslynFormatter formatter)
-    {
-        _tableGenerator = tableGenerator;
-        _viewGenerator = viewGenerator;
-        _typeGenerator = typeGenerator;
-        _functionGenerator = functionGenerator;
-        _validator = validator;
-        _formatter = formatter;
-    }
-
     /// <summary>
     /// Создает экземпляр SchemaGenerator с зависимостями по умолчанию
     /// </summary>
@@ -63,7 +47,7 @@ public sealed class SchemaGenerator : ISchemaGenerator
             formatter);
     }
 
-    public async ValueTask<SchemaGenerationResult> GenerateAsync(
+    public SchemaGenerationResult Generate(
         SchemaMetadata schemaMetadata,
         SchemaGenerationOptions options)
     {
@@ -91,7 +75,7 @@ public sealed class SchemaGenerator : ISchemaGenerator
         IReadOnlyList<GeneratedCode> tableModels = [];
         if (schemaMetadata.Tables.Any())
         {
-            tableModels = await GenerateTableModelsAsync(schemaMetadata, options);
+            tableModels = GenerateTableModels(schemaMetadata, options);
             allCode.AddRange(tableModels);
         }
 
@@ -99,7 +83,7 @@ public sealed class SchemaGenerator : ISchemaGenerator
         IReadOnlyList<GeneratedCode> viewModels = [];
         if (schemaMetadata.Views.Any())
         {
-            viewModels = await GenerateViewModelsAsync(schemaMetadata, options);
+            viewModels = GenerateViewModels(schemaMetadata, options);
             allCode.AddRange(viewModels);
         }
 
@@ -107,7 +91,7 @@ public sealed class SchemaGenerator : ISchemaGenerator
         IReadOnlyList<GeneratedCode> customTypes = [];
         if (schemaMetadata.Types.Any())
         {
-            customTypes = await GenerateCustomTypesAsync(schemaMetadata, options);
+            customTypes = GenerateCustomTypes(schemaMetadata, options);
             allCode.AddRange(customTypes);
         }
 
@@ -115,7 +99,7 @@ public sealed class SchemaGenerator : ISchemaGenerator
         IReadOnlyList<GeneratedCode> functions = [];
         if (options.GenerateFunctions && schemaMetadata.Functions.Any())
         {
-            functions = await GenerateFunctionMethodsAsync(schemaMetadata, options);
+            functions = GenerateFunctionMethods(schemaMetadata, options);
             allCode.AddRange(functions);
         }
 
@@ -123,7 +107,7 @@ public sealed class SchemaGenerator : ISchemaGenerator
 
         return new SchemaGenerationResult
         {
-            IsSuccess = !allIssues.Any(i => i.Severity == ValidationSeverity.Error),
+            IsSuccess = allIssues.All(i => i.Severity != ValidationSeverity.Error),
             GeneratedCode = allCode,
             ValidationIssues = allIssues,
             Duration = stopwatch.Elapsed,
@@ -135,44 +119,36 @@ public sealed class SchemaGenerator : ISchemaGenerator
         };
     }
 
-    public async ValueTask<IReadOnlyList<GeneratedCode>> GenerateTableModelsAsync(
-        SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions options)
+    public IReadOnlyList<GeneratedCode> GenerateTableModels( SchemaMetadata schemaMetadata, SchemaGenerationOptions options)
     {
-        return await _tableGenerator.GenerateAsync(schemaMetadata.Tables, options);
+        return tableGenerator.Generate(schemaMetadata.Tables, options);
     }
 
-    public async ValueTask<IReadOnlyList<GeneratedCode>> GenerateViewModelsAsync(
-        SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions options)
+    public IReadOnlyList<GeneratedCode> GenerateViewModels( SchemaMetadata schemaMetadata, SchemaGenerationOptions options)
     {
-        return await _viewGenerator.GenerateAsync(schemaMetadata.Views, options);
+        return viewGenerator.Generate(schemaMetadata.Views, options);
     }
 
-    public async ValueTask<IReadOnlyList<GeneratedCode>> GenerateCustomTypesAsync(
-        SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions options)
+    public IReadOnlyList<GeneratedCode> GenerateCustomTypes( SchemaMetadata schemaMetadata, SchemaGenerationOptions options)
     {
-        var result = await _typeGenerator.GenerateAsync(schemaMetadata.Types, options);
-
+        var result = typeGenerator.Generate(schemaMetadata.Types, options);
         return result;
     }
 
-    public async ValueTask<IReadOnlyList<GeneratedCode>> GenerateFunctionMethodsAsync(
-        SchemaMetadata schemaMetadata,
-        SchemaGenerationOptions options)
+    public IReadOnlyList<GeneratedCode> GenerateFunctionMethods( SchemaMetadata schemaMetadata, SchemaGenerationOptions options)
     {
-        return await _functionGenerator.GenerateAsync(schemaMetadata.Functions, options);
+        var result = functionGenerator.Generate(schemaMetadata.Functions, options);
+        return result;
     }
 
     public IReadOnlyList<ValidationIssue> ValidateSchema(SchemaMetadata schemaMetadata)
     {
-        return _validator.Validate(schemaMetadata);
+        return validator.Validate(schemaMetadata);
     }
 
-    public async ValueTask<string> FormatCodeAsync(string sourceCode)
+    public string FormatCode(string sourceCode)
     {
-        return await _formatter.FormatAsync(sourceCode);
+        return formatter.Format(sourceCode);
     }
 
     private static GenerationStatistics CalculateStatistics(

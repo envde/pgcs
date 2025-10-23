@@ -12,14 +12,10 @@ public interface IQueryModelGenerator
     /// <summary>
     /// Генерирует модель результата запроса (DTO)
     /// </summary>
-    ValueTask<GeneratedModelResult> GenerateResultModelAsync(
-        QueryMetadata queryMetadata,
-        QueryGenerationOptions options);
+    GeneratedModelResult GenerateResultModel( QueryMetadata queryMetadata, QueryGenerationOptions options);
 
     /// <summary>
     /// Генерирует модель параметров запроса
     /// </summary>
-    ValueTask<GeneratedModelResult> GenerateParameterModelAsync(
-        QueryMetadata queryMetadata,
-        QueryGenerationOptions options);
+    GeneratedModelResult GenerateParameterModel( QueryMetadata queryMetadata, QueryGenerationOptions options);
 }

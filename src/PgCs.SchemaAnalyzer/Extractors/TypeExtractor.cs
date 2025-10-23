@@ -14,7 +14,7 @@ internal sealed partial class TypeExtractor : BaseExtractor<TypeDefinition>
 
     protected override Regex Pattern => TypePatternRegex();
 
-    protected override TypeDefinition? ParseMatch(Match match, string statement)
+    protected override TypeDefinition ParseMatch(Match match, string statement)
     {
         // DOMAIN type
         if (match.Groups[4].Success)

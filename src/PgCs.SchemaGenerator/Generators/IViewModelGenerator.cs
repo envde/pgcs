@@ -13,7 +13,5 @@ public interface IViewModelGenerator
     /// <summary>
     /// Генерирует C# классы на основе определений представлений
     /// </summary>
-    ValueTask<IReadOnlyList<GeneratedCode>> GenerateAsync(
-        IReadOnlyList<ViewDefinition> views,
-        SchemaGenerationOptions options);
+    IReadOnlyList<GeneratedCode> Generate( IReadOnlyList<ViewDefinition> views, SchemaGenerationOptions options);
 }

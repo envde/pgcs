@@ -14,7 +14,7 @@ internal sealed partial class IndexExtractor : BaseExtractor<IndexDefinition>
 
     protected override Regex Pattern => IndexPatternRegex();
 
-    protected override IndexDefinition? ParseMatch(Match match, string statement)
+    protected override IndexDefinition ParseMatch(Match match, string statement)
     {
         var isUnique = !string.IsNullOrWhiteSpace(match.Groups[1].Value);
         var indexName = match.Groups[2].Value.Trim();

@@ -12,14 +12,10 @@ public interface IRepositoryGenerator
     /// <summary>
     /// Генерирует интерфейс репозитория с методами запросов
     /// </summary>
-    ValueTask<GeneratedInterfaceResult> GenerateInterfaceAsync(
-        IReadOnlyList<QueryMetadata> queries,
-        QueryGenerationOptions options);
+    GeneratedInterfaceResult GenerateInterface( IReadOnlyList<QueryMetadata> queries, QueryGenerationOptions options);
 
     /// <summary>
     /// Генерирует реализацию репозитория с методами запросов
     /// </summary>
-    ValueTask<GeneratedClassResult> GenerateImplementationAsync(
-        IReadOnlyList<QueryMetadata> queries,
-        QueryGenerationOptions options);
+    GeneratedClassResult GenerateImplementation( IReadOnlyList<QueryMetadata> queries, QueryGenerationOptions options);
 }

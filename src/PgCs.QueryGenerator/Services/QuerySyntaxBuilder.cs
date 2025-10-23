@@ -1,26 +1,15 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryAnalyzer.Models.Parameters;
 using PgCs.Common.QueryAnalyzer.Models.Results;
-using PgCs.Common.QueryGenerator.Models.Options;
 using PgCs.Common.Services;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace PgCs.QueryGenerator.Services;
 
-public sealed class QuerySyntaxBuilder
+public sealed class QuerySyntaxBuilder(ITypeMapper typeMapper, INameConverter nameConverter)
 {
-    private readonly ITypeMapper _typeMapper;
-    private readonly INameConverter _nameConverter;
-
-    public QuerySyntaxBuilder(ITypeMapper typeMapper, INameConverter nameConverter)
-    {
-        _typeMapper = typeMapper;
-        _nameConverter = nameConverter;
-    }
-
     /// <summary>
     /// Создает compilation unit для модели результата
     /// </summary>
@@ -62,7 +51,7 @@ public sealed class QuerySyntaxBuilder
     /// </summary>
     public PropertyDeclarationSyntax BuildProperty(ReturnColumn column)
     {
-        var propertyName = _nameConverter.ToPropertyName(column.Name);
+        var propertyName = nameConverter.ToPropertyName(column.Name);
         var propertyType = column.CSharpType;
 
         var property = PropertyDeclaration(
@@ -106,7 +95,7 @@ public sealed class QuerySyntaxBuilder
     /// </summary>
     private PropertyDeclarationSyntax BuildParameterProperty(QueryParameter parameter)
     {
-        var propertyName = _nameConverter.ToPropertyName(parameter.Name);
+        var propertyName = nameConverter.ToPropertyName(parameter.Name);
         var propertyType = parameter.CSharpType;
 
         var property = PropertyDeclaration(
@@ -247,7 +236,7 @@ public sealed class QuerySyntaxBuilder
 
         foreach (var column in columns)
         {
-            var requiredNamespace = _typeMapper.GetRequiredNamespace(column.PostgresType);
+            var requiredNamespace = typeMapper.GetRequiredNamespace(column.PostgresType);
             if (requiredNamespace != null)
             {
                 usings.Add(requiredNamespace);

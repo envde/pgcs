@@ -13,16 +13,9 @@ namespace PgCs.SchemaGenerator.Generators;
 /// <summary>
 /// Генератор C# типов для пользовательских типов PostgreSQL с использованием Roslyn
 /// </summary>
-public sealed class CustomTypeGenerator : ICustomTypeGenerator
+public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTypeGenerator
 {
-    private readonly SyntaxBuilder _syntaxBuilder;
-
-    public CustomTypeGenerator(SyntaxBuilder syntaxBuilder)
-    {
-        _syntaxBuilder = syntaxBuilder;
-    }
-
-    public async ValueTask<IReadOnlyList<GeneratedCode>> GenerateAsync(
+    public IReadOnlyList<GeneratedCode> Generate(
         IReadOnlyList<TypeDefinition> types,
         SchemaGenerationOptions options)
     {
@@ -44,7 +37,7 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
             }
         }
 
-        return await ValueTask.FromResult(generatedCode);
+        return generatedCode;
     }
 
     /// <summary>
@@ -55,7 +48,7 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
         // Создаем члены enum
         var members = new List<EnumMemberDeclarationSyntax>();
         
-        foreach (var value in type.EnumValues ?? [])
+        foreach (var value in type.EnumValues)
         {
             var memberName = ConvertEnumValueToIdentifier(value);
             var member = EnumMemberDeclaration(memberName);
@@ -81,7 +74,7 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
         }
 
         // Создаем compilation unit
-        var compilationUnit = _syntaxBuilder.BuildEnumCompilationUnit(
+        var compilationUnit = syntaxBuilder.BuildEnumCompilationUnit(
             options.RootNamespace,
             enumDeclaration);
 
@@ -166,7 +159,7 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
             .WithCloseBraceToken(Token(SyntaxKind.CloseBraceToken));
 
         // Добавляем свойства для каждого атрибута composite типа
-        foreach (var attribute in type.CompositeAttributes ?? [])
+        foreach (var attribute in type.CompositeAttributes)
         {
             var propertyType = attribute.DataType;
             var property = PropertyDeclaration(

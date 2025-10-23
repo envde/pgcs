@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -6,7 +5,6 @@ using PgCs.Common.CodeGeneration;
 using PgCs.Common.SchemaAnalyzer.Models.Functions;
 using PgCs.Common.SchemaGenerator.Models.Options;
 using PgCs.Common.Services;
-using PgCs.SchemaGenerator.Services;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace PgCs.SchemaGenerator.Generators;
@@ -14,27 +12,17 @@ namespace PgCs.SchemaGenerator.Generators;
 /// <summary>
 /// Генератор C# методов для функций PostgreSQL с использованием Roslyn
 /// </summary>
-public sealed class FunctionMethodGenerator : IFunctionMethodGenerator
+public sealed class FunctionMethodGenerator(ITypeMapper typeMapper, INameConverter nameConverter)
+    : IFunctionMethodGenerator
 {
-    private readonly ITypeMapper _typeMapper;
-    private readonly INameConverter _nameConverter;
-
-    public FunctionMethodGenerator(ITypeMapper typeMapper, INameConverter nameConverter)
-    {
-        _typeMapper = typeMapper;
-        _nameConverter = nameConverter;
-    }
-
-    public ValueTask<IReadOnlyList<GeneratedCode>> GenerateAsync(
-        IReadOnlyList<FunctionDefinition> functions,
-        SchemaGenerationOptions options)
+    public IReadOnlyList<GeneratedCode> Generate( IReadOnlyList<FunctionDefinition> functions, SchemaGenerationOptions options)
     {
         if (!functions.Any())
-            return ValueTask.FromResult<IReadOnlyList<GeneratedCode>>([]);
+            return [];
 
         var generatedCode = GenerateFunctionsRepositoryClass(functions, options);
         
-        return ValueTask.FromResult<IReadOnlyList<GeneratedCode>>([generatedCode]);
+        return [generatedCode];  
     }
 
     private GeneratedCode GenerateFunctionsRepositoryClass(
@@ -45,7 +33,8 @@ public sealed class FunctionMethodGenerator : IFunctionMethodGenerator
         
         // Создаём методы для каждой функции
         var methods = functions
-            .Select(f => GenerateFunctionMethod(f, options))
+            .Select(GenerateFunctionMethod)
+            .Cast<MemberDeclarationSyntax>()
             .ToArray();
 
         // Создаём класс репозитория
@@ -80,11 +69,9 @@ public sealed class FunctionMethodGenerator : IFunctionMethodGenerator
         };
     }
 
-    private MethodDeclarationSyntax GenerateFunctionMethod(
-        FunctionDefinition function,
-        SchemaGenerationOptions options)
+    private MethodDeclarationSyntax GenerateFunctionMethod(FunctionDefinition function)
     {
-        var methodName = _nameConverter.ToMethodName(function.Name);
+        var methodName = nameConverter.ToMethodName(function.Name);
         var returnType = MapReturnType(function.ReturnType);
         
         // Параметры метода
@@ -97,8 +84,8 @@ public sealed class FunctionMethodGenerator : IFunctionMethodGenerator
         // Добавляем параметры функции
         foreach (var param in function.Parameters)
         {
-            var paramType = _typeMapper.MapType(param.DataType, isNullable: false, isArray: false);
-            var paramName = _nameConverter.ToParameterName(param.Name);
+            var paramType = typeMapper.MapType(param.DataType, isNullable: false, isArray: false);
+            var paramName = nameConverter.ToParameterName(param.Name);
             
             parameters.Add(
                 Parameter(Identifier(paramName))

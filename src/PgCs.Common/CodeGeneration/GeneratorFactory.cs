@@ -1,5 +1,3 @@
-using PgCs.Common.QueryGenerator;
-using PgCs.Common.SchemaGenerator;
 using PgCs.Common.Services;
 using PgCs.Common.Writer;
 
@@ -328,7 +326,7 @@ public sealed class GeneratorFactory
     /// </summary>
     private sealed class NoOpFormatter : IRoslynFormatter
     {
-        public ValueTask<string> FormatAsync(string sourceCode) => ValueTask.FromResult(sourceCode);
+        public string Format(string sourceCode) => sourceCode;
     }
 
     #endregion

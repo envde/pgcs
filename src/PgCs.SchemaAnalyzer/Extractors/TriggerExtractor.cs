@@ -14,7 +14,7 @@ internal sealed partial class TriggerExtractor : BaseExtractor<TriggerDefinition
 
     protected override Regex Pattern => TriggerPatternRegex();
 
-    protected override TriggerDefinition? ParseMatch(Match match, string statement)
+    protected override TriggerDefinition ParseMatch(Match match, string statement)
     {
         var triggerName = match.Groups[1].Value.Trim();
         var timing = match.Groups[2].Value.Trim();

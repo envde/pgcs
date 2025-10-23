@@ -47,7 +47,7 @@ internal static partial class ColumnExtractor
         
         if (trimmed == "*")
         {
-            // TODO: требуется подключение к БД для получения схемы
+            // NOTE: Static analysis limitation - requires database connection to resolve SELECT * columns
             return [];
         }
 
@@ -68,7 +68,8 @@ internal static partial class ColumnExtractor
                 Name = columnName,
                 PostgresType = postgresType,
                 CSharpType = csharpType,
-                IsNullable = true // TODO: определить из схемы БД
+                // NOTE: Static analysis limitation - nullability requires database schema metadata
+                IsNullable = true
             });
         }
 

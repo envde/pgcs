@@ -14,9 +14,7 @@ public interface IWriter
     /// <param name="code">Список сгенерированного кода</param>
     /// <param name="options">Опции записи</param>
     /// <returns>Результат записи файлов</returns>
-    ValueTask<WriteResult> WriteManyAsync(
-        IReadOnlyList<GeneratedCode> code,
-        WriteOptions options);
+    ValueTask<WriteResult> WriteManyAsync( IReadOnlyList<GeneratedCode> code, WriteOptions options);
 
     /// <summary>
     /// Записывает один элемент сгенерированного кода в хранилище
@@ -24,9 +22,7 @@ public interface IWriter
     /// <param name="code">Сгенерированный код</param>
     /// <param name="options">Опции записи</param>
     /// <returns>Результат записи файла</returns>
-    ValueTask<WriteResult> WriteOneAsync(
-        GeneratedCode code,
-        WriteOptions options);
+    ValueTask<WriteResult> WriteOneAsync( GeneratedCode code, WriteOptions options);
 
     /// <summary>
     /// Проверяет возможность записи в указанное место назначения
@@ -40,5 +36,5 @@ public interface IWriter
     /// </summary>
     /// <param name="filePaths">Пути к файлам для удаления</param>
     /// <returns>Результат удаления</returns>
-    ValueTask<WriteResult> DeleteFilesAsync(IReadOnlyList<string> filePaths);
+    WriteResult DeleteFiles(IReadOnlyList<string> filePaths);
 }

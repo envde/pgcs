@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using PgCs.Common.CodeGeneration;
 using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryAnalyzer.Models.Results;
 using PgCs.Common.QueryGenerator.Models.Options;
@@ -15,34 +14,24 @@ namespace PgCs.QueryGenerator.Generators;
 /// <summary>
 /// Генератор C# методов для SQL запросов с использованием Roslyn
 /// </summary>
-public sealed class QueryMethodGenerator : IQueryMethodGenerator
+public sealed class QueryMethodGenerator(
+    QuerySyntaxBuilder syntaxBuilder,
+    INameConverter nameConverter)
+    : IQueryMethodGenerator
 {
-    private readonly QuerySyntaxBuilder _syntaxBuilder;
-    private readonly INameConverter _nameConverter;
-
-    public QueryMethodGenerator(
-        QuerySyntaxBuilder syntaxBuilder,
-        INameConverter nameConverter)
-    {
-        _syntaxBuilder = syntaxBuilder;
-        _nameConverter = nameConverter;
-    }
-
-    public ValueTask<GeneratedMethodResult> GenerateAsync(
-        QueryMetadata queryMetadata,
-        QueryGenerationOptions options)
+    public GeneratedMethodResult Generate( QueryMetadata queryMetadata, QueryGenerationOptions options)
     {
         var method = BuildQueryMethod(queryMetadata, options);
         var sourceCode = method.NormalizeWhitespace().ToFullString();
 
-        return ValueTask.FromResult(new GeneratedMethodResult
+        return new GeneratedMethodResult
         {
             IsSuccess = true,
             MethodName = queryMetadata.MethodName,
             MethodSignature = GetMethodSignature(queryMetadata, options),
             SourceCode = sourceCode,
             SqlQuery = queryMetadata.SqlQuery
-        });
+        };
     }
 
     /// <summary>
@@ -60,7 +49,7 @@ public sealed class QueryMethodGenerator : IQueryMethodGenerator
             .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
             .AddParameterListParameters(parameters.ToArray())
             .WithBody(body)
-            .WithLeadingTrivia(_syntaxBuilder.CreateXmlComment(
+            .WithLeadingTrivia(syntaxBuilder.CreateXmlComment(
                 $"Выполняет запрос: {queryMetadata.MethodName}",
                 options.IncludeSqlInDocumentation ? queryMetadata.SqlQuery : null));
 
@@ -174,7 +163,7 @@ public sealed class QueryMethodGenerator : IQueryMethodGenerator
     {
         foreach (var param in queryMetadata.Parameters)
         {
-            var paramName = _nameConverter.ToParameterName(param.Name);
+            var paramName = nameConverter.ToParameterName(param.Name);
             
             yield return ExpressionStatement(
                 InvocationExpression(
@@ -215,7 +204,7 @@ public sealed class QueryMethodGenerator : IQueryMethodGenerator
     /// </summary>
     private IEnumerable<StatementSyntax> BuildSelectStatements(
         QueryMetadata queryMetadata,
-        QueryGenerationOptions options)
+        QueryGenerationOptions options) // TODO: option не используется, нужно добавить использование или удалить этот параметр
     {
         // await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
         yield return LocalDeclarationStatement(
@@ -344,7 +333,7 @@ public sealed class QueryMethodGenerator : IQueryMethodGenerator
         // Параметры запроса
         foreach (var param in queryMetadata.Parameters)
         {
-            var paramName = _nameConverter.ToParameterName(param.Name);
+            var paramName = nameConverter.ToParameterName(param.Name);
             parameters.Add(
                 Parameter(Identifier(paramName))
                     .WithType(ParseTypeName(param.CSharpType)));

@@ -15,7 +15,7 @@ internal sealed partial class ViewExtractor : BaseExtractor<ViewDefinition>
 
     protected override Regex Pattern => ViewPatternRegex();
 
-    protected override ViewDefinition? ParseMatch(Match match, string statement)
+    protected override ViewDefinition ParseMatch(Match match, string statement)
     {
         var isMaterialized = !string.IsNullOrWhiteSpace(match.Groups[1].Value);
         var fullViewName = match.Groups[2].Value.Trim();

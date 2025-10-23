@@ -15,7 +15,7 @@ internal sealed partial class TableExtractor : BaseExtractor<TableDefinition>
 
     protected override Regex Pattern => TablePatternRegex();
 
-    protected override TableDefinition? ParseMatch(Match match, string statement)
+    protected override TableDefinition ParseMatch(Match match, string statement)
     {
         var fullTableName = match.Groups[1].Value.Trim();
         var columnsBlock = match.Groups[2].Value;

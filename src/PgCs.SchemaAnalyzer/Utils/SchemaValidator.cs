@@ -90,6 +90,17 @@ public static class SchemaValidator
             {
                 errors.Add($"Index '{index.Name}' has no columns");
             }
+
+            // Предупреждения для индексов
+            if (index.Columns.Count > 5)
+            {
+                warnings.Add($"Index '{index.Name}' has {index.Columns.Count} columns - consider splitting into multiple indexes");
+            }
+
+            if (!index.IsUnique && index.Columns.Count == 1)
+            {
+                warnings.Add($"Index '{index.Name}' on single column '{index.Columns[0]}' might not provide significant performance benefit");
+            }
         }
     }
 

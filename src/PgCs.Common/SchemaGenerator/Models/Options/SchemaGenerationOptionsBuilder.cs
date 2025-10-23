@@ -15,8 +15,8 @@ public sealed class SchemaGenerationOptionsBuilder
     private bool _useInitOnlyProperties = true;
     private bool _generateXmlDocumentation = true;
     private bool _formatCode = true;
-    private bool _overwriteExistingFiles = false;
-    private bool _usePrimaryConstructors = false;
+    private bool _overwriteExistingFiles;
+    private bool _usePrimaryConstructors;
     private bool _generateMappingAttributes = true;
     private bool _generateValidationAttributes = true;
     private string? _tablePrefix;

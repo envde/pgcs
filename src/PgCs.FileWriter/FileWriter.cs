@@ -19,9 +19,7 @@ public sealed class FileWriter : IWriter
     /// <summary>
     /// Записывает сгенерированный код на диск
     /// </summary>
-    public async ValueTask<WriteResult> WriteManyAsync(
-        IReadOnlyList<GeneratedCode> code,
-        WriteOptions options)
+    public async ValueTask<WriteResult> WriteManyAsync( IReadOnlyList<GeneratedCode> code, WriteOptions options)
     {
         var stopwatch = Stopwatch.StartNew();
         var writtenFiles = new List<string>();
@@ -36,15 +34,15 @@ public sealed class FileWriter : IWriter
             {
                 IsSuccess = false,
                 WrittenFiles = [],
-                Errors = new[]
-                {
+                Errors =
+                [
                     new WriteError
                     {
                         FilePath = options.OutputPath,
                         Message = $"Невозможно записать в директорию: {options.OutputPath}",
                         ErrorType = WriteErrorType.AccessDenied
                     }
-                },
+                ],
                 Duration = stopwatch.Elapsed
             };
         }
@@ -95,9 +93,7 @@ public sealed class FileWriter : IWriter
     /// <summary>
     /// Записывает один элемент сгенерированного кода на диск
     /// </summary>
-    public async ValueTask<WriteResult> WriteOneAsync(
-        GeneratedCode code,
-        WriteOptions options)
+    public async ValueTask<WriteResult> WriteOneAsync( GeneratedCode code, WriteOptions options)
     {
         var stopwatch = Stopwatch.StartNew();
         var backupFiles = new List<string>();
@@ -189,7 +185,7 @@ public sealed class FileWriter : IWriter
             return new WriteResult
             {
                 IsSuccess = true,
-                WrittenFiles = new[] { targetPath },
+                WrittenFiles = [targetPath],
                 BackupFiles = backupFiles,
                 Duration = stopwatch.Elapsed,
                 TotalBytesWritten = encoding.GetByteCount(code.SourceCode)
@@ -227,14 +223,14 @@ public sealed class FileWriter : IWriter
     /// <summary>
     /// Проверяет возможность записи в указанное место назначения
     /// </summary>
-    public ValueTask<bool> CanWriteAsync(WriteOptions options)
+    public async ValueTask<bool> CanWriteAsync(WriteOptions options)
     {
         try
         {
             // Проверяем корректность пути
             if (string.IsNullOrWhiteSpace(options.OutputPath))
             {
-                return ValueTask.FromResult(false);
+                return false;
             }
 
             // Если директория существует, проверяем права записи
@@ -244,13 +240,13 @@ public sealed class FileWriter : IWriter
                 var testFile = Path.Combine(options.OutputPath, $".pgcs_test_{Guid.NewGuid()}.tmp");
                 try
                 {
-                    File.WriteAllText(testFile, "test");
+                    await File.WriteAllTextAsync(testFile, "test");
                     File.Delete(testFile);
-                    return ValueTask.FromResult(true);
+                    return true;
                 }
                 catch
                 {
-                    return ValueTask.FromResult(false);
+                    return false;
                 }
             }
 
@@ -260,26 +256,26 @@ public sealed class FileWriter : IWriter
                 try
                 {
                     var parentDir = Directory.GetParent(options.OutputPath);
-                    return ValueTask.FromResult(parentDir?.Exists ?? false);
+                    return parentDir?.Exists ?? false;
                 }
                 catch
                 {
-                    return ValueTask.FromResult(false);
+                    return false;
                 }
             }
 
-            return ValueTask.FromResult(false);
+            return false;
         }
         catch
         {
-            return ValueTask.FromResult(false);
+            return false;
         }
     }
 
     /// <summary>
     /// Удаляет ранее созданные файлы
     /// </summary>
-    public ValueTask<WriteResult> DeleteFilesAsync(IReadOnlyList<string> filePaths)
+    public WriteResult DeleteFiles(IReadOnlyList<string> filePaths)
     {
         var stopwatch = Stopwatch.StartNew();
         var deletedFiles = new List<string>();
@@ -319,13 +315,13 @@ public sealed class FileWriter : IWriter
 
         stopwatch.Stop();
 
-        return ValueTask.FromResult(new WriteResult
+        return new WriteResult
         {
             IsSuccess = errors.Count == 0,
             WrittenFiles = deletedFiles,
             Errors = errors,
             Duration = stopwatch.Elapsed
-        });
+        };
     }
 
     #region Private helpers

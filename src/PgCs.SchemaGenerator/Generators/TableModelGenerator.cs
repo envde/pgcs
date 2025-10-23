@@ -9,42 +9,31 @@ namespace PgCs.SchemaGenerator.Generators;
 /// <summary>
 /// Генератор C# моделей для таблиц PostgreSQL с использованием Roslyn
 /// </summary>
-public sealed class TableModelGenerator : ITableModelGenerator
+public sealed class TableModelGenerator(SyntaxBuilder syntaxBuilder) : ITableModelGenerator
 {
-    private readonly SyntaxBuilder _syntaxBuilder;
-
-    public TableModelGenerator(SyntaxBuilder syntaxBuilder)
-    {
-        _syntaxBuilder = syntaxBuilder;
-    }
-
-    public async ValueTask<IReadOnlyList<GeneratedCode>> GenerateAsync(
-        IReadOnlyList<TableDefinition> tables,
-        SchemaGenerationOptions options)
+    public IReadOnlyList<GeneratedCode> Generate( IReadOnlyList<TableDefinition> tables, SchemaGenerationOptions options)
     {
         var code = new List<GeneratedCode>();
 
         foreach (var table in tables)
         {
-            var generatedCode = await GenerateTableCodeAsync(table, options);
+            var generatedCode = GenerateTableCode(table, options);
             code.Add(generatedCode);
         }
 
         return code;
     }
 
-    private ValueTask<GeneratedCode> GenerateTableCodeAsync(
-        TableDefinition table,
-        SchemaGenerationOptions options)
+    private GeneratedCode GenerateTableCode( TableDefinition table, SchemaGenerationOptions options)
     {
         // Используем SyntaxBuilder (Roslyn) для построения класса
-        var classDeclaration = _syntaxBuilder.BuildTableClass(table, options);
+        var classDeclaration = syntaxBuilder.BuildTableClass(table, options);
 
         // Получаем необходимые using директивы
         var usings = GetRequiredUsings(table, options);
 
         // Создаём compilation unit
-        var compilationUnit = _syntaxBuilder.BuildCompilationUnit(
+        var compilationUnit = syntaxBuilder.BuildCompilationUnit(
             options.RootNamespace,
             classDeclaration,
             usings);
@@ -60,7 +49,7 @@ public sealed class TableModelGenerator : ITableModelGenerator
             CodeType = GeneratedFileType.TableModel
         };
 
-        return ValueTask.FromResult(code);
+        return code;
     }
 
     private static IEnumerable<string> GetRequiredUsings(

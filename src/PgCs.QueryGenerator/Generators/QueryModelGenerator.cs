@@ -11,34 +11,27 @@ namespace PgCs.QueryGenerator.Generators;
 /// <summary>
 /// Генератор моделей для результатов и параметров запросов
 /// </summary>
-public sealed class QueryModelGenerator : IQueryModelGenerator
+public sealed class QueryModelGenerator(
+    QuerySyntaxBuilder syntaxBuilder,
+    ITypeMapper typeMapper,
+    INameConverter nameConverter)
+    : IQueryModelGenerator
 {
-    private readonly QuerySyntaxBuilder _syntaxBuilder;
-    private readonly ITypeMapper _typeMapper;
-    private readonly INameConverter _nameConverter;
+    //TODO: не используемый параметр, проверь нужен ли он. Если нужен то используй, если нет, то удали.
+    private readonly INameConverter _nameConverter = nameConverter;
 
-    public QueryModelGenerator(
-        QuerySyntaxBuilder syntaxBuilder,
-        ITypeMapper typeMapper,
-        INameConverter nameConverter)
-    {
-        _syntaxBuilder = syntaxBuilder;
-        _typeMapper = typeMapper;
-        _nameConverter = nameConverter;
-    }
-
-    public ValueTask<GeneratedModelResult> GenerateResultModelAsync(
+    public GeneratedModelResult GenerateResultModel(
         QueryMetadata queryMetadata,
         QueryGenerationOptions options)
     {
         if (queryMetadata.ReturnType == null || !queryMetadata.ReturnType.Columns.Any())
         {
-            return ValueTask.FromResult(new GeneratedModelResult
+            return new GeneratedModelResult
             {
                 IsSuccess = false,
                 ModelName = string.Empty,
                 Code = null!
-            });
+            };
         }
 
         // Определяем имя модели
@@ -49,16 +42,16 @@ public sealed class QueryModelGenerator : IQueryModelGenerator
         // Проверяем, нужно ли создавать модель (может использоваться существующая)
         if (options.ReuseSchemaModels && !queryMetadata.ReturnType.RequiresCustomModel)
         {
-            return ValueTask.FromResult(new GeneratedModelResult
+            return new GeneratedModelResult
             {
                 IsSuccess = true,
                 ModelName = modelName,
                 Code = null! // Модель уже существует
-            });
+            };
         }
 
         // Создаем compilation unit
-        var compilationUnit = _syntaxBuilder.BuildResultModelCompilationUnit(
+        var compilationUnit = syntaxBuilder.BuildResultModelCompilationUnit(
             options.RootNamespace,
             modelName,
             queryMetadata.ReturnType.Columns);
@@ -78,33 +71,33 @@ public sealed class QueryModelGenerator : IQueryModelGenerator
             CodeType = GeneratedFileType.ResultModel,
         };
 
-        return ValueTask.FromResult(new GeneratedModelResult
+        return new GeneratedModelResult
         {
             IsSuccess = true,
             ModelName = modelName,
             Code = code
-        });
+        };
     }
 
-    public ValueTask<GeneratedModelResult> GenerateParameterModelAsync(
+    public GeneratedModelResult GenerateParameterModel(
         QueryMetadata queryMetadata,
         QueryGenerationOptions options)
     {
         if (!options.GenerateParameterModels || 
             queryMetadata.Parameters.Count < options.ParameterModelThreshold)
         {
-            return ValueTask.FromResult(new GeneratedModelResult
+            return new GeneratedModelResult
             {
                 IsSuccess = false,
                 ModelName = string.Empty,
                 Code = null!
-            });
+            };
         }
 
         var modelName = $"{queryMetadata.MethodName}Parameters";
 
         // Создаем класс модели параметров
-        var classDeclaration = _syntaxBuilder.BuildParameterModelClass(
+        var classDeclaration = syntaxBuilder.BuildParameterModelClass(
             modelName,
             queryMetadata.Parameters);
 
@@ -112,7 +105,7 @@ public sealed class QueryModelGenerator : IQueryModelGenerator
         var usings = new HashSet<string> { "System" };
         foreach (var param in queryMetadata.Parameters)
         {
-            var ns = _typeMapper.GetRequiredNamespace(param.PostgresType);
+            var ns = typeMapper.GetRequiredNamespace(param.PostgresType);
             if (ns != null)
             {
                 usings.Add(ns);
@@ -122,16 +115,16 @@ public sealed class QueryModelGenerator : IQueryModelGenerator
         // Создаем compilation unit
         var usingDirectives = usings
             .OrderBy(u => u)
-            .Select(u => Microsoft.CodeAnalysis.CSharp.SyntaxFactory.UsingDirective(
-                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.IdentifierName(u)))
+            .Select(u => SyntaxFactory.UsingDirective(
+                SyntaxFactory.IdentifierName(u)))
             .ToArray();
 
-        var fileScopedNamespace = Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+        var fileScopedNamespace = SyntaxFactory
             .FileScopedNamespaceDeclaration(
-                Microsoft.CodeAnalysis.CSharp.SyntaxFactory.IdentifierName(options.RootNamespace))
+                SyntaxFactory.IdentifierName(options.RootNamespace))
             .AddMembers(classDeclaration);
 
-        var compilationUnit = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.CompilationUnit()
+        var compilationUnit = SyntaxFactory.CompilationUnit()
             .AddUsings(usingDirectives)
             .AddMembers(fileScopedNamespace);
 
@@ -151,11 +144,11 @@ public sealed class QueryModelGenerator : IQueryModelGenerator
             CodeType = GeneratedFileType.ParameterModel,
         };
 
-        return ValueTask.FromResult(new GeneratedModelResult
+        return new GeneratedModelResult
         {
             IsSuccess = true,
             ModelName = modelName,
             Code = code
-        });
+        };
     }
 }

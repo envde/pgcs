@@ -21,54 +21,53 @@ internal static class SqlStatementSplitter
         for (var i = 0; i < sqlScript.Length; i++)
         {
             var currentChar = sqlScript[i];
-            var nextChar = i + 1 < sqlScript.Length ? sqlScript[i + 1] : '\0';
 
-            // Обработка строковых литералов
-            if (currentChar == '\'' && !inDollarQuote)
+            switch (currentChar)
             {
-                inString = !inString;
-                currentStatement.Append(currentChar);
-                continue;
-            }
-
-            // Обработка dollar-quoted строк ($$текст$$ или $tag$текст$tag$)
-            if (currentChar == '$' && !inString)
-            {
-                var tag = ExtractDollarQuoteTag(sqlScript, i);
-                if (!string.IsNullOrEmpty(tag))
+                // Обработка строковых литералов
+                case '\'' when !inDollarQuote:
+                    inString = !inString;
+                    break;
+                // Обработка dollar-quoted строк ($$текст$$ или $tag$текст$tag$)
+                case '$' when !inString:
                 {
-                    if (!inDollarQuote)
+                    var tag = ExtractDollarQuoteTag(sqlScript, i);
+                    if (!string.IsNullOrEmpty(tag))
                     {
-                        inDollarQuote = true;
-                        dollarQuoteTag = tag;
-                        currentStatement.Append(tag);
-                        i += tag.Length - 1;
+                        if (!inDollarQuote)
+                        {
+                            inDollarQuote = true;
+                            dollarQuoteTag = tag;
+                            currentStatement.Append(tag);
+                            i += tag.Length - 1;
+                        }
+                        else if (tag == dollarQuoteTag)
+                        {
+                            inDollarQuote = false;
+                            currentStatement.Append(tag);
+                            i += tag.Length - 1;
+                            dollarQuoteTag = string.Empty;
+                        }
+                        else
+                        {
+                            currentStatement.Append(currentChar);
+                        }
+                        continue;
                     }
-                    else if (tag == dollarQuoteTag)
+
+                    break;
+                }
+                // Разделитель - точка с запятой
+                case ';' when !inString && !inDollarQuote:
+                {
+                    var statement = currentStatement.ToString().Trim();
+                    if (!string.IsNullOrWhiteSpace(statement))
                     {
-                        inDollarQuote = false;
-                        currentStatement.Append(tag);
-                        i += tag.Length - 1;
-                        dollarQuoteTag = string.Empty;
+                        statements.Add(statement);
                     }
-                    else
-                    {
-                        currentStatement.Append(currentChar);
-                    }
+                    currentStatement.Clear();
                     continue;
                 }
-            }
-
-            // Разделитель - точка с запятой
-            if (currentChar == ';' && !inString && !inDollarQuote)
-            {
-                var statement = currentStatement.ToString().Trim();
-                if (!string.IsNullOrWhiteSpace(statement))
-                {
-                    statements.Add(statement);
-                }
-                currentStatement.Clear();
-                continue;
             }
 
             currentStatement.Append(currentChar);

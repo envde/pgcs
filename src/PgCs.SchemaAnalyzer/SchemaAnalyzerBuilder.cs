@@ -1,4 +1,3 @@
-using PgCs.Common.SchemaAnalyzer;
 using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
 using PgCs.Common.SchemaAnalyzer.Models.Views;

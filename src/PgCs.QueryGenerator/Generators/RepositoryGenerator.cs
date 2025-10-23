@@ -14,22 +14,12 @@ namespace PgCs.QueryGenerator.Generators;
 /// <summary>
 /// Генератор интерфейса и реализации репозитория запросов с использованием Roslyn
 /// </summary>
-public sealed class RepositoryGenerator : IRepositoryGenerator
+public sealed class RepositoryGenerator(
+    QuerySyntaxBuilder syntaxBuilder,
+    IQueryMethodGenerator methodGenerator)
+    : IRepositoryGenerator
 {
-    private readonly QuerySyntaxBuilder _syntaxBuilder;
-    private readonly IQueryMethodGenerator _methodGenerator;
-
-    public RepositoryGenerator(
-        QuerySyntaxBuilder syntaxBuilder,
-        IQueryMethodGenerator methodGenerator)
-    {
-        _syntaxBuilder = syntaxBuilder;
-        _methodGenerator = methodGenerator;
-    }
-
-    public ValueTask<GeneratedInterfaceResult> GenerateInterfaceAsync(
-        IReadOnlyList<QueryMetadata> queries,
-        QueryGenerationOptions options)
+    public GeneratedInterfaceResult GenerateInterface( IReadOnlyList<QueryMetadata> queries, QueryGenerationOptions options)
     {
         // Генерируем методы для всех запросов
         var methods = new List<MethodDeclarationSyntax>();
@@ -40,7 +30,7 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
         }
 
         // Используем QuerySyntaxBuilder для построения интерфейса
-        var interfaceDecl = _syntaxBuilder.BuildRepositoryInterface(
+        var interfaceDecl = syntaxBuilder.BuildRepositoryInterface(
             options.RepositoryInterfaceName,
             methods);
 
@@ -67,18 +57,16 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
             CodeType = GeneratedFileType.RepositoryInterface,
         };
 
-        return ValueTask.FromResult(new GeneratedInterfaceResult
+        return new GeneratedInterfaceResult
         {
             IsSuccess = true,
             InterfaceName = options.RepositoryInterfaceName,
             Code = code,
             MethodCount = queries.Count
-        });
+        };
     }
 
-    public ValueTask<GeneratedClassResult> GenerateImplementationAsync(
-        IReadOnlyList<QueryMetadata> queries,
-        QueryGenerationOptions options)
+    public GeneratedClassResult GenerateImplementation( IReadOnlyList<QueryMetadata> queries, QueryGenerationOptions options)
     {
         // Генерируем методы для всех запросов
         var methods = new List<MethodDeclarationSyntax>();
@@ -89,7 +77,7 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
         }
 
         // Используем QuerySyntaxBuilder для построения класса
-        var classDecl = _syntaxBuilder.BuildRepositoryClass(
+        var classDecl = syntaxBuilder.BuildRepositoryClass(
             options.RepositoryClassName,
             options.GenerateInterface ? options.RepositoryInterfaceName : null,
             methods);
@@ -117,13 +105,13 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
             CodeType = GeneratedFileType.RepositoryClass,
         };
 
-        return ValueTask.FromResult(new GeneratedClassResult
+        return new GeneratedClassResult
         {
             IsSuccess = true,
             ClassName = options.RepositoryClassName,
             Code = code,
             MethodCount = queries.Count
-        });
+        };
     }
 
     /// <summary>
@@ -139,7 +127,7 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
         return MethodDeclaration(ParseTypeName(returnType), queryMetadata.MethodName + "Async")
             .AddParameterListParameters(parameters.ToArray())
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-            .WithLeadingTrivia(_syntaxBuilder.CreateXmlComment(
+            .WithLeadingTrivia(syntaxBuilder.CreateXmlComment(
                 $"Выполняет запрос: {queryMetadata.MethodName}",
                 options.IncludeSqlInDocumentation ? queryMetadata.SqlQuery : null));
     }
@@ -154,8 +142,7 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
         var returnType = GetReturnType(queryMetadata);
         var parameters = BuildParameters(queryMetadata, options);
         
-        // ИСПРАВЛЕНО: Используем QueryMethodGenerator для построения тела метода
-        var methodResult = _methodGenerator.GenerateAsync(queryMetadata, options).GetAwaiter().GetResult();
+        var methodResult = methodGenerator.Generate(queryMetadata, options);
         
         // Парсим сгенерированный метод и извлекаем его тело
         var parsedMethod = ParseMemberDeclaration(methodResult.SourceCode) as MethodDeclarationSyntax;
@@ -165,7 +152,7 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
             .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
             .AddParameterListParameters(parameters.ToArray())
             .WithBody(body)
-            .WithLeadingTrivia(_syntaxBuilder.CreateXmlComment(
+            .WithLeadingTrivia(syntaxBuilder.CreateXmlComment(
                 $"Выполняет запрос: {queryMetadata.MethodName}",
                 options.IncludeSqlInDocumentation ? queryMetadata.SqlQuery : null));
     }
@@ -173,17 +160,17 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
     /// <summary>
     /// Резервное тело метода (если парсинг не удался)
     /// </summary>
-    private BlockSyntax BuildFallbackMethodBody(QueryMetadata queryMetadata, QueryGenerationOptions options)
+    private BlockSyntax BuildFallbackMethodBody(QueryMetadata queryMetadata, QueryGenerationOptions options) // TODO: проверить почему не используется параметр options и если он не нужен то удали его, а если нужен то используй
     {
         return Block(
             ThrowStatement(
                 ObjectCreationExpression(ParseTypeName("NotImplementedException"))
                     .WithArgumentList(ArgumentList(
-                        SeparatedList(new[] {
+                        SeparatedList([
                             Argument(LiteralExpression(
                                 SyntaxKind.StringLiteralExpression,
                                 Literal($"Method {queryMetadata.MethodName} not implemented")))
-                        })))));
+                        ])))));
     }
 
     /// <summary>
