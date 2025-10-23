@@ -12,7 +12,7 @@ namespace PgCs.Common.SchemaAnalyzer;
 /// <summary>
 /// Fluent API для фильтрации метаданных схемы базы данных
 /// </summary>
-public sealed class SchemaFilter
+public sealed class SchemaFilter : ISchemaFilter
 {
     private readonly SchemaMetadata _sourceMetadata;
     private HashSet<string>? _excludedSchemas;
