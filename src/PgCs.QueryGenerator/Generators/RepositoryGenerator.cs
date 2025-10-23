@@ -153,7 +153,13 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
     {
         var returnType = GetReturnType(queryMetadata);
         var parameters = BuildParameters(queryMetadata, options);
-        var body = BuildMethodBody(queryMetadata, options);
+        
+        // ИСПРАВЛЕНО: Используем QueryMethodGenerator для построения тела метода
+        var methodResult = _methodGenerator.GenerateAsync(queryMetadata, options).GetAwaiter().GetResult();
+        
+        // Парсим сгенерированный метод и извлекаем его тело
+        var parsedMethod = ParseMemberDeclaration(methodResult.SourceCode) as MethodDeclarationSyntax;
+        var body = parsedMethod?.Body ?? BuildFallbackMethodBody(queryMetadata, options);
 
         return MethodDeclaration(ParseTypeName(returnType), queryMetadata.MethodName + "Async")
             .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
@@ -165,15 +171,19 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
     }
 
     /// <summary>
-    /// Строит тело метода (временное решение, потом QueryMethodGenerator будет возвращать готовые блоки)
+    /// Резервное тело метода (если парсинг не удался)
     /// </summary>
-    private BlockSyntax BuildMethodBody(QueryMetadata queryMetadata, QueryGenerationOptions options)
+    private BlockSyntax BuildFallbackMethodBody(QueryMetadata queryMetadata, QueryGenerationOptions options)
     {
-        // TODO: Использовать полноценную генерацию из QueryMethodGenerator
         return Block(
             ThrowStatement(
                 ObjectCreationExpression(ParseTypeName("NotImplementedException"))
-                    .WithArgumentList(ArgumentList())));
+                    .WithArgumentList(ArgumentList(
+                        SeparatedList(new[] {
+                            Argument(LiteralExpression(
+                                SyntaxKind.StringLiteralExpression,
+                                Literal($"Method {queryMetadata.MethodName} not implemented")))
+                        })))));
     }
 
     /// <summary>
@@ -256,5 +266,41 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Создает XML комментарий для документации метода
+    /// </summary>
+    public SyntaxTriviaList CreateXmlComment(string summary, string? additionalInfo = null)
+    {
+        var lines = new List<string>
+        {
+            "/// <summary>",
+            $"/// {summary}",
+            "/// </summary>"
+        };
+
+        if (!string.IsNullOrWhiteSpace(additionalInfo))
+        {
+            lines.Add("/// <remarks>");
+            
+            // Разбиваем дополнительную информацию на строки для лучшего форматирования
+            var infoLines = additionalInfo.Split('\n');
+            foreach (var line in infoLines)
+            {
+                lines.Add($"/// {line.TrimEnd()}");
+            }
+            
+            lines.Add("/// </remarks>");
+        }
+
+        var triviaList = TriviaList();
+        foreach (var line in lines)
+        {
+            triviaList = triviaList.Add(
+                Comment(line + Environment.NewLine));
+        }
+
+        return triviaList;
     }
 }

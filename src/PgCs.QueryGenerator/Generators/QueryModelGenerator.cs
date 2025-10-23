@@ -1,6 +1,4 @@
-using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Formatting;
 using PgCs.Common.CodeGeneration;
 using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryGenerator.Models.Options;

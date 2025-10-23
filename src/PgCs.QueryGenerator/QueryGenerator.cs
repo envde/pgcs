@@ -84,6 +84,14 @@ public sealed class QueryGenerator : IQueryGenerator
             };
         }
 
+        // Генерация отдельных методов для каждого запроса
+        var methods = new List<GeneratedMethodResult>();
+        foreach (var query in queries)
+        {
+            var method = await GenerateMethodAsync(query, options);
+            methods.Add(method);
+        }
+
         // Генерация моделей результатов
         var resultModels = new List<GeneratedModelResult>();
         foreach (var query in queries.Where(q => q.ReturnType != null))
@@ -139,7 +147,7 @@ public sealed class QueryGenerator : IQueryGenerator
             GeneratedCode = allCode,
             ValidationIssues = allIssues,
             Duration = stopwatch.Elapsed,
-            Methods = new List<GeneratedMethodResult>(), // TODO: Implement
+            Methods = methods, // ИСПРАВЛЕНО: теперь используем сгенерированные методы
             RepositoryInterface = repositoryInterface,
             RepositoryImplementation = repositoryClass,
             ResultModels = resultModels,
