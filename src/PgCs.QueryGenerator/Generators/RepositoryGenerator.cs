@@ -273,33 +273,33 @@ public sealed class RepositoryGenerator : IRepositoryGenerator
     /// </summary>
     public SyntaxTriviaList CreateXmlComment(string summary, string? additionalInfo = null)
     {
-        var lines = new List<string>
-        {
-            "/// <summary>",
-            $"/// {summary}",
-            "/// </summary>"
-        };
+        var documentationElements = new List<XmlNodeSyntax>();
 
+        // Создаем <summary> элемент используя Roslyn XML API
+        documentationElements.Add(
+            XmlSummaryElement(
+                XmlText(XmlTextLiteral(summary))));
+
+        // Если есть дополнительная информация, добавляем <remarks>
         if (!string.IsNullOrWhiteSpace(additionalInfo))
         {
-            lines.Add("/// <remarks>");
-            
-            // Разбиваем дополнительную информацию на строки для лучшего форматирования
             var infoLines = additionalInfo.Split('\n');
+            var remarksContent = new List<XmlNodeSyntax>();
+            
             foreach (var line in infoLines)
             {
-                lines.Add($"/// {line.TrimEnd()}");
+                remarksContent.Add(XmlText(XmlTextLiteral(line.TrimEnd())));
+                remarksContent.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: false)));
             }
-            
-            lines.Add("/// </remarks>");
+
+            documentationElements.Add(
+                XmlRemarksElement(remarksContent.ToArray()));
         }
 
-        var triviaList = TriviaList();
-        foreach (var line in lines)
-        {
-            triviaList = triviaList.Add(
-                Comment(line + Environment.NewLine));
-        }
+        // Создаем DocumentationComment trivia
+        var triviaList = TriviaList(
+            Trivia(
+                DocumentationComment(documentationElements.ToArray())));
 
         return triviaList;
     }

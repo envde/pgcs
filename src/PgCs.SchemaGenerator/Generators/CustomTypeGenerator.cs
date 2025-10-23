@@ -235,12 +235,20 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
         var lines = comment.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         var triviaList = TriviaList();
 
-        triviaList = triviaList.Add(Comment("/// <summary>"));
+        // Создаем текстовые элементы для каждой строки
+        var textTokens = new List<XmlNodeSyntax>();
         foreach (var line in lines)
         {
-            triviaList = triviaList.Add(Comment($"/// {line.Trim()}"));
+            textTokens.Add(XmlText(XmlTextLiteral(line.Trim())));
+            textTokens.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: false)));
         }
-        triviaList = triviaList.Add(Comment("/// </summary>"));
+
+        // Используем DocumentationCommentTrivia из Roslyn
+        triviaList = triviaList.Add(
+            Trivia(
+                DocumentationComment(
+                    XmlSummaryElement(textTokens.ToArray()))));
+
         triviaList = triviaList.Add(CarriageReturnLineFeed);
 
         return triviaList;

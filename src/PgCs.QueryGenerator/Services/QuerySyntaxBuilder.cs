@@ -10,9 +10,6 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace PgCs.QueryGenerator.Services;
 
-/// <summary>
-/// Строитель синтаксических деревьев C# для методов запросов с использованием Roslyn
-/// </summary>
 public sealed class QuerySyntaxBuilder
 {
     private readonly ITypeMapper _typeMapper;
@@ -136,12 +133,21 @@ public sealed class QuerySyntaxBuilder
         var interfaceDeclaration = InterfaceDeclaration(interfaceName)
             .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
+        // Добавляем методы (только сигнатуры, без тела)
         foreach (var method in methods)
         {
-            // Преобразуем метод в сигнатуру интерфейса (без тела)
-            var interfaceMethod = method
-                .WithBody(null)
+            // Создаем метод интерфейса без модификаторов и тела
+            var interfaceMethod = MethodDeclaration(
+                    method.ReturnType,
+                    method.Identifier)
+                .WithParameterList(method.ParameterList)
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+
+            // Копируем XML комментарии
+            if (method.HasLeadingTrivia)
+            {
+                interfaceMethod = interfaceMethod.WithLeadingTrivia(method.GetLeadingTrivia());
+            }
 
             interfaceDeclaration = interfaceDeclaration.AddMembers(interfaceMethod);
         }
@@ -254,26 +260,42 @@ public sealed class QuerySyntaxBuilder
     /// <summary>
     /// Создает XML комментарий для документации
     /// </summary>
-    public SyntaxTriviaList CreateXmlComment(string summary, string? sql = null)
+    public SyntaxTriviaList CreateXmlComment(string summary, string? additionalInfo = null)
     {
         var triviaList = TriviaList();
 
+        // <summary>
         triviaList = triviaList.Add(Comment("/// <summary>"));
-        triviaList = triviaList.Add(Comment($"/// {summary}"));
-        triviaList = triviaList.Add(Comment("/// </summary>"));
+        triviaList = triviaList.Add(CarriageReturnLineFeed);
 
-        if (sql != null)
+        // Разбиваем summary на строки
+        var summaryLines = summary.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in summaryLines)
         {
-            triviaList = triviaList.Add(Comment("/// <remarks>"));
-            triviaList = triviaList.Add(Comment("/// SQL Query:"));
-            foreach (var line in sql.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                triviaList = triviaList.Add(Comment($"/// {line.Trim()}"));
-            }
-            triviaList = triviaList.Add(Comment("/// </remarks>"));
+            triviaList = triviaList.Add(Comment($"/// {line.Trim()}"));
+            triviaList = triviaList.Add(CarriageReturnLineFeed);
         }
 
+        // </summary>
+        triviaList = triviaList.Add(Comment("/// </summary>"));
         triviaList = triviaList.Add(CarriageReturnLineFeed);
+
+        // <remarks> (если есть дополнительная информация)
+        if (!string.IsNullOrWhiteSpace(additionalInfo))
+        {
+            triviaList = triviaList.Add(Comment("/// <remarks>"));
+            triviaList = triviaList.Add(CarriageReturnLineFeed);
+
+            var remarksLines = additionalInfo.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in remarksLines)
+            {
+                triviaList = triviaList.Add(Comment($"/// {line.Trim()}"));
+                triviaList = triviaList.Add(CarriageReturnLineFeed);
+            }
+
+            triviaList = triviaList.Add(Comment("/// </remarks>"));
+            triviaList = triviaList.Add(CarriageReturnLineFeed);
+        }
 
         return triviaList;
     }
