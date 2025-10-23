@@ -45,4 +45,9 @@ public sealed record WriteOptions
     /// Выполнять ли "сухой запуск" (проверка без записи)
     /// </summary>
     public bool DryRun { get; init; } = false;
+
+    /// <summary>
+    /// Создаёт новый builder для настройки опций через Fluent API
+    /// </summary>
+    public static WriteOptionsBuilder CreateBuilder() => new();
 }

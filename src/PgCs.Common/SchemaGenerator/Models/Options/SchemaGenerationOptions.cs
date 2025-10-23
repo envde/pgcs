@@ -66,4 +66,10 @@ public sealed record SchemaGenerationOptions : CodeGenerationOptions
     /// Организация файлов по типам объектов
     /// </summary>
     public FileOrganization FileOrganization { get; init; } = FileOrganization.ByType;
+
+    /// <summary>
+    /// Создаёт новый builder для настройки опций через Fluent API
+    /// </summary>
+    /// <returns>Builder для конфигурации опций</returns>
+    public static SchemaGenerationOptionsBuilder CreateBuilder() => new();
 }

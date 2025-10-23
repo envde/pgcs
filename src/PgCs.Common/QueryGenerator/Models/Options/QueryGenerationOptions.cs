@@ -106,4 +106,9 @@ public sealed record QueryGenerationOptions : CodeGenerationOptions
     /// Использовать NpgsqlDataSource для управления соединениями
     /// </summary>
     public bool UseNpgsqlDataSource { get; init; } = true;
+
+    /// <summary>
+    /// Создаёт новый builder для настройки опций через Fluent API
+    /// </summary>
+    public static QueryGenerationOptionsBuilder CreateBuilder() => new();
 }

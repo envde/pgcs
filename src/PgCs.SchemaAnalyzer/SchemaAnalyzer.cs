@@ -139,7 +139,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         return _constraintExtractor.Extract(sqlScript);
     }
     
-    private SchemaMetadata AnalyzeScript(string sqlScript)
+    public SchemaMetadata AnalyzeScript(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
 

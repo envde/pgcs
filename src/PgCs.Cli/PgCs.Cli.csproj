@@ -7,4 +7,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PgCs.Common\PgCs.Common.csproj" />
+    <ProjectReference Include="..\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" />
+    <ProjectReference Include="..\PgCs.SchemaGenerator\PgCs.SchemaGenerator.csproj" />
+    <ProjectReference Include="..\PgCs.QueryAnalyzer\PgCs.QueryAnalyzer.csproj" />
+    <ProjectReference Include="..\PgCs.QueryGenerator\PgCs.QueryGenerator.csproj" />
+    <ProjectReference Include="..\PgCs.FileWriter\PgCs.FileWriter.csproj" />
+  </ItemGroup>
+
 </Project>
+
