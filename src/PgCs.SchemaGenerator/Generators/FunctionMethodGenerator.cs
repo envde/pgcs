@@ -125,9 +125,12 @@ public sealed class FunctionMethodGenerator : IFunctionMethodGenerator
     {
         var statements = new List<StatementSyntax>();
 
-        // Формируем SQL запрос
-        var paramNames = string.Join(", ", functionParams.Select((_, i) => $"${i + 1}"));
-        var sql = $"SELECT * FROM {function.Schema}.{function.Name}({paramNames})";
+        // Формируем SQL запрос с использованием Roslyn для строки
+        var paramPlaceholders = functionParams
+            .Select((_, i) => $"${i + 1}")
+            .ToArray();
+        
+        var sqlQuery = $"SELECT * FROM {function.Schema}.{function.Name}({string.Join(", ", paramPlaceholders)})";
 
         // await using var cmd = new NpgsqlCommand(sql, connection);
         statements.Add(
@@ -138,15 +141,12 @@ public sealed class FunctionMethodGenerator : IFunctionMethodGenerator
                             .WithInitializer(EqualsValueClause(
                                 ObjectCreationExpression(ParseTypeName("NpgsqlCommand"))
                                     .AddArgumentListArguments(
-                                        Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(sql))),
-                                        Argument(IdentifierName("connection"))
-                                    )
-                            ))
-                    )
-            )
+                                        Argument(LiteralExpression(
+                                            SyntaxKind.StringLiteralExpression,
+                                            Literal(sqlQuery))),
+                                        Argument(IdentifierName("connection")))))))
             .WithAwaitKeyword(Token(SyntaxKind.AwaitKeyword))
-            .WithUsingKeyword(Token(SyntaxKind.UsingKeyword))
-        );
+            .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)));
 
         // Добавляем параметры
         for (int i = 0; i < functionParams.Count; i++)
@@ -160,16 +160,13 @@ public sealed class FunctionMethodGenerator : IFunctionMethodGenerator
                             MemberAccessExpression(
                                 SyntaxKind.SimpleMemberAccessExpression,
                                 IdentifierName("cmd"),
-                                IdentifierName("Parameters")
-                            ),
-                            IdentifierName("AddWithValue")
-                        )
-                    ).AddArgumentListArguments(
-                        Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal($"${i + 1}"))),
-                        Argument(IdentifierName(paramName))
-                    )
-                )
-            );
+                                IdentifierName("Parameters")),
+                            IdentifierName("AddWithValue")))
+                    .AddArgumentListArguments(
+                        Argument(LiteralExpression(
+                            SyntaxKind.StringLiteralExpression,
+                            Literal($"${i + 1}"))),
+                        Argument(IdentifierName(paramName)))));
         }
 
         // await cmd.ExecuteNonQueryAsync();
@@ -180,12 +177,7 @@ public sealed class FunctionMethodGenerator : IFunctionMethodGenerator
                         MemberAccessExpression(
                             SyntaxKind.SimpleMemberAccessExpression,
                             IdentifierName("cmd"),
-                            IdentifierName("ExecuteNonQueryAsync")
-                        )
-                    )
-                )
-            )
-        );
+                            IdentifierName("ExecuteNonQueryAsync"))))));
 
         return Block(statements);
     }

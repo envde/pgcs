@@ -1,16 +1,17 @@
-using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PgCs.Common.CodeGeneration;
-using PgCs.Common.SchemaAnalyzer.Models;
-using PgCs.Common.SchemaAnalyzer.Models.Indexes;
-using PgCs.Common.SchemaAnalyzer.Models.Tables;
 using PgCs.Common.SchemaAnalyzer.Models.Types;
 using PgCs.Common.SchemaGenerator.Models.Options;
 using PgCs.SchemaGenerator.Services;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using SchemaTypeKind = PgCs.Common.SchemaAnalyzer.Models.Types.TypeKind;
 
 namespace PgCs.SchemaGenerator.Generators;
 
 /// <summary>
-/// Генератор C# типов для пользовательских типов PostgreSQL
+/// Генератор C# типов для пользовательских типов PostgreSQL с использованием Roslyn
 /// </summary>
 public sealed class CustomTypeGenerator : ICustomTypeGenerator
 {
@@ -25,126 +26,223 @@ public sealed class CustomTypeGenerator : ICustomTypeGenerator
         IReadOnlyList<TypeDefinition> types,
         SchemaGenerationOptions options)
     {
-        var code = new List<GeneratedCode>();
-        var enumCount = 0;
-        var domainCount = 0;
-        var compositeCount = 0;
+        var generatedCode = new List<GeneratedCode>();
 
         foreach (var type in types)
         {
-            switch (type.Kind)
+            var code = type.Kind switch
             {
-                case TypeKind.Enum:
-                    var enumCode = await GenerateEnumCodeAsync(type, options);
-                    code.Add(enumCode);
-                    enumCount++;
-                    break;
+                SchemaTypeKind.Enum => GenerateEnumType(type, options),
+                SchemaTypeKind.Domain => GenerateDomainType(type, options),
+                SchemaTypeKind.Composite => GenerateCompositeType(type, options),
+                _ => null
+            };
 
-                case TypeKind.Composite:
-                    var compositeCode = await GenerateCompositeCodeAsync(type, options);
-                    code.Add(compositeCode);
-                    compositeCount++;
-                    break;
-
-                case TypeKind.Domain:
-                    // Domain типы пока пропускаем, они обычно маппятся на базовые типы
-                    domainCount++;
-                    break;
+            if (code != null)
+            {
+                generatedCode.Add(code);
             }
         }
 
-        return code;
+        return await ValueTask.FromResult(generatedCode);
     }
 
-    private ValueTask<GeneratedCode> GenerateEnumCodeAsync(
-        TypeDefinition enumType,
-        SchemaGenerationOptions options)
+    /// <summary>
+    /// Генерирует enum тип с использованием Roslyn
+    /// </summary>
+    private GeneratedCode GenerateEnumType(TypeDefinition type, SchemaGenerationOptions options)
     {
-        // Строим enum
-        var enumDeclaration = _syntaxBuilder.BuildEnum(enumType);
+        // Создаем члены enum
+        var members = new List<EnumMemberDeclarationSyntax>();
+        
+        foreach (var value in type.EnumValues ?? [])
+        {
+            var memberName = ConvertEnumValueToIdentifier(value);
+            var member = EnumMemberDeclaration(memberName);
+            
+            if (options.GenerateXmlDocumentation)
+            {
+                member = member.WithLeadingTrivia(
+                    CreateXmlComment($"Значение '{value}'"));
+            }
+            
+            members.Add(member);
+        }
+
+        // Создаем enum declaration
+        var enumDeclaration = EnumDeclaration(type.Name)
+            .AddModifiers(Token(SyntaxKind.PublicKeyword))
+            .AddMembers(members.ToArray());
+
+        if (options.GenerateXmlDocumentation && !string.IsNullOrWhiteSpace(type.Comment))
+        {
+            enumDeclaration = enumDeclaration.WithLeadingTrivia(
+                CreateXmlComment(type.Comment));
+        }
 
         // Создаем compilation unit
         var compilationUnit = _syntaxBuilder.BuildEnumCompilationUnit(
             options.RootNamespace,
             enumDeclaration);
 
-        // Генерируем исходный код
-        var sourceCode = compilationUnit.ToFullString();
+        var sourceCode = compilationUnit.NormalizeWhitespace().ToFullString();
 
-        // Определяем имя enum
-        var enumName = enumDeclaration.Identifier.Text;
-
-        return ValueTask.FromResult(new GeneratedCode
+        return new GeneratedCode
         {
             SourceCode = sourceCode,
-            TypeName = enumName,
+            TypeName = type.Name,
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.EnumType
-        });
+        };
     }
 
-    private ValueTask<GeneratedCode> GenerateCompositeCodeAsync(
-        TypeDefinition compositeType,
-        SchemaGenerationOptions options)
+    /// <summary>
+    /// Генерирует domain тип как type alias с использованием Roslyn
+    /// </summary>
+    private GeneratedCode GenerateDomainType(TypeDefinition type, SchemaGenerationOptions options)
     {
-        // Конвертируем composite type в TableDefinition для переиспользования логики
-        var columns = compositeType.CompositeAttributes?.Select(attr => new ColumnDefinition
+        // Domain типы генерируем как record с единственным свойством Value
+        var baseTypeName = type.DomainInfo?.BaseType ?? "string";
+        
+        var recordDeclaration = RecordDeclaration(
+                Token(SyntaxKind.RecordKeyword),
+                type.Name)
+            .AddModifiers(
+                Token(SyntaxKind.PublicKeyword),
+                Token(SyntaxKind.SealedKeyword))
+            .WithOpenBraceToken(Token(SyntaxKind.OpenBraceToken))
+            .WithCloseBraceToken(Token(SyntaxKind.CloseBraceToken));
+
+        // Добавляем свойство Value
+        var valueProperty = PropertyDeclaration(
+                ParseTypeName(baseTypeName),
+                "Value")
+            .AddModifiers(Token(SyntaxKind.PublicKeyword))
+            .AddModifiers(Token(SyntaxKind.RequiredKeyword))
+            .AddAccessorListAccessors(
+                AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
+                AccessorDeclaration(SyntaxKind.InitAccessorDeclaration)
+                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
+
+        recordDeclaration = recordDeclaration.AddMembers(valueProperty);
+
+        if (options.GenerateXmlDocumentation && !string.IsNullOrWhiteSpace(type.Comment))
         {
-            Name = attr.Name,
-            DataType = attr.DataType,
-            IsNullable = true, // Composite атрибуты всегда nullable
-            IsPrimaryKey = false,
-            IsUnique = false,
-            IsArray = false
-        }).ToList() ?? new List<ColumnDefinition>();
-
-        var tableDefinition = new TableDefinition
-        {
-            Name = compositeType.Name,
-            Schema = compositeType.Schema,
-            Columns = columns,
-            Comment = compositeType.Comment,
-            Constraints = [],
-            Indexes = []
-        };
-
-        // Строим класс
-        var classDeclaration = _syntaxBuilder.BuildTableClass(tableDefinition, options);
-
-        // Собираем необходимые usings
-        var usings = _syntaxBuilder.GetRequiredUsings(columns);
+            recordDeclaration = recordDeclaration.WithLeadingTrivia(
+                CreateXmlComment(type.Comment));
+        }
 
         // Создаем compilation unit
-        var compilationUnit = _syntaxBuilder.BuildCompilationUnit(
-            options.RootNamespace,
-            classDeclaration,
-            usings);
+        var compilationUnit = CompilationUnit()
+            .AddMembers(
+                FileScopedNamespaceDeclaration(IdentifierName(options.RootNamespace))
+                    .AddMembers(recordDeclaration))
+            .NormalizeWhitespace();
 
-        // Генерируем исходный код
         var sourceCode = compilationUnit.ToFullString();
 
-        // Определяем имя файла и путь
-        var className = classDeclaration.Identifier.Text;
-        var fileName = $"{className}.cs";
-        var relativePath = options.FileOrganization switch
-        {
-            FileOrganization.BySchema => Path.Combine(
-                "Types",
-                compositeType.Schema ?? "public",
-                fileName),
-            FileOrganization.ByType => Path.Combine(
-                "Types",
-                fileName),
-            FileOrganization.Flat => fileName,
-            _ => fileName
-        };
-
-        return ValueTask.FromResult(new GeneratedCode
+        return new GeneratedCode
         {
             SourceCode = sourceCode,
-            TypeName = className,
+            TypeName = type.Name,
+            Namespace = options.RootNamespace,
+            CodeType = GeneratedFileType.DomainType
+        };
+    }
+
+    /// <summary>
+    /// Генерирует composite тип как record с использованием Roslyn
+    /// </summary>
+    private GeneratedCode GenerateCompositeType(TypeDefinition type, SchemaGenerationOptions options)
+    {
+        var recordDeclaration = RecordDeclaration(
+                Token(SyntaxKind.RecordKeyword),
+                type.Name)
+            .AddModifiers(
+                Token(SyntaxKind.PublicKeyword),
+                Token(SyntaxKind.SealedKeyword))
+            .WithOpenBraceToken(Token(SyntaxKind.OpenBraceToken))
+            .WithCloseBraceToken(Token(SyntaxKind.CloseBraceToken));
+
+        // Добавляем свойства для каждого атрибута composite типа
+        foreach (var attribute in type.CompositeAttributes ?? [])
+        {
+            var propertyType = attribute.DataType;
+            var property = PropertyDeclaration(
+                    ParseTypeName(propertyType),
+                    attribute.Name)
+                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .AddModifiers(Token(SyntaxKind.RequiredKeyword))
+                .AddAccessorListAccessors(
+                    AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                        .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
+                    AccessorDeclaration(SyntaxKind.InitAccessorDeclaration)
+                        .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
+
+            recordDeclaration = recordDeclaration.AddMembers(property);
+        }
+
+        if (options.GenerateXmlDocumentation && !string.IsNullOrWhiteSpace(type.Comment))
+        {
+            recordDeclaration = recordDeclaration.WithLeadingTrivia(
+                CreateXmlComment(type.Comment));
+        }
+
+        // Создаем compilation unit
+        var compilationUnit = CompilationUnit()
+            .AddMembers(
+                FileScopedNamespaceDeclaration(IdentifierName(options.RootNamespace))
+                    .AddMembers(recordDeclaration))
+            .NormalizeWhitespace();
+
+        var sourceCode = compilationUnit.ToFullString();
+
+        return new GeneratedCode
+        {
+            SourceCode = sourceCode,
+            TypeName = type.Name,
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.CompositeType
-        });
+        };
+    }
+
+    /// <summary>
+    /// Конвертирует значение enum в валидный C# идентификатор
+    /// </summary>
+    private static string ConvertEnumValueToIdentifier(string value)
+    {
+        // Убираем недопустимые символы и делаем PascalCase
+        var identifier = new string(value
+            .Select((c, i) => i == 0 ? char.ToUpper(c) : c)
+            .Where(c => char.IsLetterOrDigit(c) || c == '_')
+            .ToArray());
+
+        // Если начинается с цифры, добавляем префикс
+        if (char.IsDigit(identifier[0]))
+        {
+            identifier = "Value_" + identifier;
+        }
+
+        return identifier;
+    }
+
+    /// <summary>
+    /// Создает XML комментарий
+    /// </summary>
+    private static SyntaxTriviaList CreateXmlComment(string comment)
+    {
+        var lines = comment.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var triviaList = TriviaList();
+
+        triviaList = triviaList.Add(Comment("/// <summary>"));
+        foreach (var line in lines)
+        {
+            triviaList = triviaList.Add(Comment($"/// {line.Trim()}"));
+        }
+        triviaList = triviaList.Add(Comment("/// </summary>"));
+        triviaList = triviaList.Add(CarriageReturnLineFeed);
+
+        return triviaList;
     }
 }
