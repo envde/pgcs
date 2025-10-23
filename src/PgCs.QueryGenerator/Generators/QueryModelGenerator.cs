@@ -13,13 +13,9 @@ namespace PgCs.QueryGenerator.Generators;
 /// </summary>
 public sealed class QueryModelGenerator(
     QuerySyntaxBuilder syntaxBuilder,
-    ITypeMapper typeMapper,
-    INameConverter nameConverter)
+    ITypeMapper typeMapper)
     : IQueryModelGenerator
 {
-    //TODO: не используемый параметр, проверь нужен ли он. Если нужен то используй, если нет, то удали.
-    private readonly INameConverter _nameConverter = nameConverter;
-
     public GeneratedModelResult GenerateResultModel(
         QueryMetadata queryMetadata,
         QueryGenerationOptions options)

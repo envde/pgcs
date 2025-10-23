@@ -30,7 +30,7 @@ public sealed class QueryGenerator(
         var syntaxBuilder = new QuerySyntaxBuilder(typeMapper, nameConverter);
         
         var methodGenerator = new QueryMethodGenerator(syntaxBuilder, nameConverter);
-        var modelGenerator = new QueryModelGenerator(syntaxBuilder, typeMapper, nameConverter);
+        var modelGenerator = new QueryModelGenerator(syntaxBuilder, typeMapper);
         var repositoryGenerator = new RepositoryGenerator(syntaxBuilder, methodGenerator);
         var validator = new QueryValidator();
 

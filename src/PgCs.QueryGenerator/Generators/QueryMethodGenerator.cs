@@ -192,7 +192,7 @@ public sealed class QueryMethodGenerator(
         return queryMetadata.QueryType switch
         {
             QueryType.Select when queryMetadata.ReturnType != null =>
-                BuildSelectStatements(queryMetadata, options),
+                BuildSelectStatements(queryMetadata),
             QueryType.Insert or QueryType.Update or QueryType.Delete =>
                 BuildModificationStatements(),
             _ => BuildVoidStatements()
@@ -202,9 +202,7 @@ public sealed class QueryMethodGenerator(
     /// <summary>
     /// Создаёт statements для SELECT запроса
     /// </summary>
-    private IEnumerable<StatementSyntax> BuildSelectStatements(
-        QueryMetadata queryMetadata,
-        QueryGenerationOptions options) // TODO: option не используется, нужно добавить использование или удалить этот параметр
+    private IEnumerable<StatementSyntax> BuildSelectStatements(QueryMetadata queryMetadata)
     {
         // await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
         yield return LocalDeclarationStatement(

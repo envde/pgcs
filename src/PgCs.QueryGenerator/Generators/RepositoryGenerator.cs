@@ -146,7 +146,7 @@ public sealed class RepositoryGenerator(
         
         // Парсим сгенерированный метод и извлекаем его тело
         var parsedMethod = ParseMemberDeclaration(methodResult.SourceCode) as MethodDeclarationSyntax;
-        var body = parsedMethod?.Body ?? BuildFallbackMethodBody(queryMetadata, options);
+        var body = parsedMethod?.Body ?? BuildFallbackMethodBody(queryMetadata);
 
         return MethodDeclaration(ParseTypeName(returnType), queryMetadata.MethodName + "Async")
             .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
@@ -160,7 +160,7 @@ public sealed class RepositoryGenerator(
     /// <summary>
     /// Резервное тело метода (если парсинг не удался)
     /// </summary>
-    private BlockSyntax BuildFallbackMethodBody(QueryMetadata queryMetadata, QueryGenerationOptions options) // TODO: проверить почему не используется параметр options и если он не нужен то удали его, а если нужен то используй
+    private BlockSyntax BuildFallbackMethodBody(QueryMetadata queryMetadata)
     {
         return Block(
             ThrowStatement(
