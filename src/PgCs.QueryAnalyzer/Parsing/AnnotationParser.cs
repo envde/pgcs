@@ -1,10 +1,12 @@
+using System.Text.RegularExpressions;
 using PgCs.Common.QueryAnalyzer.Models.Annotations;
+using PgCs.Common.QueryAnalyzer.Models.Results;
 
 namespace PgCs.QueryAnalyzer.Parsing;
 
-using System.Text.RegularExpressions;
-using PgCs.Common.QueryAnalyzer.Models.Results;
-
+/// <summary>
+/// Парсер аннотаций SQL запросов в стиле sqlc
+/// </summary>
 internal static partial class AnnotationParser
 {
     private static readonly Regex NameAnnotationRegex = GenerateNameAnnotationRegex();

@@ -2,11 +2,16 @@ using PgCs.Common.QueryAnalyzer.Models.Metadata;
 
 namespace PgCs.QueryAnalyzer.Parsing;
 
+/// <summary>
+/// Парсер SQL запросов для разделения на части и определения типа
+/// </summary>
 internal static class SqlQueryParser
 {
     /// <summary>
-    /// Разделяет SQL на комментарии и сам запрос
+    /// Разделяет SQL текст на комментарии (аннотации) и сам запрос
     /// </summary>
+    /// <param name="sqlQuery">Исходный SQL текст</param>
+    /// <returns>Кортеж (комментарии, запрос)</returns>
     public static (string Comments, string Query) SplitCommentsAndQuery(ReadOnlySpan<char> sqlQuery)
     {
         Span<Range> lineRanges = stackalloc Range[128];
@@ -21,6 +26,7 @@ internal static class SqlQueryParser
             var line = sqlQuery[lineRanges[i]];
             var trimmed = line.Trim();
 
+            // Строки начинающиеся с -- это комментарии
             if (trimmed.StartsWith("--"))
             {
                 if (!isInQuery)
@@ -40,8 +46,10 @@ internal static class SqlQueryParser
     }
 
     /// <summary>
-    /// Определяет тип SQL запроса
+    /// Определяет тип SQL запроса по первому ключевому слову
     /// </summary>
+    /// <param name="sqlQuery">SQL запрос для анализа</param>
+    /// <returns>Тип запроса (SELECT, INSERT, UPDATE, DELETE, Unknown)</returns>
     public static QueryType DetermineQueryType(string sqlQuery)
     {
         var normalized = sqlQuery.AsSpan().Trim();
@@ -63,8 +71,10 @@ internal static class SqlQueryParser
     }
 
     /// <summary>
-    /// Разбивает файл на отдельные SQL блоки
+    /// Разбивает многострочный SQL файл на отдельные блоки запросов (по точке с запятой)
     /// </summary>
+    /// <param name="content">Содержимое SQL файла</param>
+    /// <returns>Коллекция SQL блоков</returns>
     public static IEnumerable<string> SplitIntoQueryBlocks(string content)
     {
         var lines = content.Split('\n');
@@ -74,6 +84,7 @@ internal static class SqlQueryParser
         {
             currentBlock.Add(line);
 
+            // Точка с запятой обозначает конец блока
             if (line.TrimEnd().EndsWith(';'))
             {
                 yield return string.Join('\n', currentBlock);
@@ -81,6 +92,7 @@ internal static class SqlQueryParser
             }
         }
 
+        // Последний блок без точки с запятой
         if (currentBlock.Count > 0)
         {
             yield return string.Join('\n', currentBlock);

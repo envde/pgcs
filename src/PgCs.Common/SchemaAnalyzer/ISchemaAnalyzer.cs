@@ -25,13 +25,6 @@ public interface ISchemaAnalyzer
     ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath);
 
     /// <summary>
-    /// Анализирует отдельный SQL скрипт с определениями объектов БД
-    /// </summary>
-    /// <param name="sqlScript">SQL скрипт с определениями</param>
-    /// <returns>Метаданные схемы</returns>
-    SchemaMetadata AnalyzeScript(string sqlScript);
-
-    /// <summary>
     /// Извлекает определения таблиц из SQL скрипта
     /// </summary>
     /// <param name="sqlScript">SQL скрипт</param>

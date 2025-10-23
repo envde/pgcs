@@ -1,17 +1,20 @@
+using System.Text.RegularExpressions;
 using PgCs.Common.QueryAnalyzer.Models.Parameters;
 
 namespace PgCs.QueryAnalyzer.Parsing;
 
-using System.Text.RegularExpressions;
-using PgCs.Common.QueryAnalyzer;
-
+/// <summary>
+/// Извлекатель параметров из SQL запросов (поддерживает @param и $param синтаксис)
+/// </summary>
 internal static partial class ParameterExtractor
 {
     private static readonly Regex ParameterRegex = GenerateParameterRegex();
 
     /// <summary>
-    /// Извлекает все параметры из SQL запроса
+    /// Извлекает все уникальные параметры из SQL запроса с определением их типов
     /// </summary>
+    /// <param name="sqlQuery">SQL запрос для анализа</param>
+    /// <returns>Список параметров с метаданными о типах</returns>
     public static IReadOnlyList<QueryParameter> Extract(string sqlQuery)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlQuery);
@@ -25,6 +28,7 @@ internal static partial class ParameterExtractor
         {
             var paramName = match.Groups[1].Value;
             
+            // Пропускаем дубликаты
             if (seen.ContainsKey(paramName))
                 continue;
 
@@ -47,6 +51,9 @@ internal static partial class ParameterExtractor
         return parameters;
     }
 
+    /// <summary>
+    /// Regex для поиска параметров в формате @name или $name
+    /// </summary>
     [GeneratedRegex(@"[@$](\w+)", RegexOptions.Compiled)]
     private static partial Regex GenerateParameterRegex();
 }

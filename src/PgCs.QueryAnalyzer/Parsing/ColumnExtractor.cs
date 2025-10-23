@@ -1,18 +1,22 @@
+using System.Text;
+using System.Text.RegularExpressions;
 using PgCs.Common.QueryAnalyzer.Models.Results;
 
 namespace PgCs.QueryAnalyzer.Parsing;
 
-using System.Text.RegularExpressions;
-using PgCs.Common.QueryAnalyzer;
-
+/// <summary>
+/// Извлекатель информации о колонках из SQL запросов (SELECT и RETURNING)
+/// </summary>
 internal static partial class ColumnExtractor
 {
     private static readonly Regex SelectRegex = GenerateSelectRegex();
     private static readonly Regex ReturningRegex = GenerateReturningRegex();
 
     /// <summary>
-    /// Извлекает колонки из SELECT или RETURNING
+    /// Извлекает список колонок из SELECT или RETURNING части SQL запроса
     /// </summary>
+    /// <param name="sqlQuery">SQL запрос для анализа</param>
+    /// <returns>Список колонок с информацией о типах</returns>
     public static IReadOnlyList<ReturnColumn> Extract(string sqlQuery)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlQuery);
@@ -34,6 +38,9 @@ internal static partial class ColumnExtractor
         return [];
     }
 
+    /// <summary>
+    /// Парсит список колонок из строки вида "col1, col2 AS alias, func(col3)"
+    /// </summary>
     private static IReadOnlyList<ReturnColumn> ParseColumnList(string columnList)
     {
         var trimmed = columnList.Trim();
@@ -68,10 +75,13 @@ internal static partial class ColumnExtractor
         return columns;
     }
 
+    /// <summary>
+    /// Разбивает список колонок по запятым, учитывая вложенность скобок
+    /// </summary>
     private static List<string> SplitColumns(string columnList)
     {
         var parts = new List<string>();
-        var current = new System.Text.StringBuilder();
+        var current = new StringBuilder();
         var depth = 0;
 
         foreach (var ch in columnList)
@@ -102,6 +112,9 @@ internal static partial class ColumnExtractor
         return parts;
     }
 
+    /// <summary>
+    /// Извлекает имя колонки из выражения (учитывает AS алиасы)
+    /// </summary>
     private static string ExtractColumnName(string columnExpression)
     {
         // Ищем AS alias
@@ -117,9 +130,15 @@ internal static partial class ColumnExtractor
         return "column";
     }
 
+    /// <summary>
+    /// Regex для поиска SELECT части запроса
+    /// </summary>
     [GeneratedRegex(@"SELECT\s+(.*?)\s+FROM", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled)]
     private static partial Regex GenerateSelectRegex();
 
+    /// <summary>
+    /// Regex для поиска RETURNING части запроса
+    /// </summary>
     [GeneratedRegex(@"RETURNING\s+(.*?)(?:;|\s*$)", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled)]
     private static partial Regex GenerateReturningRegex();
 }

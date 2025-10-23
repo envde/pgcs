@@ -1,5 +1,3 @@
-using PgCs.Common.SchemaAnalyzer.Models.Tables;
-
 namespace PgCs.Common.SchemaAnalyzer.Models.Tables;
 
 /// <summary>
@@ -7,7 +5,18 @@ namespace PgCs.Common.SchemaAnalyzer.Models.Tables;
 /// </summary>
 public sealed record PartitionInfo
 {
+    /// <summary>
+    /// Стратегия партиционирования (Range, List, Hash)
+    /// </summary>
     public required PartitionStrategy Strategy { get; init; }
+    
+    /// <summary>
+    /// Список колонок, используемых для партиционирования
+    /// </summary>
     public required IReadOnlyList<string> PartitionKeys { get; init; }
+    
+    /// <summary>
+    /// Список дочерних партиций
+    /// </summary>
     public IReadOnlyList<PartitionDefinition> Partitions { get; init; } = [];
 }
