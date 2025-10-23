@@ -4,13 +4,15 @@
 
 ## 📊 Статистика
 
-**Всего тестов**: 126  
+**Всего тестов**: 174  
 **Структура**:
 - `NameConverterTests`: 25 тестов
 - `PostgreSqlTypeMapperTests`: 37 тестов
 - `RoslynFormatterTests`: 12 тестов
 - `NameConversionStrategyBuilderTests`: 32 тестов
 - `TypeMapperBuilderTests`: 20 тестов
+- `GeneratorFactoryTests`: 31 тестов
+- `ValidationPipelineTests`: 17 тестов
 
 ## 🧪 Тестируемые компоненты
 
@@ -52,6 +54,48 @@ Fluent builder для кастомизации правил конвертаци
 - Regex правила и custom трансформации
 - Preset конфигурации для быстрой настройки
 - Префикс/суффикс removal для legacy схем
+
+### GeneratorFactoryTests (31 тестов)
+Fluent API factory для создания генераторов с кастомными зависимостями:
+
+- **Basic Configuration** (3 теста): Create, GetDependencies с defaults, GetWriter
+- **TypeMapper Configuration** (6 тестов): WithTypeMapper (instance/builder), WithDefaultTypeMapper, null validations
+- **NameConverter Configuration** (6 тестов): WithNameConverter (instance/builder), WithDefaultNameConverter, null validations
+- **Formatter Configuration** (4 теста): WithFormatter, WithDefaultFormatter, WithoutFormatter (no-op)
+- **Defaults Strategy** (3 теста): WithoutDefaults требует explicit configuration, WithDefaults позволяет partial config
+- **Quick Presets** (5 тестов): UseSystemTextJsonPreset, UseNodaTimePreset, UseNetTopologySuitePreset, UseMinimalPreset, UseCustomizationPreset
+- **Chaining** (2 теста): Multiple configurations, multiple presets (last wins)
+- **Edge Cases** (3 теста): GetDependencies caching, WithoutDefaults validation errors
+
+**Ключевые возможности**:
+- Centralized dependency configuration
+- Preset configurations для быстрой настройки
+- Support for TypeMapper/NameConverter/Formatter/Writer
+- Fluent API with method chaining
+- Defaults strategy (optional explicit configuration)
+
+### ValidationPipelineTests (17 тестов)
+Fluent API для комплексной валидации SQL запросов:
+
+- **Basic Configuration** (2 теста): Create, empty validation
+- **Queries Validation** (3 теста): Duplicate method names, empty SQL, valid queries
+- **Parameters Validation** (2 теста): Too many parameters warning, few parameters ok
+- **Return Types Validation** (2 теста): Missing return type warning, Exec cardinality no warning
+- **ValidateAll** (1 тест): Combines all query validations
+- **Filtering** (2 теста): WithMinimumSeverity filters warnings/includes errors
+- **StopOnFirstError** (1 тест): Stops after first error
+- **OnIssue** (1 тест): Handler invoked for each issue
+- **ValidateOrThrow** (2 теста): Throws on errors, returns on success
+- **ValidationResult** (1 тест): GetReport formatting
+- **Chaining** (1 тест): Multiple validators work together
+
+**Ключевые возможности**:
+- Fluent API для multi-step validation
+- Queries validation (method names, SQL, parameters, return types)
+- Configurable severity filtering
+- Stop-on-first-error mode
+- Issue callbacks for logging
+- ValidateOrThrow для fail-fast scenarios
 
 ### PostgreSqlTypeMapper (37 тестов)
 Маппинг PostgreSQL типов в C# типы:
@@ -128,15 +172,17 @@ PgCs.Common.Tests/
     ├── NameConversionStrategyBuilderTests.cs      # 32 теста
     ├── PostgreSqlTypeMapperTests.cs               # 37 тестов
     ├── TypeMapperBuilderTests.cs                  # 20 тестов
-    └── RoslynFormatterTests.cs                    # 12 тестов
+    ├── RoslynFormatterTests.cs                    # 12 тестов
+    ├── GeneratorFactoryTests.cs                   # 31 тестов
+    └── ValidationPipelineTests.cs                 # 17 тестов
 ```
 
 ## ✅ Результаты
 
-Все 126 тестов проходят успешно:
+Все 174 теста проходят успешно:
 
 ```
-Test summary: total: 126, failed: 0, succeeded: 126, skipped: 0
+Test summary: total: 174, failed: 0, succeeded: 174, skipped: 0
 ```
 
 ## 🔧 Зависимости
