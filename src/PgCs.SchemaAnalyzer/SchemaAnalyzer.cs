@@ -97,35 +97,6 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         };
     }
 
-    public SchemaMetadata AnalyzeScript(string sqlScript)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-
-        var normalizedScript = SqlNormalizer.Normalize(sqlScript);
-
-        var types = ExtractTypes(normalizedScript);
-        var tables = ExtractTables(normalizedScript);
-        var views = ExtractViews(normalizedScript);
-        var functions = ExtractFunctions(normalizedScript);
-        var indexes = ExtractIndexes(normalizedScript);
-        var triggers = ExtractTriggers(normalizedScript);
-        var constraints = ExtractConstraints(normalizedScript);
-        var comments = _commentExtractor.ExtractComments(normalizedScript);
-
-        return new SchemaMetadata
-        {
-            Tables = tables,
-            Views = views,
-            Types = types,
-            Functions = functions,
-            Indexes = indexes,
-            Triggers = triggers,
-            Constraints = constraints,
-            Comments = comments,
-            AnalyzedAt = DateTime.UtcNow
-        };
-    }
-
     public IReadOnlyList<TableDefinition> ExtractTables(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
@@ -166,5 +137,34 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
         return _constraintExtractor.Extract(sqlScript);
+    }
+    
+    private SchemaMetadata AnalyzeScript(string sqlScript)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+
+        var normalizedScript = SqlNormalizer.Normalize(sqlScript);
+
+        var types = ExtractTypes(normalizedScript);
+        var tables = ExtractTables(normalizedScript);
+        var views = ExtractViews(normalizedScript);
+        var functions = ExtractFunctions(normalizedScript);
+        var indexes = ExtractIndexes(normalizedScript);
+        var triggers = ExtractTriggers(normalizedScript);
+        var constraints = ExtractConstraints(normalizedScript);
+        var comments = _commentExtractor.ExtractComments(normalizedScript);
+
+        return new SchemaMetadata
+        {
+            Tables = tables,
+            Views = views,
+            Types = types,
+            Functions = functions,
+            Indexes = indexes,
+            Triggers = triggers,
+            Constraints = constraints,
+            Comments = comments,
+            AnalyzedAt = DateTime.UtcNow
+        };
     }
 }
