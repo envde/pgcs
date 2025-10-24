@@ -1,0 +1,381 @@
+# pgcs.yaml - PgCs Configuration File
+# Documentation: https://github.com/yourproject/pgcs
+
+# =============================================================================
+# SCHEMA: Analysis and Generation
+# =============================================================================
+schema:
+  # Input schema file(s)
+  input:
+    file: "./database/schema.sql"
+    # Or multiple files:
+    # files:
+    #   - "./database/schema.sql"
+    #   - "./database/migrations/*.sql"
+    # Or directory:
+    # directory: "./database"
+    # pattern: "*.sql"
+  
+  # Output settings
+  output:
+    directory: "./Generated/Models"
+    namespace: "MyApp.Database.Models"
+    
+    # File organization
+    oneFilePerModel: true
+    groupByCategory: true
+    categories:
+      tables: "Tables"
+      views: "Views"
+      types: "Types"
+      enums: "Enums"
+  
+  # Filtering
+  filter:
+    includeSchemas:
+      - "public"
+    excludeSchemas:
+      - "pg_catalog"
+      - "information_schema"
+    
+    includeTables: []
+    excludeTables:
+      - "migrations"
+      - "flyway_schema_history"
+    
+    includeViews: []
+    excludeViews: []
+    
+    includeTypes: []
+    excludeTypes: []
+    
+    includeFunctions: []
+    excludeFunctions: []
+  
+  # Generation options
+  generation:
+    # Model type
+    useRecordTypes: true
+    nullableReferenceTypes: true
+    useInitOnlyProperties: true
+    
+    # Documentation
+    generateDocumentation: true
+    generateMappingAttributes: true
+    includeSchemaInAttributes: false
+    
+    # Additional members
+    generateConstructor: false
+    generateToString: false
+    generateEqualityMembers: false
+  
+  # Naming conventions
+  naming:
+    classNames: "PascalCase"           # PascalCase, camelCase, snake_case
+    propertyNames: "PascalCase"
+    
+    singularizeTableNames: true
+    pluralizeCollections: true
+    
+    removePrefixes:
+      - "tbl_"
+      - "vw_"
+    
+    removeSuffixes:
+      - "_table"
+      - "_view"
+    
+    # Custom name mappings
+    customMappings:
+      "user_role": "UserRole"
+      "oauth_token": "OAuthToken"
+  
+  # Type mappings (PostgreSQL -> C#)
+  types:
+    customMappings:
+      "uuid": "System.Guid"
+      "jsonb": "System.Text.Json.JsonDocument"
+      "json": "System.Text.Json.JsonDocument"
+      "inet": "System.Net.IPAddress"
+      "macaddr": "System.Net.NetworkInformation.PhysicalAddress"
+    
+    # Handle arrays as List<T> instead of T[]
+    arraysAsLists: true
+    
+    # Nullable strategy: NullableReferenceTypes, Nullable<T>, Both
+    nullableStrategy: "NullableReferenceTypes"
+  
+  # Validation
+  validation:
+    enabled: true
+    strictMode: true
+    
+    rules:
+      requirePrimaryKeys: true
+      checkForeignKeyIndexes: true
+      warnNoIndexes: true
+      checkCircularReferences: true
+      validateNamingConventions: true
+      namingPattern: "^[a-z][a-z0-9_]*$"
+
+# =============================================================================
+# QUERIES: Analysis and Generation
+# =============================================================================
+queries:
+  # Input query file(s)
+  input:
+    file: "./database/queries.sql"
+    # Or multiple files:
+    # files:
+    #   - "./database/queries/*.sql"
+    #   - "./database/admin-queries.sql"
+  
+  # Output settings
+  output:
+    directory: "./Generated/Repositories"
+    namespace: "MyApp.Database.Repositories"
+    
+    # File organization
+    oneFilePerRepository: true
+    separateInterfaceFiles: true
+  
+  # Repository generation
+  repositories:
+    generateInterfaces: true
+    interfacePrefix: "I"
+    interfaceSuffix: ""
+    
+    generateBaseRepository: false
+    baseRepositoryName: "BaseRepository"
+  
+  # Method generation
+  methods:
+    useAsync: true
+    useCancellationToken: true
+    includeTransaction: false
+    includeSqlInDocumentation: true
+    
+    # Method organization: GroupByEntity, Alphabetical, ByQueryType, SingleFile
+    organization: "GroupByEntity"
+    
+    accessModifier: "public"
+    generateDocumentation: true
+  
+  # Model generation
+  models:
+    generateResultModels: true
+    generateParameterModels: true
+    
+    useRecordTypes: true
+    nullableReferenceTypes: true
+    
+    resultModelSuffix: "Result"
+    parameterModelSuffix: "Parameters"
+  
+  # Connection settings
+  connection:
+    connectionStringName: "DefaultConnection"
+    generateConnectionFactory: false
+    useConnectionPooling: true
+  
+  # Error handling
+  errorHandling:
+    # NullHandling: ThrowOnNull, ReturnNull, ReturnDefault
+    nullHandling: "ThrowOnNull"
+    generateTryCatch: false
+    logExceptions: false
+  
+  # Validation
+  validation:
+    enabled: true
+    strictMode: true
+    
+    rules:
+      requireMethodNames: true
+      requireReturnTypes: true
+      checkSqlInjection: true
+      validateParameterTypes: true
+      warnUnusedParameters: false
+      requireTransactionForMutations: false
+
+# =============================================================================
+# FORMATTING: Code style and formatting
+# =============================================================================
+formatting:
+  enabled: true
+  useRoslynFormatter: true
+  
+  indentation:
+    style: "spaces"                    # spaces or tabs
+    size: 4
+  
+  lineBreaks:
+    maxLineLength: 120
+    placeOpenBraceOnNewLine: true
+    placeElseOnNewLine: true
+  
+  spacing:
+    beforeOpenParen: false
+    afterComma: true
+    beforeColon: false
+    afterColon: true
+  
+  usings:
+    sortUsings: true
+    separateSystemUsings: true
+    removeUnusedUsings: true
+    useFileScopedNamespace: true
+  
+  conventions:
+    useVarKeyword: true
+    useExpressionBodies: true
+    usePatternMatching: true
+
+# =============================================================================
+# OUTPUT: File writing and reports
+# =============================================================================
+output:
+  # General output directory (can be overridden in schema/queries)
+  baseDirectory: "./Generated"
+  
+  # File writing
+  files:
+    overwrite: true
+    createBackup: false
+    backupDirectory: "./Backup"
+    
+    encoding: "UTF-8"
+    lineEnding: "LF"                   # LF, CRLF, Auto
+    addBom: false
+    permissions: "0644"
+  
+  # File headers
+  headers:
+    addAutoGeneratedComment: true
+    includeTimestamp: true
+    includeSourcePath: true
+    
+    template: |
+      // <auto-generated>
+      //     This code was generated by PgCs v{version}.
+      //     Changes to this file may cause incorrect behavior and will be lost
+      //     if the code is regenerated.
+      // </auto-generated>
+  
+  # Reports
+  reports:
+    generateReport: true
+    format: "text"                     # text, json, html, markdown
+    outputFile: "./pgcs-report.txt"
+    
+    includeStatistics: true
+    includeWarnings: true
+    includeValidationIssues: true
+
+# =============================================================================
+# LOGGING: Console and file logging
+# =============================================================================
+logging:
+  # Log level: Trace, Debug, Information, Warning, Error, Critical, None
+  level: "Information"
+  
+  console:
+    enabled: true
+    colorized: true
+  
+  file:
+    enabled: false
+    path: "./pgcs.log"
+    maxSize: "10MB"
+    maxFiles: 5
+  
+  structured: false
+  includeTimestamps: true
+  includeLevel: true
+  includeContext: false
+
+# =============================================================================
+# ADVANCED: Performance, caching, plugins
+# =============================================================================
+advanced:
+  # Parallel processing
+  parallel:
+    enabled: true
+    maxDegreeOfParallelism: -1         # -1 = use all cores
+  
+  # Caching
+  cache:
+    enabled: true
+    directory: "./.pgcs-cache"
+    ttl: "1h"
+  
+  # Performance
+  performance:
+    incrementalGeneration: false
+    checksumAlgorithm: "SHA256"
+  
+  # Plugins
+  plugins:
+    enabled: false
+    directory: "./plugins"
+    assemblies: []
+  
+  # Templates
+  templates:
+    useCustomTemplates: false
+    directory: "./templates"
+    engine: "Scriban"                  # Scriban, Liquid, Razor
+  
+  # Experimental features
+  experimental:
+    enabled: false
+    generateMigrations: false
+    generateGraphQL: false
+    generateOpenApi: false
+
+# =============================================================================
+# ENVIRONMENTS: Environment-specific overrides
+# =============================================================================
+environments:
+  development:
+    logging:
+      level: "Debug"
+    output:
+      files:
+        overwrite: true
+        createBackup: false
+  
+  production:
+    logging:
+      level: "Warning"
+      file:
+        enabled: true
+    output:
+      files:
+        overwrite: false
+        createBackup: true
+    schema:
+      validation:
+        strictMode: true
+    queries:
+      validation:
+        strictMode: true
+
+# =============================================================================
+# INTEGRATION: Git, CI/CD, IDE
+# =============================================================================
+integration:
+  git:
+    autoCommit: false
+    commitMessage: "chore: regenerate database code"
+    updateGitignore: true
+  
+  ci:
+    failOnValidationErrors: true
+    failOnWarnings: false
+    exitCodeOnFailure: 1
+  
+  ide:
+    generateEditorConfig: false
+    generateVsTasks: false
+    generateVsCodeTasks: false
