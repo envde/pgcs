@@ -47,6 +47,10 @@ public class CodeGenerationPipeline
     /// </summary>
     public CodeGenerationPipeline FromSchemaFile(string filePath)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"Schema file not found: {filePath}");
+        
         _schemaFiles.Add(filePath);
         return this;
     }
@@ -271,8 +275,9 @@ public class CodeGenerationPipeline
     /// <summary>
     /// Выполнить весь pipeline
     /// </summary>
-    public async ValueTask<PipelineResult> ExecuteAsync()
+    public async ValueTask<PipelineResult> ExecuteAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = new PipelineResult { IsSuccess = false };
         var startTime = DateTime.UtcNow;
 
@@ -283,7 +288,7 @@ public class CodeGenerationPipeline
             if (_generateSchema && (_schemaFiles.Any() || _schemaDirectories.Any()))
             {
                 ReportProgress("Анализ схемы базы данных...");
-                schemaMetadata = await AnalyzeSchemaAsync();
+                schemaMetadata = await AnalyzeSchemaAsync(cancellationToken);
                 result.AnalyzedSchemaMetadata = schemaMetadata;
                 ReportProgress($"Проанализировано: {schemaMetadata.Tables.Count} таблиц, {schemaMetadata.Types.Count} типов");
             }
@@ -307,6 +312,13 @@ public class CodeGenerationPipeline
                     _schemaOptions ?? CreateDefaultSchemaOptions());
                 result.SchemaGenerationResult = schemaGenResult;
                 ReportProgress($"Сгенерировано {schemaGenResult.GeneratedCode.Count} файлов моделей");
+
+                if (schemaGenResult != null && schemaGenResult.ValidationIssues.Any(i => i.Severity == ValidationSeverity.Error))
+                {
+                    ReportError($"Schema generation errors: {string.Join(", ", schemaGenResult.ValidationIssues.Select(i => i.Message))}");
+                    result.IsSuccess = false;
+                    return result;
+                }
             }
 
             // ШАГ 4: Анализ запросов
@@ -386,7 +398,7 @@ public class CodeGenerationPipeline
 
     #region Private Methods
 
-    private async ValueTask<SchemaMetadata> AnalyzeSchemaAsync()
+    private async ValueTask<SchemaMetadata> AnalyzeSchemaAsync(CancellationToken cancellationToken)
     {
         var builder = SchemaAnalyzerBuilder.Create();
 
