@@ -1,4 +1,5 @@
 using PgCs.Cli.Configuration;
+using PgCs.Common.CodeGeneration;
 using PgCs.Common.SchemaAnalyzer.Models;
 
 namespace PgCs.Cli.Services;
@@ -15,7 +16,17 @@ public sealed class SchemaGenerationService
         int TablesGenerated,
         int EnumsGenerated,
         IReadOnlyList<string> FilesCreated,
-        IReadOnlyList<string> Warnings
+        IReadOnlyList<ValidationMessage> Issues
+    );
+
+    /// <summary>
+    /// Validation message (error or warning)
+    /// </summary>
+    public record ValidationMessage(
+        ValidationSeverity Severity,
+        string Code,
+        string Message,
+        string? Location
     );
 
     /// <summary>
@@ -30,67 +41,74 @@ public sealed class SchemaGenerationService
             throw new InvalidOperationException("Schema configuration is missing");
         }
 
-        var warnings = new List<string>();
+        var issues = new List<ValidationMessage>();
         var filesCreated = new List<string>();
 
-        // TODO: Implement actual integration with CodeGenerationPipeline
-        // This is a placeholder implementation
+        // Create and configure pipeline
+        var pipeline = CodeGenerationPipeline.Create();
 
-        // Simulate work
-        await Task.Delay(100, cancellationToken);
-
-        // Example: Use CodeGenerationPipeline
-        /*
-        var pipeline = new CodeGenerationPipeline();
-        
+        // Configure input
         if (!string.IsNullOrEmpty(config.Schema.Input.File))
         {
             pipeline.FromSchemaFile(config.Schema.Input.File);
         }
         else if (!string.IsNullOrEmpty(config.Schema.Input.Directory))
         {
-            pipeline.FromSchemaDirectory(
-                config.Schema.Input.Directory,
-                config.Schema.Input.Pattern,
-                config.Schema.Input.Recursive
-            );
+            pipeline.FromSchemaDirectory(config.Schema.Input.Directory);
         }
 
-        if (config.Schema.Filter is not null)
+        // Configure schema generation options
+        pipeline.WithSchemaGeneration(builder =>
         {
-            pipeline.FilterSchema(filter =>
-            {
-                if (config.Schema.Filter.Schemas.Count > 0)
-                    filter.IncludeSchemas = config.Schema.Filter.Schemas;
-                
-                if (config.Schema.Filter.ExcludeSchemas.Count > 0)
-                    filter.ExcludeSchemas = config.Schema.Filter.ExcludeSchemas;
-                
-                if (config.Schema.Filter.Tables.Count > 0)
-                    filter.IncludeTables = config.Schema.Filter.Tables;
-                
-                if (config.Schema.Filter.ExcludeTables.Count > 0)
-                    filter.ExcludeTables = config.Schema.Filter.ExcludeTables;
-            });
-        }
-
-        pipeline.WithSchemaGeneration(options =>
-        {
-            options.OutputDirectory = config.Schema.Output.Directory;
-            options.Namespace = config.Schema.Output.Namespace;
-            options.FilePerTable = config.Schema.Output.FilePerTable;
-            // ... more options
+            builder.WithNamespace(config.Schema.Output.Namespace)
+                   .OutputTo(config.Schema.Output.Directory)
+                   .UseRecords()
+                   .WithXmlDocs()
+                   .OverwriteFiles();
         });
 
-        var result = await pipeline.ExecuteAsync(cancellationToken);
-        */
+        // Disable query generation for schema-only pipeline
+        pipeline.WithoutQueryGeneration();
 
-        // Return placeholder result
+        // Execute pipeline
+        var pipelineResult = await pipeline.ExecuteAsync(cancellationToken);
+
+        if (!pipelineResult.IsSuccess)
+        {
+            throw new InvalidOperationException(
+                $"Schema generation failed: {pipelineResult.Error?.Message}",
+                pipelineResult.Error);
+        }
+
+        // Extract results
+        var stats = pipelineResult.Statistics!;
+        var writeResult = pipelineResult.SchemaWriteResult;
+
+        // Collect validation issues from schema metadata
+        if (pipelineResult.AnalyzedSchemaMetadata?.ValidationIssues is not null)
+        {
+            foreach (var issue in pipelineResult.AnalyzedSchemaMetadata.ValidationIssues)
+            {
+                issues.Add(new ValidationMessage(
+                    Severity: issue.Severity,
+                    Code: issue.Code ?? "UNKNOWN",
+                    Message: issue.Message ?? "Unknown error",
+                    Location: issue.Location
+                ));
+            }
+        }
+
+        // Collect written files
+        if (writeResult is not null)
+        {
+            filesCreated.AddRange(writeResult.WrittenFiles);
+        }
+
         return new Result(
-            TablesGenerated: 10,
-            EnumsGenerated: 3,
+            TablesGenerated: stats.TablesAnalyzed,
+            EnumsGenerated: stats.TypesAnalyzed,
             FilesCreated: filesCreated,
-            Warnings: warnings
+            Issues: issues
         );
     }
 

@@ -2,6 +2,8 @@ using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
 using PgCs.Cli.Output;
+using PgCs.Cli.Services;
+using PgCs.Common.CodeGeneration;
 
 namespace PgCs.Cli.Commands;
 
@@ -122,49 +124,85 @@ public sealed class GenerateQueriesCommand : BaseCommand
 
             // Create progress reporter
             var progress = new ProgressReporter(Writer);
-            progress.Start("Query generation", 6);
+            progress.Start("Query generation", 5);
 
-            // TODO: Implement actual query generation using CodeGenerationPipeline
-            // This is a placeholder that demonstrates the structure
-
-            progress.Step("Loading query file(s)");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Parsing SQL queries");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Analyzing query parameters");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Generating repository interfaces");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Generating repository implementations");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Writing output files");
-            await Task.Delay(100); // Simulate work
-
-            stopwatch.Stop();
-
-            // Print results (placeholder)
-            if (dryRun)
+            try
             {
-                var resultPrinter = new ResultPrinter(Writer);
-                resultPrinter.PrintDryRunResult(15, 5, config.Queries.Output.Directory);
-            }
-            else
-            {
+                progress.Step("Loading query file(s)");
+                progress.Step("Parsing SQL queries");
+                progress.Step("Generating repositories");
+                progress.Step("Generating models");
+                progress.Step("Writing output files");
+
+                // Use real query generation service
+                var queryService = new QueryGenerationService();
+                var queryResult = await queryService.GenerateAsync(config, context.GetCancellationToken());
+
+                stopwatch.Stop();
+
+                if (verbose && queryResult.FilesCreated.Count > 0)
+                {
+                    Writer.Info($"Generated files:");
+                    foreach (var file in queryResult.FilesCreated)
+                    {
+                        Writer.Info($"  • {file}");
+                    }
+                }
+
+                // Display validation issues if any
+                if (queryResult.Issues.Count > 0)
+                {
+                    Writer.WriteLine();
+                    Writer.Info($"Found {queryResult.Issues.Count} issue(s) during query analysis:");
+                    Writer.WriteLine();
+                    
+                    foreach (var issue in queryResult.Issues)
+                    {
+                        // Format message
+                        var message = $"[{issue.Code}] {issue.Message}";
+                        
+                        // Display based on severity
+                        if (issue.Severity == ValidationSeverity.Error)
+                        {
+                            Writer.Error($"ERROR: {message}");
+                        }
+                        else if (issue.Severity == ValidationSeverity.Warning)
+                        {
+                            Writer.Warning($"{message}");
+                        }
+                        else
+                        {
+                            Writer.Info($"{message}");
+                        }
+                        
+                        // Display location if available
+                        if (!string.IsNullOrEmpty(issue.Location))
+                        {
+                            var locationPreview = issue.Location.Length > 100 
+                                ? issue.Location.Substring(0, 100) + "..." 
+                                : issue.Location;
+                            Writer.Info($"  → {locationPreview}");
+                        }
+                    }
+                    Writer.WriteLine();
+                }
+
                 progress.Complete("Query generation");
-                
+
+                // Print results
                 var resultPrinter = new ResultPrinter(Writer);
                 resultPrinter.PrintQueryResult(
-                    repositoriesGenerated: 3,
-                    methodsGenerated: 12,
-                    modelsGenerated: 8,
+                    repositoriesGenerated: queryResult.RepositoriesGenerated,
+                    methodsGenerated: queryResult.MethodsGenerated,
+                    modelsGenerated: queryResult.ModelsGenerated,
                     outputDirectory: config.Queries.Output.Directory,
                     elapsed: stopwatch.Elapsed
                 );
+            }
+            catch (Exception ex)
+            {
+                progress.Fail("Query generation failed");
+                throw new InvalidOperationException($"Query generation failed: {ex.Message}", ex);
             }
 
             return 0;

@@ -17,6 +17,12 @@ internal sealed partial class TableExtractor : BaseExtractor<TableDefinition>
 
     protected override TableDefinition ParseMatch(Match match, string statement)
     {
+        // Пропускаем PARTITION OF таблицы (они наследуют структуру от parent table)
+        if (Regex.IsMatch(statement, @"PARTITION\s+OF\s+", RegexOptions.IgnoreCase))
+        {
+            return null!; // Возвращаем null для пропуска
+        }
+
         var fullTableName = match.Groups[1].Value.Trim();
         
         // Извлекаем содержимое скобок с учетом вложенности

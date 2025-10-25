@@ -265,6 +265,7 @@ public sealed class SchemaFilter : ISchemaFilter
             Triggers = filteredTriggers,
             Constraints = filteredConstraints,
             Comments = _sourceMetadata.Comments,
+            ValidationIssues = _sourceMetadata.ValidationIssues,
             SourceFile = _sourceMetadata.SourceFile,
             AnalyzedAt = _sourceMetadata.AnalyzedAt
         };

@@ -2,6 +2,8 @@ using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
 using PgCs.Cli.Output;
+using PgCs.Cli.Services;
+using PgCs.Common.CodeGeneration;
 
 namespace PgCs.Cli.Commands;
 
@@ -122,45 +124,83 @@ public sealed class GenerateSchemaCommand : BaseCommand
 
             // Create progress reporter
             var progress = new ProgressReporter(Writer);
-            progress.Start("Schema generation", 5);
+            progress.Start("Schema generation", 4);
 
-            // TODO: Implement actual schema generation using CodeGenerationPipeline
-            // This is a placeholder that demonstrates the structure
-
-            progress.Step("Loading schema file(s)");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Analyzing database schema");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Generating C# classes");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Writing output files");
-            await Task.Delay(100); // Simulate work
-
-            progress.Step("Formatting code");
-            await Task.Delay(100); // Simulate work
-
-            stopwatch.Stop();
-
-            // Print results (placeholder)
-            if (dryRun)
+            try
             {
-                var resultPrinter = new ResultPrinter(Writer);
-                resultPrinter.PrintDryRunResult(10, 3, config.Schema.Output.Directory);
-            }
-            else
-            {
+                progress.Step("Loading schema file(s)");
+                progress.Step("Analyzing database schema");
+                progress.Step("Generating C# classes");
+                progress.Step("Writing output files");
+
+                // Use real schema generation service
+                var schemaService = new SchemaGenerationService();
+                var schemaResult = await schemaService.GenerateAsync(config, context.GetCancellationToken());
+
+                stopwatch.Stop();
+
+                if (verbose && schemaResult.FilesCreated.Count > 0)
+                {
+                    Writer.Info($"Generated files:");
+                    foreach (var file in schemaResult.FilesCreated)
+                    {
+                        Writer.Info($"  • {file}");
+                    }
+                }
+
+                // Display validation issues if any
+                if (schemaResult.Issues.Count > 0)
+                {
+                    Writer.WriteLine();
+                    Writer.Info($"Found {schemaResult.Issues.Count} issue(s) during schema analysis:");
+                    Writer.WriteLine();
+                    
+                    foreach (var issue in schemaResult.Issues)
+                    {
+                        // Format message
+                        var message = $"[{issue.Code}] {issue.Message}";
+                        
+                        // Display based on severity
+                        if (issue.Severity == ValidationSeverity.Error)
+                        {
+                            Writer.Error($"ERROR: {message}");
+                        }
+                        else if (issue.Severity == ValidationSeverity.Warning)
+                        {
+                            Writer.Warning($"{message}");
+                        }
+                        else
+                        {
+                            Writer.Info($"{message}");
+                        }
+                        
+                        // Display location if available
+                        if (!string.IsNullOrEmpty(issue.Location))
+                        {
+                            var locationPreview = issue.Location.Length > 100 
+                                ? issue.Location.Substring(0, 100) + "..." 
+                                : issue.Location;
+                            Writer.Info($"  → {locationPreview}");
+                        }
+                    }
+                    Writer.WriteLine();
+                }
+
                 progress.Complete("Schema generation");
-                
+
+                // Print results
                 var resultPrinter = new ResultPrinter(Writer);
                 resultPrinter.PrintSchemaResult(
-                    tablesGenerated: 10,
-                    enumsGenerated: 3,
+                    tablesGenerated: schemaResult.TablesGenerated,
+                    enumsGenerated: schemaResult.EnumsGenerated,
                     outputDirectory: config.Schema.Output.Directory,
                     elapsed: stopwatch.Elapsed
                 );
+            }
+            catch (Exception ex)
+            {
+                progress.Fail("Schema generation failed");
+                throw new InvalidOperationException($"Schema generation failed: {ex.Message}", ex);
             }
 
             return 0;

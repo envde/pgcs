@@ -1,0 +1,13 @@
+schema:
+  input:
+    file: "src/PgCs.Cli/Examples/Sql/Schema/full_schema.sql"
+  output:
+    directory: "./Generated/FullTest/Models"
+    namespace: "MyApp.Database.Models"
+
+queries:
+  input:
+    file: "test_with_schema.sql"
+  output:
+    directory: "./Generated/FullTest/Repositories"
+    namespace: "MyApp.Database.Repositories"

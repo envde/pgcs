@@ -45,6 +45,9 @@ public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTy
     /// </summary>
     private GeneratedCode GenerateEnumType(TypeDefinition type, SchemaGenerationOptions options)
     {
+        // Конвертируем имя типа в PascalCase (user_status → UserStatus)
+        var enumName = ConvertEnumValueToIdentifier(type.Name);
+        
         // Создаем члены enum
         var members = new List<EnumMemberDeclarationSyntax>();
         
@@ -55,22 +58,27 @@ public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTy
             
             if (options.GenerateXmlDocumentation)
             {
-                member = member.WithLeadingTrivia(
-                    CreateXmlComment($"Значение '{value}'"));
+                member = member.WithLeadingTrivia(TriviaList(
+                    Comment($"/// <summary>Значение '{value}'</summary>"),
+                    CarriageReturnLineFeed));
             }
             
             members.Add(member);
         }
 
-        // Создаем enum declaration
-        var enumDeclaration = EnumDeclaration(type.Name)
+        // Создаем enum declaration с PascalCase именем
+        var enumDeclaration = EnumDeclaration(enumName)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddMembers(members.ToArray());
 
         if (options.GenerateXmlDocumentation && !string.IsNullOrWhiteSpace(type.Comment))
         {
             enumDeclaration = enumDeclaration.WithLeadingTrivia(
-                CreateXmlComment(type.Comment));
+                TriviaList(
+                    Comment("/// <summary>"),
+                    Comment($"{Environment.NewLine}/// {type.Comment}{Environment.NewLine}"),
+                    Comment("/// </summary>"),
+                    CarriageReturnLineFeed));
         }
 
         // Создаем compilation unit
@@ -78,12 +86,12 @@ public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTy
             options.RootNamespace,
             enumDeclaration);
 
-        var sourceCode = compilationUnit.NormalizeWhitespace().ToFullString();
+        var sourceCode = compilationUnit.ToFullString();
 
         return new GeneratedCode
         {
             SourceCode = sourceCode,
-            TypeName = type.Name,
+            TypeName = enumName, // Используем PascalCase имя enum
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.EnumType
         };
@@ -205,19 +213,27 @@ public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTy
     /// </summary>
     private static string ConvertEnumValueToIdentifier(string value)
     {
-        // Убираем недопустимые символы и делаем PascalCase
-        var identifier = new string(value
-            .Select((c, i) => i == 0 ? char.ToUpper(c) : c)
+        // Убираем недопустимые символы
+        var cleaned = new string(value
             .Where(c => char.IsLetterOrDigit(c) || c == '_')
             .ToArray());
 
         // Если начинается с цифры, добавляем префикс
-        if (char.IsDigit(identifier[0]))
+        if (char.IsDigit(cleaned[0]))
         {
-            identifier = "Value_" + identifier;
+            cleaned = "Value_" + cleaned;
         }
 
-        return identifier;
+        // Обрабатываем snake_case: user_status → UserStatus
+        if (cleaned.Contains('_'))
+        {
+            var parts = cleaned.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            return string.Concat(parts.Select(part =>
+                char.ToUpperInvariant(part[0]) + (part.Length > 1 ? part[1..].ToLowerInvariant() : "")));
+        }
+
+        // Простое имя - делаем PascalCase
+        return cleaned.Length > 0 ? char.ToUpperInvariant(cleaned[0]) + (cleaned.Length > 1 ? cleaned[1..] : "") : cleaned;
     }
 
     /// <summary>
@@ -242,6 +258,7 @@ public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTy
                 DocumentationComment(
                     XmlSummaryElement(textTokens.ToArray()))));
 
+        // КРИТИЧНО: Добавляем перевод строки ПОСЛЕ XML comment
         triviaList = triviaList.Add(CarriageReturnLineFeed);
 
         return triviaList;

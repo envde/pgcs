@@ -72,6 +72,12 @@ internal static class TypeInference
 
         if (upper.Contains("::UUID"))
             return ("uuid", "Guid");
+
+        if (upper.Contains("::NUMERIC") || upper.Contains("::DECIMAL"))
+            return ("numeric", "decimal");
+
+        if (upper.Contains("::TEXT") || upper.Contains("::VARCHAR"))
+            return ("text", "string");
         
         // По умолчанию string
         return ("text", "string");

@@ -78,7 +78,10 @@ public sealed class QueryGenerator(
         {
             var model = GenerateResultModel(query, options);
             resultModels.Add(model);
-            allCode.Add(model.Code);
+            if (model.Code != null)
+            {
+                allCode.Add(model.Code);
+            }
         }
 
         // Генерация моделей параметров (если требуется)
@@ -90,7 +93,10 @@ public sealed class QueryGenerator(
             {
                 var model = GenerateParameterModel(query, options);
                 parameterModels.Add(model);
-                allCode.Add(model.Code);
+                if (model.Code != null)
+                {
+                    allCode.Add(model.Code);
+                }
             }
         }
 
@@ -183,8 +189,8 @@ public sealed class QueryGenerator(
             TotalFilesGenerated = code.Count,
             QueriesProcessed = queries.Count,
             MethodsGenerated = queries.Count,
-            ResultModelsGenerated = code.Count(c => c.CodeType == GeneratedFileType.ResultModel),
-            ParameterModelsGenerated = code.Count(c => c.CodeType == GeneratedFileType.ParameterModel),
+            ResultModelsGenerated = code.Count(c => c != null && c.CodeType == GeneratedFileType.ResultModel),
+            ParameterModelsGenerated = code.Count(c => c != null && c.CodeType == GeneratedFileType.ParameterModel),
             SelectQueriesCount = queries.Count(q => q.QueryType == QueryType.Select),
             InsertQueriesCount = queries.Count(q => q.QueryType == QueryType.Insert),
             UpdateQueriesCount = queries.Count(q => q.QueryType == QueryType.Update),

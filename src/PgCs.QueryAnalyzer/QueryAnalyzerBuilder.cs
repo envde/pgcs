@@ -1,4 +1,6 @@
+using PgCs.Common.CodeGeneration;
 using PgCs.Common.QueryAnalyzer.Models.Metadata;
+using PgCs.Common.SchemaAnalyzer.Models;
 
 namespace PgCs.QueryAnalyzer;
 
@@ -8,6 +10,12 @@ namespace PgCs.QueryAnalyzer;
 public sealed class QueryAnalyzerBuilder
 {
     private readonly List<string> _files = [];
+    private SchemaMetadata? _schemaMetadata;
+
+    /// <summary>
+    /// ValidationIssues собранные во время последнего анализа
+    /// </summary>
+    public List<ValidationIssue> Issues { get; } = new();
 
     private QueryAnalyzerBuilder()
     {
@@ -55,6 +63,15 @@ public sealed class QueryAnalyzerBuilder
     }
 
     /// <summary>
+    /// Использовать метаданные схемы для определения типов колонок
+    /// </summary>
+    public QueryAnalyzerBuilder WithSchema(SchemaMetadata schemaMetadata)
+    {
+        _schemaMetadata = schemaMetadata;
+        return this;
+    }
+
+    /// <summary>
     /// Выполнить анализ запросов
     /// </summary>
     public async ValueTask<IReadOnlyList<QueryMetadata>> AnalyzeAsync()
@@ -65,7 +82,8 @@ public sealed class QueryAnalyzerBuilder
                 "No source specified. Use FromFile() or FromDirectory().");
         }
 
-        var analyzer = new QueryAnalyzer();
+        Issues.Clear(); // Очищаем перед новым анализом
+        var analyzer = new QueryAnalyzer(_schemaMetadata);
         var allQueries = new List<QueryMetadata>();
 
         // Анализ файлов
@@ -73,6 +91,9 @@ public sealed class QueryAnalyzerBuilder
         {
             var queries = await analyzer.AnalyzeFileAsync(filePath);
             allQueries.AddRange(queries);
+            
+            // Собираем issues из analyzer
+            Issues.AddRange(analyzer.Issues);
         }
 
         return allQueries;

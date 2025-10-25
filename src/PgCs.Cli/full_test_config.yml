@@ -1,0 +1,14 @@
+# Full test configuration with complete schema and queries
+schema:
+  input:
+    file: "/Users/valerijvorobev/Projects/pgcs/src/PgCs.Common/Examples/Schema.sql"
+  output:
+    directory: "./Generated/FullTest/Models"
+    namespace: "FullTest.Models"
+
+queries:
+  input:
+    file: "/Users/valerijvorobev/Projects/pgcs/src/PgCs.Common/Examples/Queries.sql"
+  output:
+    directory: "./Generated/FullTest"
+    namespace: "FullTest"

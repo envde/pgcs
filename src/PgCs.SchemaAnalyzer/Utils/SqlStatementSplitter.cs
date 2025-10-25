@@ -25,6 +25,7 @@ internal static partial class SqlStatementSplitter
         var inDollarQuote = false;
         var dollarQuoteTag = string.Empty;
         var consecutiveNewlines = 0;
+        var parenthesesDepth = 0; // Отслеживаем глубину скобок
 
         for (var i = 0; i < sqlScript.Length; i++)
         {
@@ -70,6 +71,17 @@ internal static partial class SqlStatementSplitter
                     currentStatement.Append(currentChar);
                     continue;
                 }
+                // Отслеживание скобок
+                case '(' when !inString && !inDollarQuote:
+                    parenthesesDepth++;
+                    currentStatement.Append(currentChar);
+                    consecutiveNewlines = 0;
+                    continue;
+                case ')' when !inString && !inDollarQuote:
+                    parenthesesDepth--;
+                    currentStatement.Append(currentChar);
+                    consecutiveNewlines = 0;
+                    continue;
                 // Разделитель - точка с запятой
                 case ';' when !inString && !inDollarQuote:
                 {
@@ -80,6 +92,7 @@ internal static partial class SqlStatementSplitter
                     }
                     currentStatement.Clear();
                     consecutiveNewlines = 0;
+                    parenthesesDepth = 0; // Сброс глубины скобок
                     continue;
                 }
                 // Игнорируем \r, обрабатываем только \n
@@ -89,6 +102,13 @@ internal static partial class SqlStatementSplitter
                 case '\n' when !inString && !inDollarQuote:
                 {
                     consecutiveNewlines++;
+                    
+                    // НЕ разделяем если мы внутри незакрытых скобок
+                    if (parenthesesDepth > 0)
+                    {
+                        currentStatement.Append(currentChar);
+                        continue;
+                    }
                     
                     // Проверяем, начинается ли следующая строка с ключевого слова
                     if (consecutiveNewlines >= 1 && currentStatement.Length > 0)
@@ -101,6 +121,7 @@ internal static partial class SqlStatementSplitter
                             {
                                 statements.Add(statement);
                                 currentStatement.Clear();
+                                parenthesesDepth = 0; // Сброс глубины скобок
                             }
                             consecutiveNewlines = 0;
                             continue;
@@ -118,6 +139,7 @@ internal static partial class SqlStatementSplitter
                         {
                             statements.Add(statement);
                             currentStatement.Clear();
+                            parenthesesDepth = 0; // Сброс глубины скобок
                         }
                         consecutiveNewlines = 0;
                     }

@@ -32,6 +32,7 @@ public class CodeGenerationPipeline
     private Action<string>? _onProgress;
     private Action<string>? _onError;
     private Action<PipelineStatistics>? _onComplete;
+    private QueryAnalyzerBuilder? _lastQueryAnalyzerBuilder; // Для доступа к issues
 
     private CodeGenerationPipeline() { }
 
@@ -283,14 +284,25 @@ public class CodeGenerationPipeline
 
         try
         {
-            // ШАГ 1: Анализ схемы
+            // ШАГ 1: Анализ схемы (если есть schema files ИЛИ если нужно для queries)
             SchemaMetadata? schemaMetadata = null;
-            if (_generateSchema && (_schemaFiles.Any() || _schemaDirectories.Any()))
+            var needSchemaForQueries = _generateQueries && _queryFiles.Any();
+            var shouldAnalyzeSchema = (_generateSchema || needSchemaForQueries) && 
+                                     (_schemaFiles.Any() || _schemaDirectories.Any());
+            
+            if (shouldAnalyzeSchema)
             {
-                ReportProgress("Анализ схемы базы данных...");
-                schemaMetadata = await AnalyzeSchemaAsync(cancellationToken);
-                result.AnalyzedSchemaMetadata = schemaMetadata;
-                ReportProgress($"Проанализировано: {schemaMetadata.Tables.Count} таблиц, {schemaMetadata.Types.Count} типов");
+                try
+                {
+                    ReportProgress("Анализ схемы базы данных...");
+                    schemaMetadata = await AnalyzeSchemaAsync(cancellationToken);
+                    result.AnalyzedSchemaMetadata = schemaMetadata;
+                    ReportProgress($"Проанализировано: {schemaMetadata.Tables.Count} таблиц, {schemaMetadata.Types.Count} типов");
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Schema analysis failed: {ex.Message}", ex);
+                }
             }
 
             // ШАГ 2: Фильтрация схемы
@@ -325,23 +337,44 @@ public class CodeGenerationPipeline
             IReadOnlyList<QueryMetadata>? queries = null;
             if (_generateQueries && _queryFiles.Any())
             {
-                ReportProgress("Анализ SQL запросов...");
-                queries = await AnalyzeQueriesAsync();
-                result.AnalyzedQueries = queries;
-                ReportProgress($"Проанализировано {queries.Count} SQL запросов");
+                try
+                {
+                    ReportProgress("Анализ SQL запросов...");
+                    queries = await AnalyzeQueriesAsync(schemaMetadata);
+                    result.AnalyzedQueries = queries;
+                    
+                    // Собираем ValidationIssues из QueryAnalyzer
+                    if (_lastQueryAnalyzerBuilder?.Issues.Count > 0)
+                    {
+                        result.QueryValidationIssues = _lastQueryAnalyzerBuilder.Issues.ToList();
+                    }
+                    
+                    ReportProgress($"Проанализировано {queries.Count} SQL запросов");
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Query analysis failed: {ex.Message}", ex);
+                }
             }
 
             // ШАГ 5: Генерация репозиториев
             QueryGenerationResult? queryGenResult = null;
             if (_generateQueries && queries != null && queries.Any())
             {
-                ReportProgress("Генерация C# репозиториев для запросов...");
-                var queryGen = QueryGenerator.QueryGenerator.Create();
-                queryGenResult = queryGen.Generate(
-                    queries,
-                    _queryOptions ?? CreateDefaultQueryOptions());
-                result.QueryGenerationResult = queryGenResult;
-                ReportProgress($"Сгенерировано {queryGenResult.GeneratedCode.Count} файлов репозиториев");
+                try
+                {
+                    ReportProgress("Генерация C# репозиториев для запросов...");
+                    var queryGen = QueryGenerator.QueryGenerator.Create();
+                    queryGenResult = queryGen.Generate(
+                        queries,
+                        _queryOptions ?? CreateDefaultQueryOptions());
+                    result.QueryGenerationResult = queryGenResult;
+                    ReportProgress($"Сгенерировано {queryGenResult.GeneratedCode.Count} файлов репозиториев");
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Query generation failed: {ex.Message}", ex);
+                }
             }
 
             // ШАГ 6: Запись файлов
@@ -389,6 +422,21 @@ public class CodeGenerationPipeline
             result.IsSuccess = false;
             result.Error = ex;
             result.Duration = DateTime.UtcNow - startTime;
+            
+            // Детальное логирование для debug
+            Console.WriteLine($"[PIPELINE ERROR] Exception type: {ex.GetType().FullName}");
+            Console.WriteLine($"[PIPELINE ERROR] Message: {ex.Message}");
+            Console.WriteLine($"[PIPELINE ERROR] Stack Trace:");
+            Console.WriteLine(ex.StackTrace);
+            
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"[PIPELINE ERROR] Inner Exception type: {ex.InnerException.GetType().FullName}");
+                Console.WriteLine($"[PIPELINE ERROR] Inner Message: {ex.InnerException.Message}");
+                Console.WriteLine($"[PIPELINE ERROR] Inner Stack Trace:");
+                Console.WriteLine(ex.InnerException.StackTrace);
+            }
+            
             ReportError($"Ошибка выполнения pipeline: {ex.Message}");
             return result;
         }
@@ -411,12 +459,17 @@ public class CodeGenerationPipeline
         return await builder.AnalyzeAsync();
     }
 
-    private async ValueTask<IReadOnlyList<QueryMetadata>> AnalyzeQueriesAsync()
+    private async ValueTask<IReadOnlyList<QueryMetadata>> AnalyzeQueriesAsync(SchemaMetadata? schemaMetadata = null)
     {
         var builder = QueryAnalyzerBuilder.Create();
+        _lastQueryAnalyzerBuilder = builder; // Сохраняем для доступа к issues
 
         foreach (var file in _queryFiles)
             builder.FromFile(file);
+
+        // Если есть схема, передаем ее для определения типов
+        if (schemaMetadata != null)
+            builder.WithSchema(schemaMetadata);
 
         return await builder.AnalyzeAsync();
     }
@@ -498,6 +551,9 @@ public record PipelineResult
     public SchemaMetadata? AnalyzedSchemaMetadata { get; set; }
     public SchemaMetadata? FilteredSchemaMetadata { get; set; }
     public IReadOnlyList<QueryMetadata>? AnalyzedQueries { get; set; }
+
+    // ValidationIssues from query analysis
+    public IReadOnlyList<ValidationIssue>? QueryValidationIssues { get; set; }
 
     // Результаты генерации
     public SchemaGenerationResult? SchemaGenerationResult { get; set; }

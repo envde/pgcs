@@ -1,4 +1,5 @@
 ﻿using System.Collections.Frozen;
+using PgCs.Common.CodeGeneration;
 using PgCs.Common.SchemaAnalyzer;
 using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaAnalyzer.Models.Functions;
@@ -61,6 +62,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var allTriggers = new List<TriggerDefinition>();
         var allConstraints = new List<ConstraintDefinition>();
         var allComments = new Dictionary<string, string>();
+        var allIssues = new List<ValidationIssue>();
 
         foreach (var file in sqlFiles)
         {
@@ -80,6 +82,12 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                 foreach (var (key, value) in metadata.Comments)
                     allComments.TryAdd(key, value);
             }
+
+            // Собираем ValidationIssues из каждого файла
+            if (metadata.ValidationIssues is not null)
+            {
+                allIssues.AddRange(metadata.ValidationIssues);
+            }
         }
 
         return new SchemaMetadata
@@ -92,6 +100,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Triggers = allTriggers.ToFrozenSet().ToArray(),
             Constraints = allConstraints.ToFrozenSet().ToArray(),
             Comments = allComments.ToFrozenDictionary(),
+            ValidationIssues = allIssues.Count > 0 ? allIssues : null,
             SourceFile = schemaDirectoryPath,
             AnalyzedAt = DateTime.UtcNow
         };
@@ -168,6 +177,16 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             allConstraints.AddRange(table.Constraints);
         }
 
+        // Собрать validation issues из всех extractors
+        var allIssues = new List<ValidationIssue>();
+        allIssues.AddRange(_tableExtractor.Issues);
+        allIssues.AddRange(_viewExtractor.Issues);
+        allIssues.AddRange(_typeExtractor.Issues);
+        allIssues.AddRange(_functionExtractor.Issues);
+        allIssues.AddRange(_indexExtractor.Issues);
+        allIssues.AddRange(_triggerExtractor.Issues);
+        allIssues.AddRange(_constraintExtractor.Issues);
+
         return new SchemaMetadata
         {
             Tables = tables,
@@ -178,6 +197,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Triggers = triggers,
             Constraints = allConstraints,
             Comments = comments,
+            ValidationIssues = allIssues.Count > 0 ? allIssues : null,
             AnalyzedAt = DateTime.UtcNow
         };
     }

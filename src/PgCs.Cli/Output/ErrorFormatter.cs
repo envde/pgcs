@@ -49,6 +49,13 @@ public sealed class ErrorFormatter
             _writer.WriteLine();
             _writer.Dim("  Inner Exception:");
             _writer.Dim($"    {exception.InnerException.Message}");
+            
+            // В debug mode показываем stack trace inner exception
+            if (Environment.GetEnvironmentVariable("PGCS_DEBUG") == "1" && exception.InnerException.StackTrace is not null)
+            {
+                _writer.Dim("    Stack Trace:");
+                _writer.Dim($"{exception.InnerException.StackTrace}");
+            }
         }
 
         // Display stack trace in debug mode

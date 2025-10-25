@@ -1,0 +1,14 @@
+# Configuration for testing full Queries.sql
+schema:
+  input:
+    file: "/Users/valerijvorobev/Projects/pgcs/src/PgCs.Cli/Examples/Sql/Schema/Schema.sql"
+  output:
+    directory: "./Generated/FullQueriesTest/Models"
+    namespace: "FullQueriesTest.Models"
+
+queries:
+  input:
+    file: "/Users/valerijvorobev/Projects/pgcs/src/PgCs.Cli/Examples/Sql/Queries/Queries.sql"
+  output:
+    directory: "./Generated/FullQueriesTest"
+    namespace: "FullQueriesTest"

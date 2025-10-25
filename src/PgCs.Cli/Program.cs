@@ -38,7 +38,7 @@ internal static class Program
         var rootCommand = new RootCommand("PgCs - PostgreSQL C# Code Generator")
         {
             Description = """
-                Professional CLI tool for generating C# code from PostgreSQL schemas and queries.
+                CLI tool for generating C# code from PostgreSQL schemas and queries.
                 
                 Features:
                   • Generate C# classes from PostgreSQL schema DDL
@@ -108,17 +108,16 @@ internal static class Program
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("""
-            
               ____        ____
              |  _ \ __ _ / ___|___
              | |_) / _` | |   / __|
              |  __/ (_| | |___\__ \
              |_|   \__, |\____|___/
                    |___/            
-            
+                   
             """);
         Console.ResetColor();
-        Console.WriteLine($"  PostgreSQL C# Code Generator v{Version}");
+        Console.WriteLine($"PostgreSQL C# Code Generator v{Version}");
         Console.WriteLine();
     }
 }

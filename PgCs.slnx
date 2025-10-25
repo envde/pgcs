@@ -1,4 +1,16 @@
 <Solution>
+  <Folder Name="/docs/">
+    <File Path="docs\EXAMPLES.md" />
+    <File Path="docs\INTEGRATION.md" />
+    <File Path="docs\IMPLEMENTATION.md" />
+    <File Path="docs\FLUENT_API_SUMMARY.md" />
+    <File Path="docs\FLUENT_API_EXAMPLES.md" />
+  </Folder>
+  <Folder Name="/outline/">
+    <File Path=".gitignore" />
+    <File Path="NuGet.config" />
+    <File Path="PgCs.sln.DotSettings.user" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/PgCs.Cli/PgCs.Cli.csproj" />
     <Project Path="src/PgCs.Common/PgCs.Common.csproj" />

@@ -1,8 +1,10 @@
+using PgCs.Common.CodeGeneration;
 using PgCs.Common.QueryAnalyzer;
 using PgCs.Common.QueryAnalyzer.Models.Annotations;
 using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryAnalyzer.Models.Parameters;
 using PgCs.Common.QueryAnalyzer.Models.Results;
+using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.QueryAnalyzer.Parsing;
 
 namespace PgCs.QueryAnalyzer;
@@ -12,6 +14,21 @@ namespace PgCs.QueryAnalyzer;
 /// </summary>
 public sealed class QueryAnalyzer : IQueryAnalyzer
 {
+    private readonly SchemaMetadata? _schemaMetadata;
+
+    /// <summary>
+    /// Warnings и errors собранные во время parsing queries
+    /// </summary>
+    public List<ValidationIssue> Issues { get; } = new();
+
+    /// <summary>
+    /// Создает новый экземпляр анализатора запросов
+    /// </summary>
+    /// <param name="schemaMetadata">Метаданные схемы для определения типов колонок (опционально)</param>
+    public QueryAnalyzer(SchemaMetadata? schemaMetadata = null)
+    {
+        _schemaMetadata = schemaMetadata;
+    }
     /// <summary>
     /// Анализирует SQL файл и извлекает все запросы с аннотациями sqlc
     /// </summary>
@@ -25,11 +42,13 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
         if (!File.Exists(sqlFilePath))
             throw new FileNotFoundException($"SQL файл не найден: {sqlFilePath}");
 
+        Issues.Clear(); // Очищаем перед новым анализом
         var content = await File.ReadAllTextAsync(sqlFilePath);
         var queries = new List<QueryMetadata>();
+        var blocks = SqlQueryParser.SplitIntoQueryBlocks(content);
 
         // Разбиваем файл на блоки запросов
-        foreach (var block in SqlQueryParser.SplitIntoQueryBlocks(content))
+        foreach (var block in blocks)
         {
             // Обрабатываем только блоки с аннотациями
             if (!AnnotationParser.HasAnnotation(block))
@@ -37,12 +56,47 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
 
             try
             {
-                queries.Add(AnalyzeQuery(block));
+                var queryMetadata = AnalyzeQuery(block);
+                queries.Add(queryMetadata);
             }
-            catch
+            catch (Exception ex)
             {
-                // Пропускаем некорректные запросы (опционально можно логировать)
+                // Логируем ошибку парсинга
+                var preview = block.Length > 150 
+                    ? block.Substring(0, 150) + "..." 
+                    : block;
+                
+                Issues.Add(new ValidationIssue
+                {
+                    Severity = ValidationSeverity.Error,
+                    Code = "QUERY_PARSE_ERROR",
+                    Message = $"Failed to parse query: {ex.Message}",
+                    Location = preview,
+                    Details = new Dictionary<string, string>
+                    {
+                        ["Exception"] = ex.GetType().Name,
+                        ["QueryPreview"] = preview
+                    }
+                });
             }
+        }
+
+        // Проверка: если нет queries с аннотациями, это может быть проблемой
+        var blockCount = blocks.Count();
+        if (queries.Count == 0 && blockCount > 0)
+        {
+            Issues.Add(new ValidationIssue
+            {
+                Severity = ValidationSeverity.Warning,
+                Code = "NO_ANNOTATED_QUERIES",
+                Message = $"No queries with annotations found in file. Make sure to use '-- name: MethodName :one' annotations.",
+                Location = $"File: {sqlFilePath}",
+                Details = new Dictionary<string, string>
+                {
+                    ["BlocksFound"] = blockCount.ToString(),
+                    ["FilePath"] = sqlFilePath
+                }
+            });
         }
 
         return queries;
@@ -81,7 +135,10 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
             QueryType = queryType,
             ReturnCardinality = annotation.Cardinality,
             Parameters = parameters,
-            ReturnType = returnType
+            ReturnType = returnType,
+            Summary = annotation.Summary,
+            ParameterDescriptions = annotation.ParameterDescriptions,
+            ReturnsDescription = annotation.Returns
         };
     }
 
@@ -100,7 +157,7 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlQuery);
 
-        var columns = ColumnExtractor.Extract(sqlQuery);
+        var columns = ColumnExtractor.Extract(sqlQuery, _schemaMetadata);
         var modelName = ModelNameGenerator.Generate(columns);
 
         return new ReturnTypeInfo

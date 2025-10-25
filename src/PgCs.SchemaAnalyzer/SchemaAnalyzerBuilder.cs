@@ -1,3 +1,4 @@
+using PgCs.Common.CodeGeneration;
 using PgCs.Common.SchemaAnalyzer.Models;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
 using PgCs.Common.SchemaAnalyzer.Models.Views;
@@ -400,6 +401,7 @@ public class SchemaAnalyzerBuilder
         var allTriggers = new List<TriggerDefinition>();
         var allConstraints = new List<ConstraintDefinition>();
         var allComments = new Dictionary<string, string>();
+        var allIssues = new List<ValidationIssue>();
 
         foreach (var metadata in metadataList)
         {
@@ -417,6 +419,12 @@ public class SchemaAnalyzerBuilder
                 {
                     allComments.TryAdd(key, value);
                 }
+            }
+            
+            // Собираем ValidationIssues из каждого metadata
+            if (metadata.ValidationIssues is not null)
+            {
+                allIssues.AddRange(metadata.ValidationIssues);
             }
         }
 
@@ -442,6 +450,7 @@ public class SchemaAnalyzerBuilder
             Triggers = allTriggers,
             Constraints = allConstraints,
             Comments = allComments,
+            ValidationIssues = allIssues.Count > 0 ? allIssues : null,
             AnalyzedAt = DateTime.UtcNow
         };
     }

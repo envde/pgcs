@@ -2,6 +2,8 @@ using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
 using PgCs.Cli.Output;
+using PgCs.Cli.Services;
+using PgCs.Common.CodeGeneration;
 
 namespace PgCs.Cli.Commands;
 
@@ -138,23 +140,70 @@ public sealed class GenerateCommand : BaseCommand
                 var progress = new ProgressReporter(Writer);
                 progress.Start("Schema generation", 4);
 
-                // TODO: Implement actual schema generation
-                progress.Step("Loading schema file(s)");
-                await Task.Delay(100);
+                try
+                {
+                    progress.Step("Loading schema file(s)");
+                    progress.Step("Analyzing database schema");
+                    progress.Step("Generating C# classes");
+                    progress.Step("Writing output files");
 
-                progress.Step("Analyzing database schema");
-                await Task.Delay(100);
+                    var schemaService = new SchemaGenerationService();
+                    var schemaResult = await schemaService.GenerateAsync(config, context.GetCancellationToken());
 
-                progress.Step("Generating C# classes");
-                await Task.Delay(100);
+                    tablesGenerated = schemaResult.TablesGenerated;
+                    enumsGenerated = schemaResult.EnumsGenerated;
 
-                progress.Step("Writing output files");
-                await Task.Delay(100);
+                    if (verbose && schemaResult.FilesCreated.Count > 0)
+                    {
+                        Writer.Info($"Generated files:");
+                        foreach (var file in schemaResult.FilesCreated)
+                        {
+                            Writer.Info($"  • {file}");
+                        }
+                    }
 
-                progress.Complete("Schema generation");
+                    // Display validation issues if any
+                    if (schemaResult.Issues.Count > 0)
+                    {
+                        Writer.WriteLine();
+                        Writer.Info($"Found {schemaResult.Issues.Count} issue(s) during schema analysis:");
+                        Writer.WriteLine();
+                        
+                        foreach (var issue in schemaResult.Issues)
+                        {
+                            var message = $"[{issue.Code}] {issue.Message}";
+                            
+                            if (issue.Severity == ValidationSeverity.Error)
+                            {
+                                Writer.Error($"ERROR: {message}");
+                            }
+                            else if (issue.Severity == ValidationSeverity.Warning)
+                            {
+                                Writer.Warning($"{message}");
+                            }
+                            else
+                            {
+                                Writer.Info($"{message}");
+                            }
+                            
+                            if (!string.IsNullOrEmpty(issue.Location))
+                            {
+                                var locationPreview = issue.Location.Length > 100 
+                                    ? issue.Location.Substring(0, 100) + "..." 
+                                    : issue.Location;
+                                Writer.Info($"  → {locationPreview}");
+                            }
+                        }
+                        Writer.WriteLine();
+                    }
 
-                tablesGenerated = 10;
-                enumsGenerated = 3;
+                    progress.Complete("Schema generation");
+                }
+                catch (Exception ex)
+                {
+                    progress.Fail("Schema generation failed");
+                    throw new InvalidOperationException($"Schema generation failed: {ex.Message}", ex);
+                }
             }
 
             // Generate queries
@@ -164,27 +213,72 @@ public sealed class GenerateCommand : BaseCommand
                 var progress = new ProgressReporter(Writer);
                 progress.Start("Query generation", 5);
 
-                // TODO: Implement actual query generation
-                progress.Step("Loading query file(s)");
-                await Task.Delay(100);
+                try
+                {
+                    progress.Step("Loading query file(s)");
+                    progress.Step("Parsing SQL queries");
+                    progress.Step("Generating repositories");
+                    progress.Step("Generating models");
+                    progress.Step("Writing output files");
 
-                progress.Step("Parsing SQL queries");
-                await Task.Delay(100);
+                    var queryService = new QueryGenerationService();
+                    var queryResult = await queryService.GenerateAsync(config, context.GetCancellationToken());
 
-                progress.Step("Generating repositories");
-                await Task.Delay(100);
+                    repositoriesGenerated = queryResult.RepositoriesGenerated;
+                    methodsGenerated = queryResult.MethodsGenerated;
+                    modelsGenerated = queryResult.ModelsGenerated;
 
-                progress.Step("Generating models");
-                await Task.Delay(100);
+                    if (verbose && queryResult.FilesCreated.Count > 0)
+                    {
+                        Writer.Info($"Generated files:");
+                        foreach (var file in queryResult.FilesCreated)
+                        {
+                            Writer.Info($"  • {file}");
+                        }
+                    }
 
-                progress.Step("Writing output files");
-                await Task.Delay(100);
+                    // Display validation issues if any
+                    if (queryResult.Issues.Count > 0)
+                    {
+                        Writer.WriteLine();
+                        Writer.Info($"Found {queryResult.Issues.Count} issue(s) during query analysis:");
+                        Writer.WriteLine();
+                        
+                        foreach (var issue in queryResult.Issues)
+                        {
+                            var message = $"[{issue.Code}] {issue.Message}";
+                            
+                            if (issue.Severity == ValidationSeverity.Error)
+                            {
+                                Writer.Error($"ERROR: {message}");
+                            }
+                            else if (issue.Severity == ValidationSeverity.Warning)
+                            {
+                                Writer.Warning($"{message}");
+                            }
+                            else
+                            {
+                                Writer.Info($"{message}");
+                            }
+                            
+                            if (!string.IsNullOrEmpty(issue.Location))
+                            {
+                                var locationPreview = issue.Location.Length > 100 
+                                    ? issue.Location.Substring(0, 100) + "..." 
+                                    : issue.Location;
+                                Writer.Info($"  → {locationPreview}");
+                            }
+                        }
+                        Writer.WriteLine();
+                    }
 
-                progress.Complete("Query generation");
-
-                repositoriesGenerated = 3;
-                methodsGenerated = 12;
-                modelsGenerated = 8;
+                    progress.Complete("Query generation");
+                }
+                catch (Exception ex)
+                {
+                    progress.Fail("Query generation failed");
+                    throw new InvalidOperationException($"Query generation failed: {ex.Message}", ex);
+                }
             }
 
             stopwatch.Stop();

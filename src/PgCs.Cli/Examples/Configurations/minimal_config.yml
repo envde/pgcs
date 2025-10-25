@@ -1,16 +1,13 @@
-# pgcs.minimal.yaml - Minimal Configuration
-# Only required settings. Everything else uses sensible defaults.
-
 schema:
   input:
-    file: "./database/schema.sql"
+    file: "src/PgCs.Cli/Examples/Sql/Schema/Schema.sql"
   output:
-    directory: "./Generated/Models"
+    directory: "src/PgCs.Cli/Examples/Generated/Models"
     namespace: "MyApp.Database.Models"
 
 queries:
   input:
-    file: "./database/queries.sql"
+    file: "src/PgCs.Cli/Examples/Sql/Queries/Queries.sql"
   output:
-    directory: "./Generated/Repositories"
+    directory: "src/PgCs.Cli/Examples/Generated/Repositories"
     namespace: "MyApp.Database.Repositories"

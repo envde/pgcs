@@ -1,4 +1,5 @@
 using PgCs.Cli.Configuration;
+using PgCs.Common.CodeGeneration;
 
 namespace PgCs.Cli.Services;
 
@@ -15,7 +16,17 @@ public sealed class QueryGenerationService
         int MethodsGenerated,
         int ModelsGenerated,
         IReadOnlyList<string> FilesCreated,
-        IReadOnlyList<string> Warnings
+        IReadOnlyList<ValidationMessage> Issues
+    );
+
+    /// <summary>
+    /// Validation message (error or warning)
+    /// </summary>
+    public record ValidationMessage(
+        ValidationSeverity Severity,
+        string Code,
+        string Message,
+        string? Location
     );
 
     /// <summary>
@@ -30,58 +41,114 @@ public sealed class QueryGenerationService
             throw new InvalidOperationException("Queries configuration is missing");
         }
 
-        var warnings = new List<string>();
+        var issues = new List<ValidationMessage>();
         var filesCreated = new List<string>();
 
-        // TODO: Implement actual integration with CodeGenerationPipeline
-        // This is a placeholder implementation
+        // Create and configure pipeline
+        var pipeline = CodeGenerationPipeline.Create();
 
-        // Simulate work
-        await Task.Delay(100, cancellationToken);
+        // Загружаем схему если она указана в конфигурации
+        if (config.Schema is not null)
+        {
+            if (!string.IsNullOrEmpty(config.Schema.Input.File))
+            {
+                pipeline.FromSchemaFile(config.Schema.Input.File);
+            }
+            else if (!string.IsNullOrEmpty(config.Schema.Input.Directory))
+            {
+                var schemaFiles = Directory.GetFiles(
+                    config.Schema.Input.Directory,
+                    config.Schema.Input.Pattern ?? "*.sql",
+                    config.Schema.Input.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly
+                );
 
-        // Example: Use CodeGenerationPipeline
-        /*
-        var pipeline = new CodeGenerationPipeline();
-        
+                foreach (var file in schemaFiles)
+                {
+                    pipeline.FromSchemaFile(file);
+                }
+            }
+        }
+
+        // Configure input
         if (!string.IsNullOrEmpty(config.Queries.Input.File))
         {
             pipeline.FromQueryFile(config.Queries.Input.File);
         }
         else if (!string.IsNullOrEmpty(config.Queries.Input.Directory))
         {
-            pipeline.FromQueryDirectory(
+            // For now, just use the directory - TODO: add support for multiple files
+            var queryFiles = Directory.GetFiles(
                 config.Queries.Input.Directory,
                 config.Queries.Input.Pattern,
-                config.Queries.Input.Recursive
+                config.Queries.Input.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly
             );
+
+            foreach (var file in queryFiles)
+            {
+                pipeline.FromQueryFile(file);
+            }
         }
 
-        pipeline.WithQueryGeneration(options =>
+        // Configure query generation options
+        pipeline.WithQueryGeneration(builder =>
         {
-            options.OutputDirectory = config.Queries.Output.Directory;
-            options.Namespace = config.Queries.Output.Namespace;
-            options.RepositoryPerFile = config.Queries.Output.RepositoryPerFile;
-            options.SeparateModels = config.Queries.Output.SeparateModels;
-            
-            options.GenerateInterfaces = config.Queries.Repositories.GenerateInterfaces;
-            options.GenerateImplementations = config.Queries.Repositories.GenerateImplementations;
-            
-            options.AsyncMethods = config.Queries.Methods.Async;
-            options.CancellationToken = config.Queries.Methods.CancellationToken;
-            
-            // ... more options
+            builder.WithNamespace(config.Queries.Output.Namespace)
+                   .OutputTo(config.Queries.Output.Directory)
+                   .UseAsync()
+                   .UseRecords()
+                   .WithXmlDocs()
+                   .OverwriteFiles();
         });
 
-        var result = await pipeline.ExecuteAsync(cancellationToken);
-        */
+        // Disable schema generation for query-only pipeline
+        pipeline.WithoutSchemaGeneration();
 
-        // Return placeholder result
+        // Execute pipeline
+        var pipelineResult = await pipeline.ExecuteAsync(cancellationToken);
+
+        if (!pipelineResult.IsSuccess)
+        {
+            throw new InvalidOperationException(
+                $"Query generation failed: {pipelineResult.Error?.Message}",
+                pipelineResult.Error);
+        }
+
+        // Extract results
+        var stats = pipelineResult.Statistics;
+        var writeResult = pipelineResult.QueryWriteResult;
+
+        // Collect validation issues from query analysis
+        if (pipelineResult.QueryValidationIssues is not null)
+        {
+            foreach (var issue in pipelineResult.QueryValidationIssues)
+            {
+                issues.Add(new ValidationMessage(
+                    Severity: issue.Severity,
+                    Code: issue.Code ?? "UNKNOWN",
+                    Message: issue.Message ?? "Unknown error",
+                    Location: issue.Location
+                ));
+            }
+        }
+
+        // Collect written files
+        if (writeResult is not null)
+        {
+            filesCreated.AddRange(writeResult.WrittenFiles);
+        }
+
+        // Handle case where statistics might be null
+        if (stats is null)
+        {
+            throw new InvalidOperationException("Pipeline statistics are not available");
+        }
+
         return new Result(
-            RepositoriesGenerated: 3,
-            MethodsGenerated: 12,
-            ModelsGenerated: 8,
+            RepositoriesGenerated: stats.QueriesAnalyzed > 0 ? 1 : 0,
+            MethodsGenerated: stats.QueriesAnalyzed,
+            ModelsGenerated: stats.QueryFilesGenerated,
             FilesCreated: filesCreated,
-            Warnings: warnings
+            Issues: issues
         );
     }
 

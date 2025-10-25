@@ -42,4 +42,19 @@ public record QueryMetadata
     /// Имя модели, которую нужно использовать (если указано явно)
     /// </summary>
     public string? ExplicitModelName { get; init; }
+
+    /// <summary>
+    /// Описание метода для XML комментария summary (из -- summary:)
+    /// </summary>
+    public string? Summary { get; init; }
+
+    /// <summary>
+    /// Описания параметров для XML комментариев param (из -- param: name Description)
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? ParameterDescriptions { get; init; }
+
+    /// <summary>
+    /// Описание возвращаемого значения для XML комментария returns (из -- returns:)
+    /// </summary>
+    public string? ReturnsDescription { get; init; }
 }

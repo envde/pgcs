@@ -1,3 +1,4 @@
+using PgCs.Common.CodeGeneration;
 using PgCs.Common.SchemaAnalyzer.Models.Functions;
 using PgCs.Common.SchemaAnalyzer.Models.Indexes;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
@@ -51,6 +52,11 @@ public sealed record SchemaMetadata
     /// Словарь комментариев к объектам базы данных (ключ: имя объекта, значение: комментарий)
     /// </summary>
     public IReadOnlyDictionary<string, string>? Comments { get; init; }
+    
+    /// <summary>
+    /// Warnings и errors собранные во время parsing schema
+    /// </summary>
+    public IReadOnlyList<ValidationIssue>? ValidationIssues { get; init; }
     
     /// <summary>
     /// Путь к исходному файлу схемы (если анализировался файл или директория)

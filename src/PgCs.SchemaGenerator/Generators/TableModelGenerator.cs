@@ -41,10 +41,13 @@ public sealed class TableModelGenerator(SyntaxBuilder syntaxBuilder) : ITableMod
         var syntaxTree = CSharpSyntaxTree.Create(compilationUnit);
         var sourceCode = syntaxTree.ToString();
 
+        // Получаем PascalCase имя класса из сгенерированного кода
+        var className = classDeclaration.Identifier.Text;
+
         var code = new GeneratedCode
         {
             SourceCode = sourceCode,
-            TypeName = table.Name,
+            TypeName = className, // Используем имя класса из Roslyn (PascalCase), а не table.Name
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.TableModel
         };
