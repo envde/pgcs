@@ -30,4 +30,9 @@
       <ProjectReference Include="..\..\src\PgCs.SchemaGenerator\PgCs.SchemaGenerator.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Helpers\" />
+      <Folder Include="Unit\" />
+    </ItemGroup>
+
 </Project>

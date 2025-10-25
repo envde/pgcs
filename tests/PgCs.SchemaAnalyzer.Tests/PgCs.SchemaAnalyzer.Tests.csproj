@@ -29,4 +29,10 @@
       <ProjectReference Include="..\..\src\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Helpers\" />
+      <Folder Include="TestData\" />
+      <Folder Include="Unit\" />
+    </ItemGroup>
+
 </Project>

@@ -25,9 +25,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="TestData\Queries.sql">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
+      <Folder Include="Helpers\" />
+      <Folder Include="TestData\" />
+      <Folder Include="Unit\" />
     </ItemGroup>
 
 </Project>

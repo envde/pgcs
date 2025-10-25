@@ -57,10 +57,5 @@
     </None>
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Examples\Generated\Models\" />
-    <Folder Include="Examples\Generated\Repository\" />
-  </ItemGroup>
-
 </Project>
 
