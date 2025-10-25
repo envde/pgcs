@@ -126,8 +126,10 @@ public sealed class QuerySyntaxBuilder(ITypeMapper typeMapper, INameConverter na
             .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
         // Добавляем методы (только сигнатуры, без тела)
-        foreach (var method in methods)
+        for (var i = 0; i < methods.Count; i++)
         {
+            var method = methods[i];
+            
             // Создаем метод интерфейса без модификаторов и тела
             var interfaceMethod = MethodDeclaration(
                     method.ReturnType,
@@ -138,7 +140,15 @@ public sealed class QuerySyntaxBuilder(ITypeMapper typeMapper, INameConverter na
             // Копируем XML комментарии
             if (method.HasLeadingTrivia)
             {
-                interfaceMethod = interfaceMethod.WithLeadingTrivia(method.GetLeadingTrivia());
+                var trivia = method.GetLeadingTrivia();
+                
+                // Добавляем пустую строку перед каждым методом кроме первого
+                if (i > 0)
+                {
+                    trivia = trivia.Insert(0, CarriageReturnLineFeed);
+                }
+                
+                interfaceMethod = interfaceMethod.WithLeadingTrivia(trivia);
             }
 
             interfaceDeclaration = interfaceDeclaration.AddMembers(interfaceMethod);
@@ -180,9 +190,19 @@ public sealed class QuerySyntaxBuilder(ITypeMapper typeMapper, INameConverter na
         var constructor = BuildRepositoryConstructor(className);
         classDeclaration = classDeclaration.AddMembers(constructor);
 
-        // Добавляем методы
-        foreach (var method in methods)
+        // Добавляем методы с пустой строкой между ними
+        for (var i = 0; i < methods.Count; i++)
         {
+            var method = methods[i];
+            
+            // Добавляем пустую строку перед каждым методом
+            if (method.HasLeadingTrivia)
+            {
+                var trivia = method.GetLeadingTrivia();
+                trivia = trivia.Insert(0, CarriageReturnLineFeed);
+                method = method.WithLeadingTrivia(trivia);
+            }
+            
             classDeclaration = classDeclaration.AddMembers(method);
         }
 
@@ -253,83 +273,42 @@ public sealed class QuerySyntaxBuilder(ITypeMapper typeMapper, INameConverter na
         bool includeSqlInDocumentation)
     {
         var documentationElements = new List<XmlNodeSyntax>();
-
-        // <summary> - используем Summary из метаданных или default message
+        
+        // <summary>
         var summaryText = !string.IsNullOrWhiteSpace(queryMetadata.Summary)
             ? queryMetadata.Summary
             : $"Выполняет запрос: {queryMetadata.MethodName}";
-
-        var summaryContent = new List<XmlNodeSyntax> { XmlText(XmlTextLiteral(summaryText)) };
-        documentationElements.Add(XmlSummaryElement(summaryContent.ToArray()));
-
+        
+        documentationElements.Add(
+            XmlElement("summary", 
+                SingletonList<XmlNodeSyntax>(XmlText(summaryText))));
+        
         // <param> для каждого параметра
         if (queryMetadata.ParameterDescriptions != null && queryMetadata.ParameterDescriptions.Count > 0)
         {
             foreach (var paramDesc in queryMetadata.ParameterDescriptions)
             {
-                var paramContent = new List<XmlNodeSyntax> { XmlText(XmlTextLiteral(paramDesc.Value)) };
-                
-                var paramElement = XmlParamElement(
-                    paramDesc.Key + "Async", // Имя параметра из annotation
-                    paramContent.ToArray()
-                );
-                
-                documentationElements.Add(paramElement);
+                documentationElements.Add(
+                    XmlParamElement(paramDesc.Key, 
+                        SingletonList<XmlNodeSyntax>(XmlText(paramDesc.Value))));
             }
         }
-
-        // <returns> - используем ReturnsDescription или default
+        
+        // <returns>
         var returnsText = !string.IsNullOrWhiteSpace(queryMetadata.ReturnsDescription)
             ? queryMetadata.ReturnsDescription
             : GetDefaultReturnsDescription(queryMetadata.ReturnCardinality);
-
-        // Разбиваем на строки для корректного форматирования XML
-        var returnsLines = returnsText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        var returnsContent = new List<XmlNodeSyntax>();
         
-        foreach (var line in returnsLines)
-        {
-            returnsContent.Add(XmlText(XmlTextLiteral(line.Trim())));
-            if (line != returnsLines.Last())
-            {
-                returnsContent.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: true)));
-            }
-        }
+        documentationElements.Add(
+            XmlReturnsElement(
+                SingletonList<XmlNodeSyntax>(XmlText(returnsText))));
         
-        documentationElements.Add(XmlReturnsElement(returnsContent.ToArray()));
-
-        // <remarks> - SQL запрос (если включено)
-        // НЕ включаем SQL в XML комментарии, т.к. он содержит $ которые ломают парсинг C#
-        // TODO: Найти способ безопасно включить SQL (возможно через отдельный файл документации)
-        if (false && includeSqlInDocumentation && !string.IsNullOrWhiteSpace(queryMetadata.SqlQuery))
-        {
-            var remarksContent = new List<XmlNodeSyntax>();
-            
-            // Экранируем XML специальные символы: <, >, &, но оставляем $ и другие
-            var escapedSql = queryMetadata.SqlQuery
-                .Replace("&", "&amp;")
-                .Replace("<", "&lt;")
-                .Replace(">", "&gt;");
-            
-            var remarksLines = escapedSql.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            
-            foreach (var line in remarksLines)
-            {
-                remarksContent.Add(XmlText(XmlTextLiteral(line.Trim())));
-                if (line != remarksLines.Last())
-                {
-                    remarksContent.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: false)));
-                }
-            }
-
-            documentationElements.Add(XmlRemarksElement(remarksContent.ToArray()));
-        }
-
-        // Создаем trivia список с XML комментарием и переводом строки после
-        var triviaList = TriviaList(Trivia(DocumentationComment(documentationElements.ToArray())));
-        triviaList = triviaList.Add(CarriageReturnLineFeed);
+        // Создаем документацию и заворачиваем в триvia
+        var documentation = DocumentationComment(documentationElements.ToArray());
         
-        return triviaList;
+        return TriviaList(
+            Trivia(documentation),
+            CarriageReturnLineFeed);
     }
 
     /// <summary>

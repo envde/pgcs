@@ -470,10 +470,10 @@ public sealed class QueryMethodGenerator(
         {
             QueryType.Select when queryMetadata.ReturnType != null =>
                 queryMetadata.ReturnCardinality == ReturnCardinality.One
-                    ? $"Task<{queryMetadata.ReturnType.ModelName}?>"
-                    : $"Task<List<{queryMetadata.ReturnType.ModelName}>>",
-            QueryType.Insert or QueryType.Update or QueryType.Delete => "Task<int>",
-            _ => "Task"
+                    ? $"ValueTask<{queryMetadata.ReturnType.ModelName}?>"
+                    : $"ValueTask<List<{queryMetadata.ReturnType.ModelName}>>",
+            QueryType.Insert or QueryType.Update or QueryType.Delete => "ValueTask<int>",
+            _ => "ValueTask"
         };
     }
 

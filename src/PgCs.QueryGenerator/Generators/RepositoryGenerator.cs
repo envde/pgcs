@@ -37,7 +37,7 @@ public sealed class RepositoryGenerator(
             methods);
 
         // Определяем usings для интерфейса
-        var usings = new[]
+        var usings = new List<string>
         {
             "System",
             "System.Collections.Generic",
@@ -45,6 +45,12 @@ public sealed class RepositoryGenerator(
             "System.Threading.Tasks",
             "Npgsql"
         };
+        
+        // Добавляем namespace моделей схемы если используем их
+        if (!string.IsNullOrWhiteSpace(options.SchemaModelsNamespace))
+        {
+            usings.Add(options.SchemaModelsNamespace);
+        }
 
         // Используем общий helper для создания compilation unit
         var compilationUnit = RoslynSyntaxHelpers.BuildCompilationUnit(
@@ -53,6 +59,9 @@ public sealed class RepositoryGenerator(
             usings);
 
         var sourceCode = compilationUnit.ToFullString();
+        
+        // Форматируем XML документацию
+        sourceCode = RoslynSyntaxHelpers.FormatXmlDocumentation(sourceCode);
 
         var code = new GeneratedCode
         {
@@ -88,7 +97,7 @@ public sealed class RepositoryGenerator(
             methods);
 
         // Определяем usings для класса
-        var usings = new[]
+        var usings = new List<string>
         {
             "System",
             "System.Collections.Generic",
@@ -96,6 +105,12 @@ public sealed class RepositoryGenerator(
             "System.Threading.Tasks",
             "Npgsql"
         };
+        
+        // Добавляем namespace моделей схемы если используем их
+        if (!string.IsNullOrWhiteSpace(options.SchemaModelsNamespace))
+        {
+            usings.Add(options.SchemaModelsNamespace);
+        }
 
         // Используем общий helper для создания compilation unit
         var compilationUnit = RoslynSyntaxHelpers.BuildCompilationUnit(
@@ -104,6 +119,9 @@ public sealed class RepositoryGenerator(
             usings);
 
         var sourceCode = compilationUnit.ToFullString();
+        
+        // Форматируем XML документацию
+        sourceCode = RoslynSyntaxHelpers.FormatXmlDocumentation(sourceCode);
 
         var code = new GeneratedCode
         {
@@ -235,10 +253,10 @@ public sealed class RepositoryGenerator(
         {
             QueryType.Select when queryMetadata.ReturnType != null =>
                 queryMetadata.ReturnCardinality == ReturnCardinality.One
-                    ? $"Task<{queryMetadata.ReturnType.ModelName}?>"
-                    : $"Task<List<{queryMetadata.ReturnType.ModelName}>>",
-            QueryType.Insert or QueryType.Update or QueryType.Delete => "Task<int>",
-            _ => "Task"
+                    ? $"ValueTask<{queryMetadata.ReturnType.ModelName}?>"
+                    : $"ValueTask<List<{queryMetadata.ReturnType.ModelName}>>",
+            QueryType.Insert or QueryType.Update or QueryType.Delete => "ValueTask<int>",
+            _ => "ValueTask"
         };
     }
 }

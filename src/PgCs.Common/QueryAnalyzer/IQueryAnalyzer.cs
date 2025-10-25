@@ -32,8 +32,9 @@ public interface IQueryAnalyzer
     /// Определяет тип возвращаемого значения на основе SELECT запроса
     /// </summary>
     /// <param name="sqlQuery">SELECT запрос</param>
+    /// <param name="methodName">Имя метода для генерации уникального имени модели</param>
     /// <returns>Информация о возвращаемых колонках</returns>
-    ReturnTypeInfo InferReturnType(string sqlQuery);
+    ReturnTypeInfo InferReturnType(string sqlQuery, string methodName);
 
     /// <summary>
     /// Парсит комментарии sqlc формата (-- name: GetUser :one)

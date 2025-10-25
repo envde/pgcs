@@ -131,7 +131,7 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
             
             // Определяем возвращаемый тип (для SELECT запросов)
             var returnType = annotation.Cardinality is not ReturnCardinality.Exec 
-                ? InferReturnType(query) 
+                ? InferReturnType(query, annotation.Name) 
                 : null;
 
             return new QueryMetadata
@@ -188,9 +188,12 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
     /// <summary>
     /// Определяет тип возвращаемого значения на основе SELECT/RETURNING части запроса
     /// </summary>
-    public ReturnTypeInfo InferReturnType(string sqlQuery)
+    /// <param name="sqlQuery">SQL запрос для анализа</param>
+    /// <param name="methodName">Имя метода для генерации уникального имени модели</param>
+    public ReturnTypeInfo InferReturnType(string sqlQuery, string methodName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlQuery);
+        ArgumentException.ThrowIfNullOrWhiteSpace(methodName);
 
         var columns = ColumnExtractor.Extract(sqlQuery, _schemaMetadata);
         
@@ -216,15 +219,16 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
             }
             else
             {
-                // Таблица не найдена - создаем кастомную модель
-                modelName = ModelNameGenerator.Generate(columns);
+                // Таблица не найдена - создаем кастомную модель с именем метода
+                modelName = methodName + "Result";
                 requiresCustomModel = true;
             }
         }
         else
         {
             // Частичная выборка или несколько таблиц - создаем кастомную модель
-            modelName = ModelNameGenerator.Generate(columns);
+            // Используем имя метода для уникального имени модели (GetUserById → GetUserByIdResult)
+            modelName = methodName + "Result";
             requiresCustomModel = columns.Count > 0;
         }
 

@@ -155,7 +155,7 @@ public sealed class QueryAnalyzerTests
         var sql = "SELECT * FROM users;";
 
         // Act
-        var result = _sut.InferReturnType(sql);
+        var result = _sut.InferReturnType(sql, "TestMethod");
 
         // Assert
         Assert.Equal("void", result.ModelName);
@@ -170,10 +170,10 @@ public sealed class QueryAnalyzerTests
         var sql = "SELECT id, username, email FROM users;";
 
         // Act
-        var result = _sut.InferReturnType(sql);
+        var result = _sut.InferReturnType(sql, "GetUser");
 
         // Assert
-        Assert.NotEqual("void", result.ModelName);
+        Assert.Equal("GetUserResult", result.ModelName);
         Assert.Equal(3, result.Columns.Count);
         Assert.True(result.RequiresCustomModel);
     }
