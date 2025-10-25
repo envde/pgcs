@@ -76,7 +76,6 @@ public sealed class QueryGenerationService
         }
         else if (!string.IsNullOrEmpty(config.Queries.Input.Directory))
         {
-            // For now, just use the directory - TODO: add support for multiple files
             var queryFiles = Directory.GetFiles(
                 config.Queries.Input.Directory,
                 config.Queries.Input.Pattern,
