@@ -132,12 +132,14 @@ public sealed class RepositoryGenerator(
         var returnType = GetReturnType(queryMetadata);
         var parameters = BuildParameters(queryMetadata, options);
 
+        var xmlComment = syntaxBuilder.CreateQueryMethodXmlComment(
+            queryMetadata,
+            options.IncludeSqlInDocumentation);
+
         return MethodDeclaration(ParseTypeName(returnType), queryMetadata.MethodName + "Async")
             .AddParameterListParameters(parameters.ToArray())
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-            .WithLeadingTrivia(syntaxBuilder.CreateQueryMethodXmlComment(
-                queryMetadata,
-                options.IncludeSqlInDocumentation));
+            .WithLeadingTrivia(xmlComment);
     }
 
     /// <summary>

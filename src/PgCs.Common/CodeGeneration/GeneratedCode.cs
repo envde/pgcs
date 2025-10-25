@@ -26,6 +26,11 @@ public sealed record GeneratedCode
     public GeneratedFileType CodeType { get; init; }
 
     /// <summary>
+    /// Относительный путь к файлу (если нужен особый путь, например "../Models/File.cs")
+    /// </summary>
+    public string? RelativePath { get; init; }
+
+    /// <summary>
     /// Размер кода в байтах
     /// </summary>
     public long SizeInBytes => System.Text.Encoding.UTF8.GetByteCount(SourceCode);
@@ -36,7 +41,7 @@ public sealed record GeneratedCode
     public DateTime GeneratedAt { get; init; } = DateTime.UtcNow;
 
     /// <summary>
-    /// Рекомендуемое имя файла (без пути)
+    /// Рекомендуемое имя файла (с учетом RelativePath если задан)
     /// </summary>
-    public string SuggestedFileName => $"{TypeName}.cs";
+    public string SuggestedFileName => RelativePath ?? $"{TypeName}.cs";
 }

@@ -54,9 +54,9 @@ public sealed class QueryModelGenerator(
 
         var sourceCode = compilationUnit.ToFullString();
 
-        // Определяем путь к файлу
+        // Result модели создаются в папке Models (вместе с моделями схемы)
+        // Мы используем относительный путь "../Models/" чтобы выйти из Repository и попасть в Models
         var fileName = $"{modelName}.cs";
-        var filePath = Path.Combine("Models", "Results", fileName);
 
         var code = new GeneratedCode
         {
@@ -65,6 +65,8 @@ public sealed class QueryModelGenerator(
             TypeName = modelName,
             Namespace = options.RootNamespace,
             CodeType = GeneratedFileType.ResultModel,
+            // Добавляем относительный путь для корректного размещения
+            RelativePath = Path.Combine("..", "Models", fileName)
         };
 
         return new GeneratedModelResult

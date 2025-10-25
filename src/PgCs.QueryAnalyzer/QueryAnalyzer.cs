@@ -5,6 +5,7 @@ using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryAnalyzer.Models.Parameters;
 using PgCs.Common.QueryAnalyzer.Models.Results;
 using PgCs.Common.SchemaAnalyzer.Models;
+using PgCs.Common.Services;
 using PgCs.Common.Utils;
 using PgCs.QueryAnalyzer.Parsing;
 
@@ -16,6 +17,7 @@ namespace PgCs.QueryAnalyzer;
 public sealed class QueryAnalyzer : IQueryAnalyzer
 {
     private readonly SchemaMetadata? _schemaMetadata;
+    private readonly INameConverter _nameConverter;
 
     /// <summary>
     /// Warnings и errors собранные во время parsing queries
@@ -29,6 +31,7 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
     public QueryAnalyzer(SchemaMetadata? schemaMetadata = null)
     {
         _schemaMetadata = schemaMetadata;
+        _nameConverter = new NameConverter();
     }
     /// <summary>
     /// Анализирует SQL файл и извлекает все запросы с аннотациями sqlc
@@ -190,14 +193,75 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlQuery);
 
         var columns = ColumnExtractor.Extract(sqlQuery, _schemaMetadata);
-        var modelName = ModelNameGenerator.Generate(columns);
+        
+        // Проверяем является ли это SELECT * от одной таблицы
+        var isSelectStar = IsSelectStarQuery(sqlQuery);
+        var tableName = ExtractSingleTableName(sqlQuery);
+        
+        string modelName;
+        bool requiresCustomModel;
+        
+        if (isSelectStar && tableName != null && _schemaMetadata != null)
+        {
+            // SELECT * - используем модель таблицы
+            var table = _schemaMetadata.Tables.FirstOrDefault(t => 
+                t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase));
+                
+            if (table != null)
+            {
+                // Используем имя таблицы как в схеме (там уже применён singularize)
+                // SchemaGenerator создаёт модели с правильными именами (User, а не Users)
+                modelName = _nameConverter.ToClassName(table.Name);
+                requiresCustomModel = false; // Используем существующую модель схемы
+            }
+            else
+            {
+                // Таблица не найдена - создаем кастомную модель
+                modelName = ModelNameGenerator.Generate(columns);
+                requiresCustomModel = true;
+            }
+        }
+        else
+        {
+            // Частичная выборка или несколько таблиц - создаем кастомную модель
+            modelName = ModelNameGenerator.Generate(columns);
+            requiresCustomModel = columns.Count > 0;
+        }
 
         return new ReturnTypeInfo
         {
             ModelName = modelName,
             Columns = columns,
-            RequiresCustomModel = columns.Count > 0
+            RequiresCustomModel = requiresCustomModel
         };
+    }
+
+    /// <summary>
+    /// Проверяет является ли запрос SELECT *
+    /// </summary>
+    private static bool IsSelectStarQuery(string sqlQuery)
+    {
+        // Простая проверка на SELECT *
+        var selectPattern = @"\bSELECT\s+\*\s+FROM\b";
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            sqlQuery, 
+            selectPattern, 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    /// <summary>
+    /// Извлекает имя одной таблицы из FROM clause
+    /// </summary>
+    private static string? ExtractSingleTableName(string sqlQuery)
+    {
+        // Простой паттерн для извлечения имени таблицы из FROM clause
+        var fromPattern = @"\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)\b";
+        var match = System.Text.RegularExpressions.Regex.Match(
+            sqlQuery, 
+            fromPattern, 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            
+        return match.Success ? match.Groups[1].Value : null;
     }
 
     /// <summary>
