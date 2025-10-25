@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using PgCs.Common.SchemaAnalyzer.Models.Types;
+using PgCs.Common.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 
@@ -65,10 +66,8 @@ internal sealed partial class TypeExtractor : BaseExtractor<TypeDefinition>
 
     private TypeDefinition ParseEnumType(string name, string? schema, string enumValues, string rawSql)
     {
-        var values = enumValues
-            .Split(',')
-            .Select(v => v.Trim().Trim('\'', '"'))
-            .Where(v => !string.IsNullOrWhiteSpace(v))
+        var values = StringParsingHelpers.SplitAndTrim(enumValues)
+            .Select(v => v.Trim('\'', '"'))
             .ToArray();
 
         return new TypeDefinition

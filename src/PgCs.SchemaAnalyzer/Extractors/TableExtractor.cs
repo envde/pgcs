@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
+using PgCs.Common.Utils;
+using PgCs.SchemaAnalyzer.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 
@@ -44,7 +46,7 @@ internal sealed partial class TableExtractor : BaseExtractor<TableDefinition>
             partitionInfo = new PartitionInfo
             {
                 Strategy = Enum.Parse<PartitionStrategy>(partitionStrategy, ignoreCase: true),
-                PartitionKeys = partitionKeys.Split(',').Select(k => k.Trim()).ToArray()
+                PartitionKeys = StringParsingHelpers.SplitAndTrim(partitionKeys)
             };
         }
 
@@ -184,9 +186,9 @@ internal sealed partial class TableExtractor : BaseExtractor<TableDefinition>
 
         var name = match.Groups[1].Value;
         var type = match.Groups[2].Value.ToUpperInvariant();
-        var columns = match.Groups[3].Value.Split(',').Select(c => c.Trim()).ToArray();
+        var columns = StringParsingHelpers.SplitAndTrim(match.Groups[3].Value);
         var referencedTable = match.Groups[4].Value;
-        var referencedColumns = match.Groups[5].Value.Split(',').Select(c => c.Trim()).ToArray();
+        var referencedColumns = StringParsingHelpers.SplitAndTrim(match.Groups[5].Value);
         var onDelete = match.Groups[6].Value;
         var onUpdate = match.Groups[7].Value;
 
@@ -233,46 +235,9 @@ internal sealed partial class TableExtractor : BaseExtractor<TableDefinition>
 
     private static List<string> SplitColumns(string columnsBlock)
     {
-        var columns = new List<string>();
-        var currentColumn = new StringBuilder();
-        var parenthesesDepth = 0;
-        var inQuotes = false;
-
-        foreach (var ch in columnsBlock)
-        {
-            if (ch == '\'' && parenthesesDepth == 0)
-            {
-                inQuotes = !inQuotes;
-            }
-
-            if (!inQuotes)
-            {
-                if (ch == '(') parenthesesDepth++;
-                if (ch == ')') parenthesesDepth--;
-            }
-
-            if (ch == ',' && parenthesesDepth == 0 && !inQuotes)
-            {
-                var col = currentColumn.ToString().Trim();
-                if (!string.IsNullOrWhiteSpace(col))
-                {
-                    columns.Add(col);
-                }
-                currentColumn.Clear();
-            }
-            else
-            {
-                currentColumn.Append(ch);
-            }
-        }
-
-        var lastCol = currentColumn.ToString().Trim();
-        if (!string.IsNullOrWhiteSpace(lastCol))
-        {
-            columns.Add(lastCol);
-        }
-
-        return columns;
+        // Используем общий метод с учетом кавычек для корректного парсинга строковых значений
+        var parts = StringParsingHelpers.SplitByCommaRespectingDepth(columnsBlock, respectQuotes: true);
+        return parts.ToList();
     }
 
     private static string ExtractDataType(string[] parts)

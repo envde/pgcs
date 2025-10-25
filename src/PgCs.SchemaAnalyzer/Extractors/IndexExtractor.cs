@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using PgCs.Common.SchemaAnalyzer.Models.Indexes;
+using PgCs.Common.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 
@@ -46,10 +47,7 @@ internal sealed partial class IndexExtractor : BaseExtractor<IndexDefinition>
 
     private IReadOnlyList<string> ParseIndexColumns(string columnsText)
     {
-        return columnsText
-            .Split(',')
-            .Select(c => c.Trim())
-            .Where(c => !string.IsNullOrWhiteSpace(c))
+        return StringParsingHelpers.SplitAndTrim(columnsText)
             .Select(c =>
             {
                 // Убираем возможные модификаторы (DESC, ASC, NULLS FIRST и т.д.)

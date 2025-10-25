@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
+using PgCs.Common.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 
@@ -112,11 +113,7 @@ internal sealed partial class ConstraintExtractor : BaseExtractor<ConstraintDefi
 
     private static IReadOnlyList<string> ParseColumns(string columnsText)
     {
-        return columnsText
-            .Split(',')
-            .Select(c => c.Trim())
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .ToArray();
+        return StringParsingHelpers.SplitAndTrim(columnsText);
     }
 
     private static ReferentialAction? ParseReferentialAction(string action)

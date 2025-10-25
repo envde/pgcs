@@ -29,4 +29,49 @@ public sealed record ValidationIssue
     /// Дополнительные детали проблемы
     /// </summary>
     public IReadOnlyDictionary<string, string>? Details { get; init; }
+
+    /// <summary>
+    /// Создает ошибку валидации (Error)
+    /// </summary>
+    public static ValidationIssue Error(string code, string message, string? location = null, Dictionary<string, string>? details = null)
+    {
+        return new ValidationIssue
+        {
+            Severity = ValidationSeverity.Error,
+            Code = code,
+            Message = message,
+            Location = location,
+            Details = details
+        };
+    }
+
+    /// <summary>
+    /// Создает предупреждение валидации (Warning)
+    /// </summary>
+    public static ValidationIssue Warning(string code, string message, string? location = null, Dictionary<string, string>? details = null)
+    {
+        return new ValidationIssue
+        {
+            Severity = ValidationSeverity.Warning,
+            Code = code,
+            Message = message,
+            Location = location,
+            Details = details
+        };
+    }
+
+    /// <summary>
+    /// Создает информационное сообщение валидации (Info)
+    /// </summary>
+    public static ValidationIssue Info(string code, string message, string? location = null, Dictionary<string, string>? details = null)
+    {
+        return new ValidationIssue
+        {
+            Severity = ValidationSeverity.Info,
+            Code = code,
+            Message = message,
+            Location = location,
+            Details = details
+        };
+    }
 }

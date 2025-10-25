@@ -134,12 +134,12 @@ public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTy
                 CreateXmlComment(type.Comment));
         }
 
-        // Создаем compilation unit
-        var compilationUnit = CompilationUnit()
-            .AddMembers(
-                FileScopedNamespaceDeclaration(IdentifierName(options.RootNamespace))
-                    .AddMembers(recordDeclaration))
-            .NormalizeWhitespace();
+        // Создаем compilation unit используя общий helper (domain type)
+        var usings = new[] { "System" };
+        var compilationUnit = RoslynSyntaxHelpers.BuildCompilationUnit(
+            options.RootNamespace,
+            recordDeclaration,
+            usings);
 
         var sourceCode = compilationUnit.ToFullString();
 
@@ -190,12 +190,12 @@ public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTy
                 CreateXmlComment(type.Comment));
         }
 
-        // Создаем compilation unit
-        var compilationUnit = CompilationUnit()
-            .AddMembers(
-                FileScopedNamespaceDeclaration(IdentifierName(options.RootNamespace))
-                    .AddMembers(recordDeclaration))
-            .NormalizeWhitespace();
+        // Создаем compilation unit используя общий helper (composite type)
+        var usings = new[] { "System" };
+        var compilationUnit = RoslynSyntaxHelpers.BuildCompilationUnit(
+            options.RootNamespace,
+            recordDeclaration,
+            usings);
 
         var sourceCode = compilationUnit.ToFullString();
 
@@ -241,26 +241,6 @@ public sealed class CustomTypeGenerator(SyntaxBuilder syntaxBuilder) : ICustomTy
     /// </summary>
     private static SyntaxTriviaList CreateXmlComment(string comment)
     {
-        var lines = comment.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        var triviaList = TriviaList();
-
-        // Создаем текстовые элементы для каждой строки
-        var textTokens = new List<XmlNodeSyntax>();
-        foreach (var line in lines)
-        {
-            textTokens.Add(XmlText(XmlTextLiteral(line.Trim())));
-            textTokens.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: false)));
-        }
-
-        // Используем DocumentationCommentTrivia из Roslyn
-        triviaList = triviaList.Add(
-            Trivia(
-                DocumentationComment(
-                    XmlSummaryElement(textTokens.ToArray()))));
-
-        // КРИТИЧНО: Добавляем перевод строки ПОСЛЕ XML comment
-        triviaList = triviaList.Add(CarriageReturnLineFeed);
-
-        return triviaList;
+        return RoslynSyntaxHelpers.CreateXmlComment(comment, addTrailingNewLine: true);
     }
 }

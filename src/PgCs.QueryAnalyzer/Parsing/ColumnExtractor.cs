@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using PgCs.Common.QueryAnalyzer.Models.Results;
 using PgCs.Common.SchemaAnalyzer.Models;
+using PgCs.Common.Services;
+using PgCs.Common.Utils;
 
 namespace PgCs.QueryAnalyzer.Parsing;
 
@@ -12,6 +14,7 @@ internal static partial class ColumnExtractor
 {
     private static readonly Regex SelectRegex = GenerateSelectRegex();
     private static readonly Regex ReturningRegex = GenerateReturningRegex();
+    private static readonly ITypeMapper TypeMapper = new PostgreSqlTypeMapper();
 
     /// <summary>
     /// Извлекает список колонок из SELECT или RETURNING части SQL запроса
@@ -68,7 +71,7 @@ internal static partial class ColumnExtractor
                     {
                         Name = c.Name,
                         PostgresType = c.DataType,
-                        CSharpType = MapPostgresToCSharp(c.DataType),
+                        CSharpType = TypeMapper.MapType(c.DataType, c.IsNullable, c.IsArray),
                         IsNullable = c.IsNullable
                     }).ToList();
                 }
@@ -218,7 +221,10 @@ internal static partial class ColumnExtractor
                     
                     if (column != null)
                     {
-                        return (column.DataType, MapPostgresToCSharp(column.DataType), column.IsNullable);
+                        // Используем общий TypeMapper для конвертации типов
+                        var isArray = column.IsArray;
+                        var csharpType = TypeMapper.MapType(column.DataType, column.IsNullable, isArray);
+                        return (column.DataType, csharpType, column.IsNullable);
                     }
                 }
             }
@@ -242,80 +248,10 @@ internal static partial class ColumnExtractor
         if (targetColumn == null)
             return (null, null, true);
 
-        return (targetColumn.DataType, MapPostgresToCSharp(targetColumn.DataType), targetColumn.IsNullable);
-    }
-
-    /// <summary>
-    /// Простой маппинг PostgreSQL типов на C# типы
-    /// </summary>
-    private static string MapPostgresToCSharp(string postgresType)
-    {
-        if (string.IsNullOrWhiteSpace(postgresType))
-        {
-            Console.WriteLine("[ERROR] MapPostgresToCSharp received null or empty postgresType!");
-            return "string";
-        }
-
-        // Проверяем array type (например, "TEXT[]" или "VARCHAR(20)[]")
-        var isArray = postgresType.TrimEnd().EndsWith("[]");
-        if (isArray)
-        {
-            // Убираем [] и рекурсивно получаем базовый тип
-            var baseType = postgresType.TrimEnd()[..^2].Trim();
-            var csharpBaseType = MapPostgresToCSharp(baseType);
-            return $"{csharpBaseType}[]";
-        }
-
-        // Убираем длину/precision из типа (например, "VARCHAR(255)" -> "VARCHAR")
-        var cleanType = Regex.Replace(postgresType, @"\(.*?\)", "").Trim();
-        
-        if (string.IsNullOrWhiteSpace(cleanType))
-        {
-            Console.WriteLine($"[ERROR] cleanType is empty after regex! Original: '{postgresType}'");
-            return "string";
-        }
-        
-        cleanType = cleanType.ToLowerInvariant();
-        
-        return cleanType switch
-        {
-            // Integer types
-            "integer" or "int" or "int4" => "int",
-            "bigint" or "int8" or "bigserial" => "long",
-            "smallint" or "int2" => "short",
-            "serial" => "int",
-            
-            // Text types
-            "text" or "varchar" or "character varying" or "char" or "character" => "string",
-            
-            // Boolean
-            "boolean" or "bool" => "bool",
-            
-            // Date/Time types
-            "timestamp" or "timestamptz" or "timestamp with time zone" or "timestamp without time zone" => "DateTime",
-            "date" => "DateOnly",
-            "time" or "timetz" => "TimeOnly",
-            
-            // UUID
-            "uuid" => "Guid",
-            
-            // Numeric types
-            "numeric" or "decimal" or "money" => "decimal",
-            "real" or "float4" => "float",
-            "double precision" or "float8" => "double",
-            
-            // JSON
-            "jsonb" or "json" => "string", // или JsonDocument
-            
-            // Binary
-            "bytea" => "byte[]",
-            
-            // Enums and user-defined types (fallback to string)
-            _ when cleanType.Contains("_") => "string", // Обычно enum типы содержат _
-            
-            // Default fallback
-            _ => "string"
-        };
+        // Используем общий TypeMapper для конвертации типов
+        var targetIsArray = targetColumn.IsArray;
+        var targetCsharpType = TypeMapper.MapType(targetColumn.DataType, targetColumn.IsNullable, targetIsArray);
+        return (targetColumn.DataType, targetCsharpType, targetColumn.IsNullable);
     }
 
     /// <summary>

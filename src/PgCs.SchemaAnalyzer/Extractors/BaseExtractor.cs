@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using PgCs.Common.CodeGeneration;
+using PgCs.Common.Utils;
 using PgCs.SchemaAnalyzer.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
@@ -56,21 +57,16 @@ internal abstract class BaseExtractor<T>
                         // Логируем warning если statement выглядит как CREATE но был пропущен
                         if (statement.TrimStart().StartsWith("CREATE", StringComparison.OrdinalIgnoreCase))
                         {
-                            var preview = statement.Length > 100 
-                                ? statement.Substring(0, 100) + "..." 
-                                : statement;
+                            var preview = StringParsingHelpers.Truncate(statement);
                             
-                            Issues.Add(new ValidationIssue
-                            {
-                                Severity = ValidationSeverity.Warning,
-                                Code = "PARSE_SKIPPED",
-                                Message = $"Statement matched pattern but was skipped during parsing",
-                                Location = preview,
-                                Details = new Dictionary<string, string>
+                            Issues.Add(ValidationIssue.Warning(
+                                "PARSE_SKIPPED",
+                                "Statement matched pattern but was skipped during parsing",
+                                preview,
+                                new Dictionary<string, string>
                                 {
                                     ["StatementPreview"] = preview
-                                }
-                            });
+                                }));
                         }
                     }
                 }
@@ -97,22 +93,17 @@ internal abstract class BaseExtractor<T>
                         // Только логируем warning если это statement должен обрабатываться ЭТИМ extractor
                         if (!isForDifferentExtractor)
                         {
-                            var preview = statement.Length > 100 
-                                ? statement.Substring(0, 100) + "..." 
-                                : statement;
+                            var preview = StringParsingHelpers.Truncate(statement);
                             
-                            Issues.Add(new ValidationIssue
-                            {
-                                Severity = ValidationSeverity.Warning,
-                                Code = "PARSE_NO_MATCH",
-                                Message = "CREATE statement did not match expected pattern - possibly malformed SQL",
-                                Location = preview,
-                                Details = new Dictionary<string, string>
+                            Issues.Add(ValidationIssue.Warning(
+                                "PARSE_NO_MATCH",
+                                "CREATE statement did not match expected pattern - possibly malformed SQL",
+                                preview,
+                                new Dictionary<string, string>
                                 {
                                     ["StatementPreview"] = preview,
                                     ["ExtractorType"] = GetType().Name
-                                }
-                            });
+                                }));
                         }
                     }
                 }
@@ -120,22 +111,17 @@ internal abstract class BaseExtractor<T>
             catch (Exception ex)
             {
                 // Логируем ошибку парсинга
-                var preview = statement.Length > 100 
-                    ? statement.Substring(0, 100) + "..." 
-                    : statement;
+                var preview = StringParsingHelpers.Truncate(statement);
                 
-                Issues.Add(new ValidationIssue
-                {
-                    Severity = ValidationSeverity.Error,
-                    Code = "PARSE_ERROR",
-                    Message = $"Failed to parse statement: {ex.Message}",
-                    Location = preview,
-                    Details = new Dictionary<string, string>
+                Issues.Add(ValidationIssue.Error(
+                    "PARSE_ERROR",
+                    $"Failed to parse statement: {ex.Message}",
+                    preview,
+                    new Dictionary<string, string>
                     {
                         ["Exception"] = ex.GetType().Name,
                         ["StatementPreview"] = preview
-                    }
-                });
+                    }));
             }
         }
 
@@ -146,13 +132,15 @@ internal abstract class BaseExtractor<T>
 
     protected static string? ExtractSchemaName(string fullName)
     {
-        var parts = fullName.Split('.');
-        return parts.Length > 1 ? parts[0].Trim('"') : null;
+        var schema = StringParsingHelpers.ExtractSchemaName(fullName);
+        // Убираем двойные кавычки если есть
+        return schema?.Trim('"');
     }
 
     protected static string ExtractTableName(string fullName)
     {
-        var parts = fullName.Split('.');
-        return parts.Length > 1 ? parts[1].Trim('"') : parts[0].Trim('"');
+        var objectName = StringParsingHelpers.ExtractObjectName(fullName);
+        // Убираем двойные кавычки если есть
+        return objectName.Trim('"');
     }
 }

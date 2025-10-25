@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
 using PgCs.Common.SchemaAnalyzer.Models.Views;
+using PgCs.Common.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 
@@ -72,73 +73,13 @@ internal sealed partial class ViewExtractor : BaseExtractor<ViewDefinition>
 
     private static List<string> SplitSelectColumns(string columnsText)
     {
-        var columns = new List<string>();
-        var current = new System.Text.StringBuilder();
-        var depth = 0;
-        var inString = false;
-
-        foreach (var ch in columnsText)
-        {
-            if (ch == '\'' && depth == 0)
-            {
-                inString = !inString;
-            }
-
-            if (!inString)
-            {
-                if (ch == '(') depth++;
-                if (ch == ')') depth--;
-            }
-
-            if (ch == ',' && depth == 0 && !inString)
-            {
-                columns.Add(current.ToString().Trim());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(ch);
-            }
-        }
-
-        if (current.Length > 0)
-        {
-            columns.Add(current.ToString().Trim());
-        }
-
-        return columns;
+        // Используем общий метод с учетом кавычек и скобок
+        var parts = StringParsingHelpers.SplitByCommaRespectingDepth(columnsText, respectQuotes: true);
+        return parts.ToList();
     }
 
     private static string ExtractColumnName(string columnExpression)
     {
-        // Ищем AS alias
-        var asMatch = Regex.Match(columnExpression, @"\s+AS\s+([a-zA-Z_][a-zA-Z0-9_]*)", RegexOptions.IgnoreCase);
-        if (asMatch.Success)
-        {
-            return asMatch.Groups[1].Value;
-        }
-
-        // Ищем implicit alias (column_name без AS)
-        var tokens = columnExpression.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
-        if (tokens.Length >= 2 && !tokens[^1].Contains('('))
-        {
-            return tokens[^1].Trim();
-        }
-
-        // Берем имя колонки напрямую
-        var simpleMatch = Regex.Match(columnExpression, @"([a-zA-Z_][a-zA-Z0-9_]*)\s*$", RegexOptions.IgnoreCase);
-        if (simpleMatch.Success)
-        {
-            return simpleMatch.Groups[1].Value;
-        }
-
-        // Извлекаем из table.column
-        var qualifiedMatch = Regex.Match(columnExpression, @"\.([a-zA-Z_][a-zA-Z0-9_]*)", RegexOptions.IgnoreCase);
-        if (qualifiedMatch.Success)
-        {
-            return qualifiedMatch.Groups[1].Value;
-        }
-
-        return columnExpression.Trim();
+        return StringParsingHelpers.ExtractNameFromExpression(columnExpression);
     }
 }

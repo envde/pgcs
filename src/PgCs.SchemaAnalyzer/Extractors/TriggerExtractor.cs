@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using PgCs.Common.SchemaAnalyzer.Models.Triggers;
+using PgCs.Common.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 
@@ -99,10 +100,6 @@ internal sealed partial class TriggerExtractor : BaseExtractor<TriggerDefinition
         if (!match.Success)
             return null;
 
-        return match.Groups[1].Value
-            .Split(',')
-            .Select(c => c.Trim())
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .ToArray();
+        return StringParsingHelpers.SplitAndTrim(match.Groups[1].Value);
     }
 }

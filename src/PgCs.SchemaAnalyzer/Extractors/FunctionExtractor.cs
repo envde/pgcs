@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using PgCs.Common.SchemaAnalyzer.Models.Functions;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
+using PgCs.Common.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 
@@ -178,31 +179,8 @@ internal sealed partial class FunctionExtractor : BaseExtractor<FunctionDefiniti
 
     private static List<string> SplitParameters(string parametersText)
     {
-        var parameters = new List<string>();
-        var current = new System.Text.StringBuilder();
-        var depth = 0;
-
-        foreach (var ch in parametersText)
-        {
-            if (ch == '(') depth++;
-            if (ch == ')') depth--;
-
-            if (ch == ',' && depth == 0)
-            {
-                parameters.Add(current.ToString().Trim());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(ch);
-            }
-        }
-
-        if (current.Length > 0)
-        {
-            parameters.Add(current.ToString().Trim());
-        }
-
-        return parameters;
+        // Используем общий метод без учета кавычек (параметры не содержат строковых литералов)
+        var parts = StringParsingHelpers.SplitByCommaRespectingDepth(parametersText, respectQuotes: false);
+        return parts.ToList();
     }
 }

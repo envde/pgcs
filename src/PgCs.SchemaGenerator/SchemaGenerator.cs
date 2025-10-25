@@ -165,8 +165,8 @@ public sealed class SchemaGenerator(
             ViewsProcessed = schemaMetadata.Views.Count,
             TypesProcessed = schemaMetadata.Types.Count,
             FunctionsProcessed = schemaMetadata.Functions.Count,
-            ErrorCount = issues.Count(i => i.Severity == ValidationSeverity.Error),
-            WarningCount = issues.Count(i => i.Severity == ValidationSeverity.Warning)
+            ErrorCount = issues.CountErrors(),
+            WarningCount = issues.CountWarnings()
         };
     }
 }

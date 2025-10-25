@@ -50,13 +50,11 @@ public sealed class FunctionMethodGenerator(ITypeMapper typeMapper, INameConvert
             "Npgsql"
         };
 
-        var compilationUnit = CompilationUnit()
-            .AddUsings(usings.Select(u => UsingDirective(ParseName(u))).ToArray())
-            .AddMembers(
-                FileScopedNamespaceDeclaration(ParseName(options.RootNamespace))
-                    .AddMembers(classDeclaration)
-            )
-            .NormalizeWhitespace();
+        // Используем общий helper для создания compilation unit
+        var compilationUnit = RoslynSyntaxHelpers.BuildCompilationUnit(
+            options.RootNamespace,
+            classDeclaration,
+            usings);
 
         var sourceCode = compilationUnit.ToFullString();
 

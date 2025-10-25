@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using PgCs.Common.SchemaAnalyzer.Models.Tables;
+using PgCs.Common.Utils;
 
 namespace PgCs.SchemaAnalyzer.Extractors;
 
@@ -50,9 +51,8 @@ internal sealed partial class PartitionExtractor
         // LIST partition
         if (match.Groups[6].Success)
         {
-            var inValues = match.Groups[6].Value
-                .Split(',')
-                .Select(v => v.Trim().Trim('\''))
+            var inValues = StringParsingHelpers.SplitAndTrim(match.Groups[6].Value)
+                .Select(v => v.Trim('\''))
                 .ToArray();
 
             return new PartitionDefinition

@@ -32,7 +32,7 @@ public sealed class QueryGenerator(
         
         var methodGenerator = new QueryMethodGenerator(syntaxBuilder, nameConverter);
         var modelGenerator = new QueryModelGenerator(syntaxBuilder, typeMapper);
-        var repositoryGenerator = new RepositoryGenerator(syntaxBuilder, methodGenerator);
+        var repositoryGenerator = new RepositoryGenerator(syntaxBuilder, methodGenerator, nameConverter);
         var validator = new QueryValidator();
         var formatter = new RoslynFormatter();
 
@@ -203,8 +203,8 @@ public sealed class QueryGenerator(
             InsertQueriesCount = queries.Count(q => q.QueryType == QueryType.Insert),
             UpdateQueriesCount = queries.Count(q => q.QueryType == QueryType.Update),
             DeleteQueriesCount = queries.Count(q => q.QueryType == QueryType.Delete),
-            ErrorCount = issues.Count(i => i.Severity == ValidationSeverity.Error),
-            WarningCount = issues.Count(i => i.Severity == ValidationSeverity.Warning)
+            ErrorCount = issues.CountErrors(),
+            WarningCount = issues.CountWarnings()
         };
     }
 }

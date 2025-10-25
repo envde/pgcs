@@ -33,20 +33,20 @@ public abstract record CodeGenerationResult
     /// <summary>
     /// Есть ли критические ошибки
     /// </summary>
-    public bool HasErrors => ValidationIssues.Any(i => i.Severity == ValidationSeverity.Error);
+    public bool HasErrors => ValidationIssues.HasErrors();
 
     /// <summary>
     /// Есть ли предупреждения
     /// </summary>
-    public bool HasWarnings => ValidationIssues.Any(i => i.Severity == ValidationSeverity.Warning);
+    public bool HasWarnings => ValidationIssues.HasWarnings();
 
     /// <summary>
     /// Количество ошибок
     /// </summary>
-    public int ErrorCount => ValidationIssues.Count(i => i.Severity == ValidationSeverity.Error);
+    public int ErrorCount => ValidationIssues.CountErrors();
 
     /// <summary>
     /// Количество предупреждений
     /// </summary>
-    public int WarningCount => ValidationIssues.Count(i => i.Severity == ValidationSeverity.Warning);
+    public int WarningCount => ValidationIssues.CountWarnings();
 }

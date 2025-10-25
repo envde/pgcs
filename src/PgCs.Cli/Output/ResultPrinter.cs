@@ -1,3 +1,5 @@
+using PgCs.Common.Utils;
+
 namespace PgCs.Cli.Output;
 
 /// <summary>
@@ -23,7 +25,7 @@ public sealed class ResultPrinter
         _writer.TableRow("Tables Generated:", tablesGenerated.ToString());
         _writer.TableRow("Enums Generated:", enumsGenerated.ToString());
         _writer.TableRow("Output Directory:", outputDirectory);
-        _writer.TableRow("Time Elapsed:", FormatElapsedTime(elapsed));
+        _writer.TableRow("Time Elapsed:", TimeFormatter.FormatElapsedTime(elapsed));
 
         _writer.WriteLine();
         _writer.Success($"Successfully generated {tablesGenerated} table(s) and {enumsGenerated} enum(s)");
@@ -42,7 +44,7 @@ public sealed class ResultPrinter
         _writer.TableRow("Methods Generated:", methodsGenerated.ToString());
         _writer.TableRow("Models Generated:", modelsGenerated.ToString());
         _writer.TableRow("Output Directory:", outputDirectory);
-        _writer.TableRow("Time Elapsed:", FormatElapsedTime(elapsed));
+        _writer.TableRow("Time Elapsed:", TimeFormatter.FormatElapsedTime(elapsed));
 
         _writer.WriteLine();
         var repoWord = repositoriesGenerated == 1 ? "repository" : "repositories";
@@ -74,7 +76,7 @@ public sealed class ResultPrinter
         _writer.TableRow("  Models:", modelsGenerated.ToString());
 
         _writer.WriteLine();
-        _writer.TableRow("Total Time:", FormatElapsedTime(elapsed));
+        _writer.TableRow("Total Time:", TimeFormatter.FormatElapsedTime(elapsed));
 
         _writer.WriteLine();
         _writer.Success("Code generation completed successfully!");
@@ -155,19 +157,5 @@ public sealed class ResultPrinter
         }
         
         _writer.WriteLine();
-    }
-
-    /// <summary>
-    /// Format elapsed time
-    /// </summary>
-    private static string FormatElapsedTime(TimeSpan elapsed)
-    {
-        if (elapsed.TotalSeconds < 1)
-            return $"{elapsed.TotalMilliseconds:F0}ms";
-        
-        if (elapsed.TotalMinutes < 1)
-            return $"{elapsed.TotalSeconds:F2}s";
-        
-        return $"{elapsed.Minutes}m {elapsed.Seconds}s";
     }
 }

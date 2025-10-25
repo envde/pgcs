@@ -1,6 +1,7 @@
 using PgCs.Cli.Output;
 using PgCs.Common.CodeGeneration;
 using PgCs.Common.Services;
+using PgCs.Common.Utils;
 
 namespace PgCs.Cli.Commands;
 
@@ -46,9 +47,7 @@ public static class ValidationIssueDisplayHelper
             // Display location if available
             if (!string.IsNullOrEmpty(issue.Location))
             {
-                var locationPreview = issue.Location.Length > 100
-                    ? issue.Location.Substring(0, 100) + "..."
-                    : issue.Location;
+                var locationPreview = StringParsingHelpers.Truncate(issue.Location);
                 writer.Info($"  → {locationPreview}");
             }
         }

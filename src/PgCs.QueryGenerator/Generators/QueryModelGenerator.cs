@@ -108,21 +108,11 @@ public sealed class QueryModelGenerator(
             }
         }
 
-        // Создаем compilation unit
-        var usingDirectives = usings
-            .OrderBy(u => u)
-            .Select(u => SyntaxFactory.UsingDirective(
-                SyntaxFactory.IdentifierName(u)))
-            .ToArray();
-
-        var fileScopedNamespace = SyntaxFactory
-            .FileScopedNamespaceDeclaration(
-                SyntaxFactory.IdentifierName(options.RootNamespace))
-            .AddMembers(classDeclaration);
-
-        var compilationUnit = SyntaxFactory.CompilationUnit()
-            .AddUsings(usingDirectives)
-            .AddMembers(fileScopedNamespace);
+        // Создаем compilation unit используя общий helper
+        var compilationUnit = RoslynSyntaxHelpers.BuildCompilationUnit(
+            options.RootNamespace,
+            classDeclaration,
+            usings);
 
         var syntaxTree = CSharpSyntaxTree.Create(compilationUnit);
         var sourceCode = syntaxTree.ToString();

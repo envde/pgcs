@@ -290,15 +290,15 @@ public class ValidationPipeline
         }
 
     EndValidation:
-        var hasErrors = _issues.Any(i => i.Severity == ValidationSeverity.Error);
+        var hasErrors = _issues.HasErrors();
 
         return new ValidationResult
         {
             IsValid = !hasErrors,
             Issues = _issues,
-            ErrorCount = _issues.Count(i => i.Severity == ValidationSeverity.Error),
-            WarningCount = _issues.Count(i => i.Severity == ValidationSeverity.Warning),
-            InfoCount = _issues.Count(i => i.Severity == ValidationSeverity.Info)
+            ErrorCount = _issues.CountErrors(),
+            WarningCount = _issues.CountWarnings(),
+            InfoCount = _issues.CountInfo()
         };
     }
 

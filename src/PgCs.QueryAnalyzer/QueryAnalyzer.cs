@@ -5,6 +5,7 @@ using PgCs.Common.QueryAnalyzer.Models.Metadata;
 using PgCs.Common.QueryAnalyzer.Models.Parameters;
 using PgCs.Common.QueryAnalyzer.Models.Results;
 using PgCs.Common.SchemaAnalyzer.Models;
+using PgCs.Common.Utils;
 using PgCs.QueryAnalyzer.Parsing;
 
 namespace PgCs.QueryAnalyzer;
@@ -68,24 +69,17 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
             catch (Exception ex)
             {
                 // Логируем ошибку парсинга
-                var preview = block.Length > 150 
-                    ? block.Substring(0, 150) + "..." 
-                    : block;
+                var preview = StringParsingHelpers.Truncate(block, 150);
                 
-                var issue = new ValidationIssue
-                {
-                    Severity = ValidationSeverity.Error,
-                    Code = "QUERY_PARSE_ERROR",
-                    Message = $"Failed to parse query: {ex.Message}",
-                    Location = preview,
-                    Details = new Dictionary<string, string>
+                Issues.Add(ValidationIssue.Error(
+                    "QUERY_PARSE_ERROR",
+                    $"Failed to parse query: {ex.Message}",
+                    preview,
+                    new Dictionary<string, string>
                     {
                         ["Exception"] = ex.GetType().Name,
                         ["QueryPreview"] = preview
-                    }
-                };
-                
-                Issues.Add(issue);
+                    }));
             }
         }
 
@@ -93,18 +87,15 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
         var blockCount = blocks.Count();
         if (queries.Count == 0 && blockCount > 0)
         {
-            Issues.Add(new ValidationIssue
-            {
-                Severity = ValidationSeverity.Warning,
-                Code = "NO_ANNOTATED_QUERIES",
-                Message = $"No queries with annotations found in file. Make sure to use '-- name: MethodName :one' annotations.",
-                Location = $"File: {sqlFilePath}",
-                Details = new Dictionary<string, string>
+            Issues.Add(ValidationIssue.Warning(
+                "NO_ANNOTATED_QUERIES",
+                $"No queries with annotations found in file. Make sure to use '-- name: MethodName :one' annotations.",
+                $"File: {sqlFilePath}",
+                new Dictionary<string, string>
                 {
                     ["BlocksFound"] = blockCount.ToString(),
                     ["FilePath"] = sqlFilePath
-                }
-            });
+                }));
         }
 
         return queries;
@@ -157,22 +148,17 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
         catch (Exception ex)
         {
             // Добавляем ошибку в локальные issues
-            var preview = sqlQuery.Length > 150 
-                ? sqlQuery.Substring(0, 150) + "..." 
-                : sqlQuery;
+            var preview = StringParsingHelpers.Truncate(sqlQuery, 150);
             
-            localIssues.Add(new ValidationIssue
-            {
-                Severity = ValidationSeverity.Error,
-                Code = "QUERY_PARSE_ERROR",
-                Message = $"Failed to parse query: {ex.Message}",
-                Location = preview,
-                Details = new Dictionary<string, string>
+            localIssues.Add(ValidationIssue.Error(
+                "QUERY_PARSE_ERROR",
+                $"Failed to parse query: {ex.Message}",
+                preview,
+                new Dictionary<string, string>
                 {
                     ["Exception"] = ex.GetType().Name,
                     ["QueryPreview"] = preview
-                }
-            });
+                }));
 
             // Возвращаем metadata с ошибкой
             return new QueryMetadata

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using PgCs.Common.Utils;
 
 namespace PgCs.Cli.Output;
 
@@ -58,7 +59,7 @@ public sealed class ProgressReporter
         var elapsed = _stopwatch.Elapsed;
         
         var completionMessage = message ?? _currentOperation ?? "Operation";
-        var timeInfo = FormatElapsedTime(elapsed);
+        var timeInfo = TimeFormatter.FormatElapsedTime(elapsed);
         
         _writer.Success($"{completionMessage} completed in {timeInfo}");
     }
@@ -70,19 +71,5 @@ public sealed class ProgressReporter
     {
         _stopwatch.Stop();
         _writer.Error($"{_currentOperation ?? "Operation"} failed: {error}");
-    }
-
-    /// <summary>
-    /// Format elapsed time
-    /// </summary>
-    private static string FormatElapsedTime(TimeSpan elapsed)
-    {
-        if (elapsed.TotalSeconds < 1)
-            return $"{elapsed.TotalMilliseconds:F0}ms";
-        
-        if (elapsed.TotalMinutes < 1)
-            return $"{elapsed.TotalSeconds:F2}s";
-        
-        return $"{elapsed.TotalMinutes:F2}m";
     }
 }

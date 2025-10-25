@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Humanizer;
+using PgCs.Common.Utils;
 
 namespace PgCs.Common.Services;
 
@@ -496,71 +497,10 @@ public sealed class NameConversionStrategyBuilder
         {
             return caseStyle switch
             {
-                CaseStyle.PascalCase => ToPascalCase(input),
-                CaseStyle.CamelCase => ToCamelCase(input),
+                CaseStyle.PascalCase => CaseConverter.ToPascalCase(input),
+                CaseStyle.CamelCase => CaseConverter.ToCamelCase(input),
                 _ => input
             };
-        }
-
-        private static string ToPascalCase(string input)
-        {
-            if (string.IsNullOrWhiteSpace(input))
-                return input;
-
-            var parts = SplitName(input);
-            var sb = new StringBuilder();
-
-            foreach (var part in parts)
-            {
-                if (string.IsNullOrWhiteSpace(part))
-                    continue;
-
-                sb.Append(char.ToUpper(part[0], CultureInfo.InvariantCulture));
-                if (part.Length > 1)
-                {
-                    sb.Append(part[1..].ToLower(CultureInfo.InvariantCulture));
-                }
-            }
-
-            return sb.ToString();
-        }
-
-        private static string ToCamelCase(string input)
-        {
-            var pascalCase = ToPascalCase(input);
-            if (string.IsNullOrEmpty(pascalCase))
-                return pascalCase;
-
-            return char.ToLower(pascalCase[0], CultureInfo.InvariantCulture) + pascalCase[1..];
-        }
-
-        private static IEnumerable<string> SplitName(string input)
-        {
-            if (string.IsNullOrWhiteSpace(input))
-                yield break;
-
-            var currentPart = new StringBuilder();
-
-            foreach (var c in input)
-            {
-                if (c == '_' || c == '-' || char.IsWhiteSpace(c))
-                {
-                    if (currentPart.Length > 0)
-                    {
-                        yield return currentPart.ToString();
-                        currentPart.Clear();
-                    }
-                }
-                else
-                {
-                    currentPart.Append(c);
-                }
-            }
-
-            if (currentPart.Length > 0)
-            {
-                yield return currentPart.ToString();
-            }
         }
     }
 
