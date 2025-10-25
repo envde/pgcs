@@ -27,6 +27,11 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly ConstraintExtractor _constraintExtractor = new();
     private readonly CommentExtractor _commentExtractor = new();
 
+    /// <summary>
+    /// Warnings и errors собранные во время parsing schema
+    /// </summary>
+    public List<ValidationIssue> Issues { get; } = new();
+
     public async ValueTask<SchemaMetadata> AnalyzeFileAsync(string schemaFilePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(schemaFilePath);
@@ -34,6 +39,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         if (!File.Exists(schemaFilePath))
             throw new FileNotFoundException($"Schema file not found: {schemaFilePath}");
 
+        Issues.Clear(); // Очищаем перед новым анализом
         var sqlScript = await File.ReadAllTextAsync(schemaFilePath);
         var metadata = AnalyzeScript(sqlScript);
 
@@ -46,6 +52,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         if (!Directory.Exists(schemaDirectoryPath))
             throw new DirectoryNotFoundException($"Schema directory not found: {schemaDirectoryPath}");
+
+        Issues.Clear(); // Очищаем перед новым анализом
 
         var sqlFiles = Directory.GetFiles(schemaDirectoryPath, "*.sql", SearchOption.AllDirectories)
             .OrderBy(f => f)
@@ -89,6 +97,9 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                 allIssues.AddRange(metadata.ValidationIssues);
             }
         }
+
+        // Добавляем в public Issues property
+        Issues.AddRange(allIssues);
 
         return new SchemaMetadata
         {
@@ -152,6 +163,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
 
+        Issues.Clear(); // Очищаем перед новым анализом
+
         // Сначала разделяем на statements (ДО нормализации, чтобы сохранить переводы строк)
         var statements = SqlStatementSplitter.Split(sqlScript);
         
@@ -186,6 +199,9 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         allIssues.AddRange(_indexExtractor.Issues);
         allIssues.AddRange(_triggerExtractor.Issues);
         allIssues.AddRange(_constraintExtractor.Issues);
+
+        // Добавляем в public Issues property для единообразия с QueryAnalyzer
+        Issues.AddRange(allIssues);
 
         return new SchemaMetadata
         {

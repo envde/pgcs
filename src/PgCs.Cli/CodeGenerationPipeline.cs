@@ -32,7 +32,6 @@ public class CodeGenerationPipeline
     private Action<string>? _onProgress;
     private Action<string>? _onError;
     private Action<PipelineStatistics>? _onComplete;
-    private QueryAnalyzerBuilder? _lastQueryAnalyzerBuilder; // Для доступа к issues
 
     private CodeGenerationPipeline() { }
 
@@ -343,10 +342,15 @@ public class CodeGenerationPipeline
                     queries = await AnalyzeQueriesAsync(schemaMetadata);
                     result.AnalyzedQueries = queries;
                     
-                    // Собираем ValidationIssues из QueryAnalyzer
-                    if (_lastQueryAnalyzerBuilder?.Issues.Count > 0)
+                    // Собираем ValidationIssues из QueryMetadata (единообразно со SchemaMetadata)
+                    var allQueryIssues = queries
+                        .Where(q => q.ValidationIssues is not null)
+                        .SelectMany(q => q.ValidationIssues!)
+                        .ToList();
+                    
+                    if (allQueryIssues.Count > 0)
                     {
-                        result.QueryValidationIssues = _lastQueryAnalyzerBuilder.Issues.ToList();
+                        result.QueryValidationIssues = allQueryIssues;
                     }
                     
                     ReportProgress($"Проанализировано {queries.Count} SQL запросов");
@@ -462,7 +466,6 @@ public class CodeGenerationPipeline
     private async ValueTask<IReadOnlyList<QueryMetadata>> AnalyzeQueriesAsync(SchemaMetadata? schemaMetadata = null)
     {
         var builder = QueryAnalyzerBuilder.Create();
-        _lastQueryAnalyzerBuilder = builder; // Сохраняем для доступа к issues
 
         foreach (var file in _queryFiles)
             builder.FromFile(file);

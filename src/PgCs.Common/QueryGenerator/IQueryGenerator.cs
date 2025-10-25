@@ -64,4 +64,11 @@ public interface IQueryGenerator
     /// <param name="queries">Список метаданных запросов</param>
     /// <returns>Список предупреждений и ошибок валидации</returns>
     IReadOnlyList<ValidationIssue> ValidateQueries(IReadOnlyList<QueryMetadata> queries);
+
+    /// <summary>
+    /// Форматирует сгенерированный C# код с использованием Roslyn
+    /// </summary>
+    /// <param name="sourceCode">Исходный код для форматирования</param>
+    /// <returns>Отформатированный код</returns>
+    string FormatCode(string sourceCode);
 }

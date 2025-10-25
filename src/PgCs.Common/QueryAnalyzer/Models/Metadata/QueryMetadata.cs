@@ -1,3 +1,4 @@
+using PgCs.Common.CodeGeneration;
 using PgCs.Common.QueryAnalyzer.Models.Parameters;
 using PgCs.Common.QueryAnalyzer.Models.Results;
 
@@ -57,4 +58,9 @@ public record QueryMetadata
     /// Описание возвращаемого значения для XML комментария returns (из -- returns:)
     /// </summary>
     public string? ReturnsDescription { get; init; }
+
+    /// <summary>
+    /// Warnings и errors собранные во время parsing этого запроса
+    /// </summary>
+    public IReadOnlyList<ValidationIssue>? ValidationIssues { get; init; }
 }

@@ -17,7 +17,8 @@ public sealed class QueryGenerator(
     IQueryMethodGenerator methodGenerator,
     IQueryModelGenerator modelGenerator,
     IRepositoryGenerator repositoryGenerator,
-    IQueryValidator validator)
+    IQueryValidator validator,
+    IRoslynFormatter formatter)
     : IQueryGenerator
 {
     /// <summary>
@@ -33,12 +34,14 @@ public sealed class QueryGenerator(
         var modelGenerator = new QueryModelGenerator(syntaxBuilder, typeMapper);
         var repositoryGenerator = new RepositoryGenerator(syntaxBuilder, methodGenerator);
         var validator = new QueryValidator();
+        var formatter = new RoslynFormatter();
 
         return new QueryGenerator(
             methodGenerator,
             modelGenerator,
             repositoryGenerator,
-            validator);
+            validator,
+            formatter);
     }
 
     public QueryGenerationResult Generate( IReadOnlyList<QueryMetadata> queries, QueryGenerationOptions options)
@@ -177,6 +180,11 @@ public sealed class QueryGenerator(
     public IReadOnlyList<ValidationIssue> ValidateQueries(IReadOnlyList<QueryMetadata> queries)
     {
         return validator.Validate(queries);
+    }
+
+    public string FormatCode(string sourceCode)
+    {
+        return formatter.Format(sourceCode);
     }
 
     private static QueryGenerationStatistics CalculateStatistics(

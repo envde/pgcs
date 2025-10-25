@@ -58,6 +58,12 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
             {
                 var queryMetadata = AnalyzeQuery(block);
                 queries.Add(queryMetadata);
+                
+                // Собираем issues из QueryMetadata в общий список
+                if (queryMetadata.ValidationIssues is not null)
+                {
+                    Issues.AddRange(queryMetadata.ValidationIssues);
+                }
             }
             catch (Exception ex)
             {
@@ -66,7 +72,7 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
                     ? block.Substring(0, 150) + "..." 
                     : block;
                 
-                Issues.Add(new ValidationIssue
+                var issue = new ValidationIssue
                 {
                     Severity = ValidationSeverity.Error,
                     Code = "QUERY_PARSE_ERROR",
@@ -77,7 +83,9 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
                         ["Exception"] = ex.GetType().Name,
                         ["QueryPreview"] = preview
                     }
-                });
+                };
+                
+                Issues.Add(issue);
             }
         }
 
@@ -111,35 +119,73 @@ public sealed class QueryAnalyzer : IQueryAnalyzer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlQuery);
 
-        // Разделяем комментарии и сам SQL запрос
-        var (comments, query) = SqlQueryParser.SplitCommentsAndQuery(sqlQuery.AsSpan());
-        
-        // Парсим аннотации (-- name: MethodName :cardinality)
-        var annotation = ParseAnnotations(comments);
-        
-        // Определяем тип запроса (SELECT, INSERT, etc.)
-        var queryType = SqlQueryParser.DetermineQueryType(query);
-        
-        // Извлекаем параметры ($1, @param)
-        var parameters = ExtractParameters(query);
-        
-        // Определяем возвращаемый тип (для SELECT запросов)
-        var returnType = annotation.Cardinality is not ReturnCardinality.Exec 
-            ? InferReturnType(query) 
-            : null;
+        var localIssues = new List<ValidationIssue>();
 
-        return new QueryMetadata
+        try
         {
-            MethodName = annotation.Name,
-            SqlQuery = query,
-            QueryType = queryType,
-            ReturnCardinality = annotation.Cardinality,
-            Parameters = parameters,
-            ReturnType = returnType,
-            Summary = annotation.Summary,
-            ParameterDescriptions = annotation.ParameterDescriptions,
-            ReturnsDescription = annotation.Returns
-        };
+            // Разделяем комментарии и сам SQL запрос
+            var (comments, query) = SqlQueryParser.SplitCommentsAndQuery(sqlQuery.AsSpan());
+            
+            // Парсим аннотации (-- name: MethodName :cardinality)
+            var annotation = ParseAnnotations(comments);
+            
+            // Определяем тип запроса (SELECT, INSERT, etc.)
+            var queryType = SqlQueryParser.DetermineQueryType(query);
+            
+            // Извлекаем параметры ($1, @param)
+            var parameters = ExtractParameters(query);
+            
+            // Определяем возвращаемый тип (для SELECT запросов)
+            var returnType = annotation.Cardinality is not ReturnCardinality.Exec 
+                ? InferReturnType(query) 
+                : null;
+
+            return new QueryMetadata
+            {
+                MethodName = annotation.Name,
+                SqlQuery = query,
+                QueryType = queryType,
+                ReturnCardinality = annotation.Cardinality,
+                Parameters = parameters,
+                ReturnType = returnType,
+                Summary = annotation.Summary,
+                ParameterDescriptions = annotation.ParameterDescriptions,
+                ReturnsDescription = annotation.Returns,
+                ValidationIssues = localIssues.Count > 0 ? localIssues : null
+            };
+        }
+        catch (Exception ex)
+        {
+            // Добавляем ошибку в локальные issues
+            var preview = sqlQuery.Length > 150 
+                ? sqlQuery.Substring(0, 150) + "..." 
+                : sqlQuery;
+            
+            localIssues.Add(new ValidationIssue
+            {
+                Severity = ValidationSeverity.Error,
+                Code = "QUERY_PARSE_ERROR",
+                Message = $"Failed to parse query: {ex.Message}",
+                Location = preview,
+                Details = new Dictionary<string, string>
+                {
+                    ["Exception"] = ex.GetType().Name,
+                    ["QueryPreview"] = preview
+                }
+            });
+
+            // Возвращаем metadata с ошибкой
+            return new QueryMetadata
+            {
+                MethodName = "InvalidQuery",
+                SqlQuery = sqlQuery,
+                QueryType = QueryType.Select,
+                ReturnCardinality = ReturnCardinality.Exec,
+                Parameters = Array.Empty<QueryParameter>(),
+                ReturnType = null,
+                ValidationIssues = localIssues
+            };
+        }
     }
 
     /// <summary>
