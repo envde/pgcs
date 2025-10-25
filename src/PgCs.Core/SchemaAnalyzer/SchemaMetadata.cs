@@ -1,0 +1,66 @@
+using System.Reflection.Metadata;
+using PgCs.Core.SchemaAnalyzer.Definitions;
+using PgCs.Core.Validation;
+
+namespace PgCs.Core.SchemaAnalyzer;
+
+/// <summary>
+/// Полные метаданные схемы базы данных
+/// </summary>
+public sealed record SchemaMetadata
+{
+    /// <summary>
+    /// Список всех таблиц в схеме
+    /// </summary>
+    public required IReadOnlyList<TableDefinition> Tables { get; init; }
+    
+    /// <summary>
+    /// Список всех представлений (VIEW) в схеме
+    /// </summary>
+    public required IReadOnlyList<ViewDefinition> Views { get; init; }
+    
+    /// <summary>
+    /// Список всех пользовательских типов данных (ENUM, Composite, Domain, Range)
+    /// </summary>
+    public required IReadOnlyList<TypeDefinition> Types { get; init; }
+    
+    /// <summary>
+    /// Список всех функций и процедур в схеме
+    /// </summary>
+    public required IReadOnlyList<FunctionDefinition> Functions { get; init; }
+    
+    /// <summary>
+    /// Список всех индексов в схеме
+    /// </summary>
+    public required IReadOnlyList<IndexDefinition> Indexes { get; init; }
+    
+    /// <summary>
+    /// Список всех триггеров в схеме
+    /// </summary>
+    public required IReadOnlyList<TriggerDefinition> Triggers { get; init; }
+    
+    /// <summary>
+    /// Список всех ограничений целостности (constraints) в схеме
+    /// </summary>
+    public required IReadOnlyList<ConstraintDefinition> Constraints { get; init; }
+    
+    /// <summary>
+    /// Словарь комментариев к объектам базы данных (ключ: имя объекта, значение: комментарий)
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Comments { get; init; }
+    
+    /// <summary>
+    /// Warnings и errors собранные во время parsing schema
+    /// </summary>
+    public IReadOnlyList<ValidationIssue>? ValidationIssues { get; init; }
+    
+    /// <summary>
+    /// Путь к исходному файлу схемы (если анализировался файл или директория)
+    /// </summary>
+    public required string SourcePath { get; init; }
+
+    /// <summary>
+    /// Время анализа схемы (UTC)
+    /// </summary>
+    public DateTime AnalyzedAt { get; init; } = DateTime.UtcNow;
+}

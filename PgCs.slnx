@@ -7,11 +7,11 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/PgCs.Cli/PgCs.Cli.csproj" />
-    <Project Path="src/PgCs.Common/PgCs.Common.csproj" />
     <Project Path="src/PgCs.FileWriter/PgCs.FileWriter.csproj" />
     <Project Path="src/PgCs.QueryAnalyzer/PgCs.QueryAnalyzer.csproj" />
     <Project Path="src/PgCs.QueryGenerator/PgCs.QueryGenerator.csproj" />
     <Project Path="src/PgCs.SchemaGenerator/PgCs.SchemaGenerator.csproj" />
+    <Project Path="src\PgCs.Core\PgCs.Core.csproj" />
     <Project Path="src\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" />
   </Folder>
   <Folder Name="/tests/">
