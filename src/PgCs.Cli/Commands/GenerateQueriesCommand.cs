@@ -150,42 +150,10 @@ public sealed class GenerateQueriesCommand : BaseCommand
                 }
 
                 // Display validation issues if any
-                if (queryResult.Issues.Count > 0)
-                {
-                    Writer.WriteLine();
-                    Writer.Info($"Found {queryResult.Issues.Count} issue(s) during query analysis:");
-                    Writer.WriteLine();
-                    
-                    foreach (var issue in queryResult.Issues)
-                    {
-                        // Format message
-                        var message = $"[{issue.Code}] {issue.Message}";
-                        
-                        // Display based on severity
-                        if (issue.Severity == ValidationSeverity.Error)
-                        {
-                            Writer.Error($"ERROR: {message}");
-                        }
-                        else if (issue.Severity == ValidationSeverity.Warning)
-                        {
-                            Writer.Warning($"{message}");
-                        }
-                        else
-                        {
-                            Writer.Info($"{message}");
-                        }
-                        
-                        // Display location if available
-                        if (!string.IsNullOrEmpty(issue.Location))
-                        {
-                            var locationPreview = issue.Location.Length > 100 
-                                ? issue.Location.Substring(0, 100) + "..." 
-                                : issue.Location;
-                            Writer.Info($"  → {locationPreview}");
-                        }
-                    }
-                    Writer.WriteLine();
-                }
+                ValidationIssueDisplayHelper.DisplayValidationIssues(
+                    Writer, 
+                    queryResult.Issues, 
+                    "query analysis");
 
                 progress.Complete("Query generation");
 

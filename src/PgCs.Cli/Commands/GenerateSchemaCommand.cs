@@ -149,42 +149,10 @@ public sealed class GenerateSchemaCommand : BaseCommand
                 }
 
                 // Display validation issues if any
-                if (schemaResult.Issues.Count > 0)
-                {
-                    Writer.WriteLine();
-                    Writer.Info($"Found {schemaResult.Issues.Count} issue(s) during schema analysis:");
-                    Writer.WriteLine();
-                    
-                    foreach (var issue in schemaResult.Issues)
-                    {
-                        // Format message
-                        var message = $"[{issue.Code}] {issue.Message}";
-                        
-                        // Display based on severity
-                        if (issue.Severity == ValidationSeverity.Error)
-                        {
-                            Writer.Error($"ERROR: {message}");
-                        }
-                        else if (issue.Severity == ValidationSeverity.Warning)
-                        {
-                            Writer.Warning($"{message}");
-                        }
-                        else
-                        {
-                            Writer.Info($"{message}");
-                        }
-                        
-                        // Display location if available
-                        if (!string.IsNullOrEmpty(issue.Location))
-                        {
-                            var locationPreview = issue.Location.Length > 100 
-                                ? issue.Location.Substring(0, 100) + "..." 
-                                : issue.Location;
-                            Writer.Info($"  → {locationPreview}");
-                        }
-                    }
-                    Writer.WriteLine();
-                }
+                ValidationIssueDisplayHelper.DisplayValidationIssues(
+                    Writer, 
+                    schemaResult.Issues, 
+                    "schema analysis");
 
                 progress.Complete("Schema generation");
 

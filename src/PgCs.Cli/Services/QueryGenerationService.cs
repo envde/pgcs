@@ -1,5 +1,6 @@
 using PgCs.Cli.Configuration;
 using PgCs.Common.CodeGeneration;
+using PgCs.Common.Services;
 
 namespace PgCs.Cli.Services;
 
@@ -17,16 +18,6 @@ public sealed class QueryGenerationService
         int ModelsGenerated,
         IReadOnlyList<string> FilesCreated,
         IReadOnlyList<ValidationMessage> Issues
-    );
-
-    /// <summary>
-    /// Validation message (error or warning)
-    /// </summary>
-    public record ValidationMessage(
-        ValidationSeverity Severity,
-        string Code,
-        string Message,
-        string? Location
     );
 
     /// <summary>
