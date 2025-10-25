@@ -62,4 +62,12 @@ public static class TestFileHelper
     {
         return new TempSqlFile(content, prefix);
     }
+
+    /// <summary>
+    /// Создать временную директорию
+    /// </summary>
+    public static TempDirectory CreateTempDirectory(string? prefix = null)
+    {
+        return new TempDirectory(prefix);
+    }
 }

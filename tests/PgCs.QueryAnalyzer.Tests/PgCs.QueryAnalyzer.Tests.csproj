@@ -21,6 +21,7 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\PgCs.Common\PgCs.Common.csproj" />
       <ProjectReference Include="..\..\src\PgCs.QueryAnalyzer\PgCs.QueryAnalyzer.csproj" />
+      <ProjectReference Include="..\PgCs.Tests.Shared\PgCs.Tests.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>

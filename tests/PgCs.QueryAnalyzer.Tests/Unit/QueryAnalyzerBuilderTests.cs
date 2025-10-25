@@ -1,4 +1,5 @@
 using PgCs.QueryAnalyzer.Tests.Helpers;
+using SharedTestHelper = PgCs.Tests.Shared.Helpers.TestFileHelper;
 
 namespace PgCs.QueryAnalyzer.Tests.Unit;
 
@@ -21,19 +22,11 @@ public sealed class QueryAnalyzerBuilderTests
     public void FromFile_WithValidPath_AddsFile()
     {
         // Arrange
-        var tempFile = Path.GetTempFileName();
-        File.WriteAllText(tempFile, "-- @name: GetUser\nSELECT * FROM users;");
+        using var tempFile = SharedTestHelper.CreateTempFile("-- name: GetUser :one\nSELECT * FROM users;");
 
-        try
-        {
-            // Act & Assert
-            var builder = QueryAnalyzerBuilder.Create().FromFile(tempFile);
-            Assert.NotNull(builder);
-        }
-        finally
-        {
-            File.Delete(tempFile);
-        }
+        // Act & Assert
+        var builder = QueryAnalyzerBuilder.Create().FromFile(tempFile.Path);
+        Assert.NotNull(builder);
     }
 
     [Fact]
@@ -86,24 +79,13 @@ public sealed class QueryAnalyzerBuilderTests
     public void FromDirectory_WithValidDirectory_AddsAllSqlFiles()
     {
         // Arrange
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(tempDir);
-        
-        var file1 = Path.Combine(tempDir, "query1.sql");
-        var file2 = Path.Combine(tempDir, "query2.sql");
-        File.WriteAllText(file1, "-- @name: GetUser\nSELECT * FROM users;");
-        File.WriteAllText(file2, "-- @name: GetPost\nSELECT * FROM posts;");
+        using var tempDir = SharedTestHelper.CreateTempDirectory();
+        tempDir.CreateFile("query1.sql", "-- name: GetUser :one\nSELECT * FROM users;");
+        tempDir.CreateFile("query2.sql", "-- name: GetPost :one\nSELECT * FROM posts;");
 
-        try
-        {
-            // Act & Assert
-            var builder = QueryAnalyzerBuilder.Create().FromDirectory(tempDir);
-            Assert.NotNull(builder);
-        }
-        finally
-        {
-            Directory.Delete(tempDir, true);
-        }
+        // Act & Assert
+        var builder = QueryAnalyzerBuilder.Create().FromDirectory(tempDir.Path);
+        Assert.NotNull(builder);
     }
 
     [Fact]
