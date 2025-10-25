@@ -283,14 +283,35 @@ public sealed class QuerySyntaxBuilder(ITypeMapper typeMapper, INameConverter na
             ? queryMetadata.ReturnsDescription
             : GetDefaultReturnsDescription(queryMetadata.ReturnCardinality);
 
-        var returnsContent = new List<XmlNodeSyntax> { XmlText(XmlTextLiteral(returnsText)) };
+        // Разбиваем на строки для корректного форматирования XML
+        var returnsLines = returnsText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var returnsContent = new List<XmlNodeSyntax>();
+        
+        foreach (var line in returnsLines)
+        {
+            returnsContent.Add(XmlText(XmlTextLiteral(line.Trim())));
+            if (line != returnsLines.Last())
+            {
+                returnsContent.Add(XmlText(XmlTextNewLine(Environment.NewLine, continueXmlDocumentationComment: true)));
+            }
+        }
+        
         documentationElements.Add(XmlReturnsElement(returnsContent.ToArray()));
 
         // <remarks> - SQL запрос (если включено)
-        if (includeSqlInDocumentation && !string.IsNullOrWhiteSpace(queryMetadata.SqlQuery))
+        // НЕ включаем SQL в XML комментарии, т.к. он содержит $ которые ломают парсинг C#
+        // TODO: Найти способ безопасно включить SQL (возможно через отдельный файл документации)
+        if (false && includeSqlInDocumentation && !string.IsNullOrWhiteSpace(queryMetadata.SqlQuery))
         {
             var remarksContent = new List<XmlNodeSyntax>();
-            var remarksLines = queryMetadata.SqlQuery.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            
+            // Экранируем XML специальные символы: <, >, &, но оставляем $ и другие
+            var escapedSql = queryMetadata.SqlQuery
+                .Replace("&", "&amp;")
+                .Replace("<", "&lt;")
+                .Replace(">", "&gt;");
+            
+            var remarksLines = escapedSql.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             
             foreach (var line in remarksLines)
             {
@@ -304,7 +325,11 @@ public sealed class QuerySyntaxBuilder(ITypeMapper typeMapper, INameConverter na
             documentationElements.Add(XmlRemarksElement(remarksContent.ToArray()));
         }
 
-        return TriviaList(Trivia(DocumentationComment(documentationElements.ToArray())));
+        // Создаем trivia список с XML комментарием и переводом строки после
+        var triviaList = TriviaList(Trivia(DocumentationComment(documentationElements.ToArray())));
+        triviaList = triviaList.Add(CarriageReturnLineFeed);
+        
+        return triviaList;
     }
 
     /// <summary>

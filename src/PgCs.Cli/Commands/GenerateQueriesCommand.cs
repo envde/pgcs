@@ -128,15 +128,23 @@ public sealed class GenerateQueriesCommand : BaseCommand
 
             try
             {
-                progress.Step("Loading query file(s)");
-                progress.Step("Parsing SQL queries");
-                progress.Step("Generating repositories");
-                progress.Step("Generating models");
-                progress.Step("Writing output files");
-
                 // Use real query generation service
                 var queryService = new QueryGenerationService();
-                var queryResult = await queryService.GenerateAsync(config, context.GetCancellationToken());
+                var queryResult = await queryService.GenerateAsync(
+                    config, 
+                    context.GetCancellationToken(),
+                    progressMessage =>
+                    {
+                        // Map pipeline progress to our progress steps
+                        // Order matters! Check more specific patterns first
+                        if (progressMessage.StartsWith("Анализ SQL"))
+                            progress.Step("Parsing SQL queries");
+                        else if (progressMessage.StartsWith("Генерация C# репозитор"))
+                            progress.Step("Generating repositories");
+                        else if (progressMessage.StartsWith("Запись"))
+                            progress.Step("Writing output files");
+                        // Ignore intermediate status messages like "Проанализировано X запросов"
+                    });
 
                 stopwatch.Stop();
 

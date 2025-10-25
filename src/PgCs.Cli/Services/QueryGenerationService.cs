@@ -25,7 +25,8 @@ public sealed class QueryGenerationService
     /// </summary>
     public async Task<Result> GenerateAsync(
         PgCsConfiguration config,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<string>? progressCallback = null)
     {
         if (config.Queries is null)
         {
@@ -37,6 +38,12 @@ public sealed class QueryGenerationService
 
         // Create and configure pipeline
         var pipeline = CodeGenerationPipeline.Create();
+
+        // Configure progress callback
+        if (progressCallback != null)
+        {
+            pipeline.OnProgress(progressCallback);
+        }
 
         // Загружаем схему если она указана в конфигурации
         if (config.Schema is not null)
@@ -88,6 +95,14 @@ public sealed class QueryGenerationService
                    .UseRecords()
                    .WithXmlDocs()
                    .OverwriteFiles();
+        });
+
+        // Configure file writing options
+        pipeline.WithFileWriting(builder =>
+        {
+            builder.OutputTo(config.Queries.Output.Directory)
+                   .OverwriteExisting()
+                   .CreateDirectories();
         });
 
         // Disable schema generation for query-only pipeline

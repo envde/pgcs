@@ -331,12 +331,11 @@ public sealed class FileWriter : IWriter
     /// </summary>
     private static string GetTargetFilePath(GeneratedCode code, WriteOptions options)
     {
-        // Создаем путь на основе namespace и имени типа
-        var namespaceParts = code.Namespace.Split('.');
-        var relativePath = Path.Combine(namespaceParts);
+        // Просто используем OutputPath напрямую без создания подпапок из namespace
+        // Namespace уже используется в самом коде, не нужно дублировать в структуре папок
         var fileName = code.SuggestedFileName;
         
-        return Path.Combine(options.OutputPath, relativePath, fileName);
+        return Path.Combine(options.OutputPath, fileName);
     }
 
     /// <summary>

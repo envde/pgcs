@@ -128,14 +128,23 @@ public sealed class GenerateSchemaCommand : BaseCommand
 
             try
             {
-                progress.Step("Loading schema file(s)");
-                progress.Step("Analyzing database schema");
-                progress.Step("Generating C# classes");
-                progress.Step("Writing output files");
-
                 // Use real schema generation service
                 var schemaService = new SchemaGenerationService();
-                var schemaResult = await schemaService.GenerateAsync(config, context.GetCancellationToken());
+                var schemaResult = await schemaService.GenerateAsync(
+                    config, 
+                    context.GetCancellationToken(),
+                    progressMessage =>
+                    {
+                        // Map pipeline progress to our progress steps
+                        // Order matters! Check more specific patterns first
+                        if (progressMessage.StartsWith("Анализ схемы"))
+                            progress.Step("Analyzing database schema");
+                        else if (progressMessage.StartsWith("Генерация C#"))
+                            progress.Step("Generating C# classes");
+                        else if (progressMessage.StartsWith("Запись"))
+                            progress.Step("Writing output files");
+                        // Ignore intermediate status messages like "Проанализировано X таблиц"
+                    });
 
                 stopwatch.Stop();
 

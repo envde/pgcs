@@ -45,13 +45,12 @@ public sealed class QueryMethodGenerator(
         var parameters = BuildParameters(queryMetadata, options);
         var body = BuildMethodBody(queryMetadata, options);
 
+        // НЕ добавляем XML комментарии здесь - они добавятся в RepositoryGenerator
+        // Это нужно чтобы RepositoryGenerator мог корректно распарсить метод
         var method = MethodDeclaration(ParseTypeName(returnType), queryMetadata.MethodName + "Async")
             .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
             .AddParameterListParameters(parameters.ToArray())
-            .WithBody(body)
-            .WithLeadingTrivia(syntaxBuilder.CreateXmlComment(
-                $"Выполняет запрос: {queryMetadata.MethodName}",
-                options.IncludeSqlInDocumentation ? queryMetadata.SqlQuery : null));
+            .WithBody(body);
 
         return method;
     }
@@ -131,11 +130,22 @@ public sealed class QueryMethodGenerator(
         QueryMetadata queryMetadata,
         QueryGenerationOptions options)
     {
+        // Заменяем PostgreSQL placeholders ($name) на Npgsql placeholders (@name)
+        var npgsqlQuery = ConvertToNpgsqlPlaceholders(queryMetadata.SqlQuery);
+        
+        // Создаем verbatim string literal для многострочного SQL
+        var sqlLiteral = LiteralExpression(
+            SyntaxKind.StringLiteralExpression,
+            Token(
+                TriviaList(),
+                SyntaxKind.StringLiteralToken,
+                "@\"" + npgsqlQuery.Replace("\"", "\"\"") + "\"",
+                npgsqlQuery,
+                TriviaList()));
+        
         var arguments = new List<ArgumentSyntax>
         {
-            Argument(LiteralExpression(
-                SyntaxKind.StringLiteralExpression,
-                Literal(queryMetadata.SqlQuery))),
+            Argument(sqlLiteral),
             Argument(IdentifierName("connection"))
         };
 
@@ -154,6 +164,18 @@ public sealed class QueryMethodGenerator(
                         .WithInitializer(EqualsValueClause(initializer))))
             .WithAwaitKeyword(Token(SyntaxKind.AwaitKeyword))
             .WithUsingKeyword(Token(SyntaxKind.UsingKeyword));
+    }
+
+    /// <summary>
+    /// Конвертирует PostgreSQL placeholders ($name) в Npgsql placeholders (@name)
+    /// </summary>
+    private static string ConvertToNpgsqlPlaceholders(string sqlQuery)
+    {
+        // Заменяем $param на @param
+        return System.Text.RegularExpressions.Regex.Replace(
+            sqlQuery, 
+            @"\$(\w+)", 
+            "@$1");
     }
 
     /// <summary>
@@ -237,10 +259,8 @@ public sealed class QueryMethodGenerator(
                                 Argument(IdentifierName("cancellationToken"))))),
                 ReturnStatement(LiteralExpression(SyntaxKind.NullLiteralExpression)));
 
-            // return MapResult(reader);
-            yield return ReturnStatement(
-                InvocationExpression(IdentifierName($"MapTo{queryMetadata.ReturnType!.ModelName}"))
-                    .AddArgumentListArguments(Argument(IdentifierName("reader"))));
+            // return new Model { Prop1 = reader.GetString(0), ... };
+            yield return ReturnStatement(BuildResultMappingExpression(queryMetadata.ReturnType!));
         }
         else
         {
@@ -256,7 +276,7 @@ public sealed class QueryMethodGenerator(
                                             IdentifierName(queryMetadata.ReturnType!.ModelName)))
                                     .WithArgumentList(ArgumentList())))));
 
-            // while (await reader.ReadAsync(cancellationToken)) { result.Add(...); }
+            // while (await reader.ReadAsync(cancellationToken)) { result.Add(new Model { ... }); }
             yield return WhileStatement(
                 AwaitExpression(
                     InvocationExpression(
@@ -274,15 +294,96 @@ public sealed class QueryMethodGenerator(
                                 IdentifierName("result"),
                                 IdentifierName("Add")))
                             .AddArgumentListArguments(
-                                Argument(
-                                    InvocationExpression(
-                                        IdentifierName($"MapTo{queryMetadata.ReturnType.ModelName}"))
-                                        .AddArgumentListArguments(
-                                            Argument(IdentifierName("reader"))))))));
+                                Argument(BuildResultMappingExpression(queryMetadata.ReturnType))))));
 
             // return result;
             yield return ReturnStatement(IdentifierName("result"));
         }
+    }
+
+    /// <summary>
+    /// Создает expression для маппинга reader в объект результата
+    /// </summary>
+    private ExpressionSyntax BuildResultMappingExpression(ReturnTypeInfo returnType)
+    {
+        var initializers = new List<AssignmentExpressionSyntax>();
+        
+        for (var i = 0; i < returnType.Columns.Count; i++)
+        {
+            var column = returnType.Columns[i];
+            var propertyName = nameConverter.ToPropertyName(column.Name);
+            
+            // Создаем reader.GetXXX(i) или (reader.IsDBNull(i) ? null : reader.GetXXX(i))
+            ExpressionSyntax getterExpression;
+            var readerMethod = GetReaderMethod(column.CSharpType);
+            
+            var readerCall = InvocationExpression(
+                MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    IdentifierName("reader"),
+                    IdentifierName(readerMethod)))
+                .AddArgumentListArguments(
+                    Argument(LiteralExpression(
+                        SyntaxKind.NumericLiteralExpression,
+                        Literal(i))));
+
+            if (column.IsNullable)
+            {
+                // reader.IsDBNull(i) ? null : reader.GetXXX(i)
+                getterExpression = ConditionalExpression(
+                    InvocationExpression(
+                        MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            IdentifierName("reader"),
+                            IdentifierName("IsDBNull")))
+                        .AddArgumentListArguments(
+                            Argument(LiteralExpression(
+                                SyntaxKind.NumericLiteralExpression,
+                                Literal(i)))),
+                    LiteralExpression(SyntaxKind.NullLiteralExpression),
+                    readerCall);
+            }
+            else
+            {
+                getterExpression = readerCall;
+            }
+
+            initializers.Add(AssignmentExpression(
+                SyntaxKind.SimpleAssignmentExpression,
+                IdentifierName(propertyName),
+                getterExpression));
+        }
+
+        return ObjectCreationExpression(IdentifierName(returnType.ModelName))
+            .WithInitializer(
+                InitializerExpression(
+                    SyntaxKind.ObjectInitializerExpression,
+                    SeparatedList<ExpressionSyntax>(initializers)));
+    }
+
+    /// <summary>
+    /// Получает имя метода NpgsqlDataReader для чтения типа
+    /// </summary>
+    private static string GetReaderMethod(string csharpType)
+    {
+        return csharpType.TrimEnd('?') switch
+        {
+            "string" => "GetString",
+            "int" => "GetInt32",
+            "long" => "GetInt64",
+            "short" => "GetInt16",
+            "byte" => "GetByte",
+            "bool" => "GetBoolean",
+            "DateTime" => "GetDateTime",
+            "decimal" => "GetDecimal",
+            "double" => "GetDouble",
+            "float" => "GetFloat",
+            "Guid" => "GetGuid",
+            "byte[]" => "GetFieldValue<byte[]>",
+            "TimeSpan" => "GetFieldValue<TimeSpan>",
+            "DateTimeOffset" => "GetFieldValue<DateTimeOffset>",
+            _ => "GetFieldValue<" + csharpType.TrimEnd('?') + ">"
+        };
     }
 
     /// <summary>

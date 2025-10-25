@@ -1,13 +1,13 @@
 schema:
   input:
-    file: "src/PgCs.Cli/Examples/Sql/Schema/Schema.sql"
+    file: "/Users/valerijvorobev/Projects/pgcs/src/PgCs.Cli/Examples/Sql/Schema/schema_min.sql"
   output:
-    directory: "src/PgCs.Cli/Examples/Generated/Models"
+    directory: "/Users/valerijvorobev/Projects/pgcs/src/PgCs.Cli/Examples/Generated/Models"
     namespace: "MyApp.Database.Models"
 
 queries:
   input:
-    file: "src/PgCs.Cli/Examples/Sql/Queries/Queries.sql"
+    file: "/Users/valerijvorobev/Projects/pgcs/src/PgCs.Cli/Examples/Sql/Queries/queries_mini.sql"
   output:
-    directory: "src/PgCs.Cli/Examples/Generated/Repositories"
-    namespace: "MyApp.Database.Repositories"
+    directory: "/Users/valerijvorobev/Projects/pgcs/src/PgCs.Cli/Examples/Generated/Repository"
+    namespace: "MyApp.Database.Repository"

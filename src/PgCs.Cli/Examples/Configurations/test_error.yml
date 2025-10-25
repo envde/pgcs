@@ -1,0 +1,6 @@
+schema:
+  input:
+    file: "nonexistent_file.sql"  # Этого файла не существует
+  output:
+    directory: "./Generated/Models"
+    namespace: "Generated.Models"

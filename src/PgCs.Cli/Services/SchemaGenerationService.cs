@@ -25,7 +25,8 @@ public sealed class SchemaGenerationService
     /// </summary>
     public async Task<Result> GenerateAsync(
         PgCsConfiguration config,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<string>? progressCallback = null)
     {
         if (config.Schema is null)
         {
@@ -48,6 +49,12 @@ public sealed class SchemaGenerationService
             pipeline.FromSchemaDirectory(config.Schema.Input.Directory);
         }
 
+        // Configure progress callback
+        if (progressCallback != null)
+        {
+            pipeline.OnProgress(progressCallback);
+        }
+
         // Configure schema generation options
         pipeline.WithSchemaGeneration(builder =>
         {
@@ -56,6 +63,14 @@ public sealed class SchemaGenerationService
                    .UseRecords()
                    .WithXmlDocs()
                    .OverwriteFiles();
+        });
+
+        // Configure file writing options
+        pipeline.WithFileWriting(builder =>
+        {
+            builder.OutputTo(config.Schema.Output.Directory)
+                   .OverwriteExisting()
+                   .CreateDirectories();
         });
 
         // Disable query generation for schema-only pipeline

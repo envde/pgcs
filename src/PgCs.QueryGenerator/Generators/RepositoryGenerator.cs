@@ -156,13 +156,15 @@ public sealed class RepositoryGenerator(
         var parsedMethod = ParseMemberDeclaration(methodResult.SourceCode) as MethodDeclarationSyntax;
         var body = parsedMethod?.Body ?? BuildFallbackMethodBody(queryMetadata);
 
+        var xmlComment = syntaxBuilder.CreateQueryMethodXmlComment(
+            queryMetadata,
+            options.IncludeSqlInDocumentation);
+
         return MethodDeclaration(ParseTypeName(returnType), queryMetadata.MethodName + "Async")
             .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
             .AddParameterListParameters(parameters.ToArray())
             .WithBody(body)
-            .WithLeadingTrivia(syntaxBuilder.CreateQueryMethodXmlComment(
-                queryMetadata,
-                options.IncludeSqlInDocumentation));
+            .WithLeadingTrivia(xmlComment);
     }
 
     /// <summary>

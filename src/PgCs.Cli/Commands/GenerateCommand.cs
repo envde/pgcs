@@ -142,13 +142,22 @@ public sealed class GenerateCommand : BaseCommand
 
                 try
                 {
-                    progress.Step("Loading schema file(s)");
-                    progress.Step("Analyzing database schema");
-                    progress.Step("Generating C# classes");
-                    progress.Step("Writing output files");
-
                     var schemaService = new SchemaGenerationService();
-                    var schemaResult = await schemaService.GenerateAsync(config, context.GetCancellationToken());
+                    var schemaResult = await schemaService.GenerateAsync(
+                        config, 
+                        context.GetCancellationToken(),
+                        progressMessage =>
+                        {
+                            // Map pipeline progress to our progress steps
+                            // Order matters! Check more specific patterns first
+                            if (progressMessage.StartsWith("Анализ схемы"))
+                                progress.Step("Analyzing database schema");
+                            else if (progressMessage.StartsWith("Генерация C#"))
+                                progress.Step("Generating C# classes");
+                            else if (progressMessage.StartsWith("Запись"))
+                                progress.Step("Writing output files");
+                            // Ignore intermediate status messages like "Проанализировано X таблиц"
+                        });
 
                     tablesGenerated = schemaResult.TablesGenerated;
                     enumsGenerated = schemaResult.EnumsGenerated;
@@ -186,14 +195,22 @@ public sealed class GenerateCommand : BaseCommand
 
                 try
                 {
-                    progress.Step("Loading query file(s)");
-                    progress.Step("Parsing SQL queries");
-                    progress.Step("Generating repositories");
-                    progress.Step("Generating models");
-                    progress.Step("Writing output files");
-
                     var queryService = new QueryGenerationService();
-                    var queryResult = await queryService.GenerateAsync(config, context.GetCancellationToken());
+                    var queryResult = await queryService.GenerateAsync(
+                        config, 
+                        context.GetCancellationToken(),
+                        progressMessage =>
+                        {
+                            // Map pipeline progress to our progress steps
+                            // Order matters! Check more specific patterns first
+                            if (progressMessage.StartsWith("Анализ SQL"))
+                                progress.Step("Parsing SQL queries");
+                            else if (progressMessage.StartsWith("Генерация C# репозитор"))
+                                progress.Step("Generating repositories");
+                            else if (progressMessage.StartsWith("Запись"))
+                                progress.Step("Writing output files");
+                            // Ignore intermediate status messages like "Проанализировано X запросов"
+                        });
 
                     repositoriesGenerated = queryResult.RepositoriesGenerated;
                     methodsGenerated = queryResult.MethodsGenerated;
