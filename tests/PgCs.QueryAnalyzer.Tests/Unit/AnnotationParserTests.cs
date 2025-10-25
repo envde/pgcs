@@ -57,10 +57,9 @@ public sealed class AnnotationParserTests
     [InlineData("SELECT * FROM users;")]
     public void Parse_InvalidFormat_ThrowsInvalidOperationException(string comment)
     {
-        // Act
-        // Assert
+        // Act & Assert
         var ex = Assert.Throws<InvalidOperationException>(() => AnnotationParser.Parse(comment));
-        Assert.Contains("аннотация формата", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Not found annotation", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -69,10 +68,9 @@ public sealed class AnnotationParserTests
     [InlineData("-- name: Query :insert")]
     public void Parse_InvalidCardinality_ThrowsInvalidOperationException(string comment)
     {
-        // Act
-        // Assert
+        // Act & Assert
         var ex = Assert.Throws<InvalidOperationException>(() => AnnotationParser.Parse(comment));
-        Assert.Contains("Неизвестная кардинальность", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Unknown cardinality", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

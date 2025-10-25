@@ -5,6 +5,7 @@ using PgCs.Common.SchemaAnalyzer.Models.Tables;
 using PgCs.Common.SchemaAnalyzer.Models.Triggers;
 using PgCs.Common.SchemaAnalyzer.Models.Types;
 using PgCs.Common.SchemaAnalyzer.Models.Views;
+using PgCs.Common.Utils;
 
 namespace PgCs.SchemaAnalyzer.Utils;
 
@@ -45,71 +46,15 @@ internal static class SchemaMerger
 
         return new SchemaMetadata
         {
-            Tables = DeduplicateTables(allTables),
-            Views = DeduplicateViews(allViews),
-            Types = DeduplicateTypes(allTypes),
-            Functions = DeduplicateFunctions(allFunctions),
-            Indexes = DeduplicateIndexes(allIndexes),
-            Triggers = DeduplicateTriggers(allTriggers),
-            Constraints = DeduplicateConstraints(allConstraints),
+            Tables = allTables.DeduplicateBy(t => new { t.Name, t.Schema }),
+            Views = allViews.DeduplicateBy(v => new { v.Name, v.Schema }),
+            Types = allTypes.DeduplicateBy(t => new { t.Name, t.Schema }),
+            Functions = allFunctions.DeduplicateBy(f => new { f.Name, f.Schema, ParameterCount = f.Parameters.Count }),
+            Indexes = allIndexes.DeduplicateBy(i => new { i.Name, i.Schema }),
+            Triggers = allTriggers.DeduplicateBy(t => new { t.Name, t.TableName, t.Schema }),
+            Constraints = allConstraints.DeduplicateBy(c => new { c.Name, c.TableName, c.Schema }),
             Comments = allComments.Count > 0 ? allComments : null,
             AnalyzedAt = DateTime.UtcNow
         };
-    }
-
-    private static IReadOnlyList<TableDefinition> DeduplicateTables(List<TableDefinition> tables)
-    {
-        return tables
-            .GroupBy(t => new { t.Name, t.Schema })
-            .Select(g => g.First())
-            .ToArray();
-    }
-
-    private static IReadOnlyList<ViewDefinition> DeduplicateViews(List<ViewDefinition> views)
-    {
-        return views
-            .GroupBy(v => new { v.Name, v.Schema })
-            .Select(g => g.First())
-            .ToArray();
-    }
-
-    private static IReadOnlyList<TypeDefinition> DeduplicateTypes(List<TypeDefinition> types)
-    {
-        return types
-            .GroupBy(t => new { t.Name, t.Schema })
-            .Select(g => g.First())
-            .ToArray();
-    }
-
-    private static IReadOnlyList<FunctionDefinition> DeduplicateFunctions(List<FunctionDefinition> functions)
-    {
-        return functions
-            .GroupBy(f => new { f.Name, f.Schema, ParameterCount = f.Parameters.Count })
-            .Select(g => g.First())
-            .ToArray();
-    }
-
-    private static IReadOnlyList<IndexDefinition> DeduplicateIndexes(List<IndexDefinition> indexes)
-    {
-        return indexes
-            .GroupBy(i => new { i.Name, i.Schema })
-            .Select(g => g.First())
-            .ToArray();
-    }
-
-    private static IReadOnlyList<TriggerDefinition> DeduplicateTriggers(List<TriggerDefinition> triggers)
-    {
-        return triggers
-            .GroupBy(t => new { t.Name, t.TableName, t.Schema })
-            .Select(g => g.First())
-            .ToArray();
-    }
-
-    private static IReadOnlyList<ConstraintDefinition> DeduplicateConstraints(List<ConstraintDefinition> constraints)
-    {
-        return constraints
-            .GroupBy(c => new { c.Name, c.TableName, c.Schema })
-            .Select(g => g.First())
-            .ToArray();
     }
 }

@@ -23,7 +23,7 @@ public sealed class CustomTypeGeneratorTests
         Assert.Single(result);
         var code = result.First().SourceCode;
         Assert.Contains("enum", code);
-        Assert.Contains("status", code); // Uses original DB name
+        Assert.Contains("Status", code); // Generator converts to PascalCase
     }
 
     [Fact]
@@ -57,8 +57,8 @@ public sealed class CustomTypeGeneratorTests
 
         // Assert
         var code = result.First().SourceCode;
-        // Generator uses original DB name for enum
-        Assert.Contains("user_account_status", code);
+        // Generator converts snake_case to PascalCase
+        Assert.Contains("UserAccountStatus", code);
     }
 
     [Fact]
