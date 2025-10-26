@@ -19,9 +19,19 @@ public sealed record SchemaMetadata
     public required IReadOnlyList<ViewDefinition> Views { get; init; }
     
     /// <summary>
-    /// Список всех пользовательских типов данных (ENUM, Composite, Domain, Range)
+    /// Список всех Enums
     /// </summary>
-    public required IReadOnlyList<TypeDefinition> Types { get; init; }
+    public required IReadOnlyList<EnumTypeDefinition> Enums { get; init; }
+    
+    /// <summary>
+    /// Список всех Composite Types
+    /// </summary>
+    public required IReadOnlyList<CompositeTypeDefinition> Composites { get; init; }
+    
+    /// <summary>
+    /// Список всех Domain Types
+    /// </summary>
+    public required IReadOnlyList<DomainTypeDefinition> Domains { get; init; }
     
     /// <summary>
     /// Список всех функций и процедур в схеме

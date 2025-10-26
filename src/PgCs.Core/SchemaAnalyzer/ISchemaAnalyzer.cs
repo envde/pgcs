@@ -41,11 +41,25 @@ public interface ISchemaAnalyzer
     IReadOnlyList<ViewDefinition> ExtractViews(string sqlScript);
 
     /// <summary>
-    /// Извлекает определения пользовательских типов (ENUM, DOMAIN, COMPOSITE)
+    /// Извлекает определения Enum Types
     /// </summary>
     /// <param name="sqlScript">SQL скрипт</param>
     /// <returns>Список определений типов</returns>
-    IReadOnlyList<TypeDefinition> ExtractTypes(string sqlScript);
+    IReadOnlyList<EnumTypeDefinition> ExtractEnums(string sqlScript);
+    
+    /// <summary>
+    /// Извлекает определения Domain Types
+    /// </summary>
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений типов</returns>
+    IReadOnlyList<DomainTypeDefinition> ExtractDomains(string sqlScript);
+    
+    /// <summary>
+    /// Извлекает определения Composite Types
+    /// </summary>
+    /// <param name="sqlScript">SQL скрипт</param>
+    /// <returns>Список определений типов</returns>
+    IReadOnlyList<CompositeTypeDefinition> ExtractComposites(string sqlScript);
 
     /// <summary>
     /// Извлекает определения функций и процедур

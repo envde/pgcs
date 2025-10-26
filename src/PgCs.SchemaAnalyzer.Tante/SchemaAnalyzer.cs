@@ -29,7 +29,17 @@ public class SchemaAnalyzer: ISchemaAnalyzer
         throw new NotImplementedException();
     }
 
-    public IReadOnlyList<TypeDefinition> ExtractTypes(string sqlScript)
+    public IReadOnlyList<EnumTypeDefinition> ExtractEnums(string sqlScript)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IReadOnlyList<DomainTypeDefinition> ExtractDomains(string sqlScript)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IReadOnlyList<CompositeTypeDefinition> ExtractComposites(string sqlScript)
     {
         throw new NotImplementedException();
     }

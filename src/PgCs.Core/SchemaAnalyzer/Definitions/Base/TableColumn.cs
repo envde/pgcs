@@ -1,9 +1,9 @@
-namespace PgCs.Core.SchemaAnalyzer.Definitions;
+namespace PgCs.Core.SchemaAnalyzer.Definitions.Base;
 
 /// <summary>
 /// Определение колонки таблицы
 /// </summary>
-public sealed record ColumnDefinition
+public sealed record TableColumn
 {
     /// <summary>
     /// Имя колонки

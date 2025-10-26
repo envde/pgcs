@@ -1,19 +1,12 @@
+using PgCs.Core.SchemaAnalyzer.Definitions.Base;
+
 namespace PgCs.Core.SchemaAnalyzer.Definitions;
 
 /// <summary>
 /// Определение представления (VIEW)
 /// </summary>
-public sealed record ViewDefinition
+public sealed record ViewDefinition: DefinitionBase
 {
-    /// <summary>
-    /// Имя представления
-    /// </summary>
-    public required string Name { get; init; }
-    
-    /// <summary>
-    /// Схема представления (если отличается от public)
-    /// </summary>
-    public string? Schema { get; init; }
     
     /// <summary>
     /// SQL запрос, определяющий представление
@@ -28,20 +21,10 @@ public sealed record ViewDefinition
     /// <summary>
     /// Список колонок представления
     /// </summary>
-    public IReadOnlyList<ColumnDefinition> Columns { get; init; } = [];
+    public IReadOnlyList<TableColumn> Columns { get; init; } = [];
     
     /// <summary>
     /// Список индексов (для материализованных представлений)
     /// </summary>
     public IReadOnlyList<IndexDefinition> Indexes { get; init; } = [];
-    
-    /// <summary>
-    /// Комментарий к представлению (COMMENT ON VIEW)
-    /// </summary>
-    public string? Comment { get; init; }
-    
-    /// <summary>
-    /// Исходный SQL код создания представления
-    /// </summary>
-    public string? RawSql { get; init; }
 }

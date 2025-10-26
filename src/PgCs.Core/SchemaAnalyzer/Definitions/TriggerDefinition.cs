@@ -5,12 +5,8 @@ namespace PgCs.Core.SchemaAnalyzer.Definitions;
 /// <summary>
 /// Определение триггера
 /// </summary>
-public sealed record TriggerDefinition
+public sealed record TriggerDefinition: DefinitionBase
 {
-    /// <summary>
-    /// Имя триггера
-    /// </summary>
-    public required string Name { get; init; }
     
     /// <summary>
     /// Время срабатывания триггера (Before, After, InsteadOf)
@@ -41,14 +37,4 @@ public sealed record TriggerDefinition
     /// Список колонок для UPDATE OF (только для UPDATE триггеров)
     /// </summary>
     public IReadOnlyList<string>? UpdateColumns { get; init; }
-    
-    /// <summary>
-    /// Комментарий к триггеру
-    /// </summary>
-    public string? Comment { get; init; }
-    
-    /// <summary>
-    /// Исходный SQL код создания триггера
-    /// </summary>
-    public string? RawSql { get; init; }
 }

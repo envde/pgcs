@@ -1,14 +1,12 @@
+using PgCs.Core.SchemaAnalyzer.Definitions.Base;
+
 namespace PgCs.Core.SchemaAnalyzer.Definitions;
 
 /// <summary>
 /// Определение партиции
 /// </summary>
-public sealed record PartitionDefinition
+public sealed record PartitionDefinition: DefinitionBase
 {
-    /// <summary>
-    /// Имя партиции
-    /// </summary>
-    public required string Name { get; init; }
     
     /// <summary>
     /// Начальное значение диапазона для RANGE партиции (FROM)

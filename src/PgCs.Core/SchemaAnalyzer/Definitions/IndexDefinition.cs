@@ -5,13 +5,8 @@ namespace PgCs.Core.SchemaAnalyzer.Definitions;
 /// <summary>
 /// Определение индекса
 /// </summary>
-public sealed record IndexDefinition
+public sealed record IndexDefinition: DefinitionBase
 {
-    /// <summary>
-    /// Имя индекса
-    /// </summary>
-    public required string Name { get; init; }
-    
     /// <summary>
     /// Список колонок, включенных в индекс
     /// </summary>
@@ -41,14 +36,4 @@ public sealed record IndexDefinition
     /// WHERE условие для частичного индекса
     /// </summary>
     public string? WhereClause { get; init; }
-    
-    /// <summary>
-    /// Комментарий к индексу
-    /// </summary>
-    public string? Comment { get; init; }
-    
-    /// <summary>
-    /// Исходный SQL код создания индекса
-    /// </summary>
-    public string? RawSql { get; init; }
 }

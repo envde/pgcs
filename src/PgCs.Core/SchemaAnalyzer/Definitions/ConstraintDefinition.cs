@@ -5,23 +5,8 @@ namespace PgCs.Core.SchemaAnalyzer.Definitions;
 /// <summary>
 /// Определение ограничения (constraint)
 /// </summary>
-public sealed record ConstraintDefinition
+public sealed record ConstraintDefinition: DefinitionBase
 {
-    /// <summary>
-    /// Имя ограничения
-    /// </summary>
-    public required string Name { get; init; }
-    
-    /// <summary>
-    /// Имя таблицы, к которой применяется ограничение
-    /// </summary>
-    public required string TableName { get; init; }
-    
-    /// <summary>
-    /// Схема таблицы (если отличается от public)
-    /// </summary>
-    public string? Schema { get; init; }
-    
     /// <summary>
     /// Тип ограничения (PrimaryKey, ForeignKey, Unique, Check, Exclude)
     /// </summary>
@@ -66,9 +51,4 @@ public sealed record ConstraintDefinition
     /// Отложено ли ограничение по умолчанию (INITIALLY DEFERRED)
     /// </summary>
     public bool IsInitiallyDeferred { get; init; }
-    
-    /// <summary>
-    /// Исходный SQL код определения ограничения
-    /// </summary>
-    public string? RawSql { get; init; }
 }
