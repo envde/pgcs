@@ -26,7 +26,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\PgCs.Core\PgCs.Core.csproj" />
-      <ProjectReference Include="..\..\src\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" />
+      <ProjectReference Include="..\..\src\PgCs.SchemaAnalyzer.Tante\PgCs.SchemaAnalyzer.Tante.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,5 +1,7 @@
 using System.Reflection.Metadata;
 using PgCs.Core.SchemaAnalyzer.Definitions;
+using PgCs.Core.SchemaAnalyzer.Metadata;
+using PgCs.Core.SchemaAnalyzer.Options;
 
 namespace PgCs.Core.SchemaAnalyzer;
 
@@ -9,15 +11,21 @@ public interface ISchemaAnalyzer
     /// Анализирует SQL файл схемы и извлекает все объекты базы данных
     /// </summary>
     /// <param name="schemaFilePath">Путь к SQL файлу со схемой</param>
+    /// <param name="options">Настройки фильтрации</param>
+    /// <param name="cancellationToken"></param>
     /// <returns>Метаданные схемы базы данных</returns>
-    ValueTask<SchemaMetadata> AnalyzeFileAsync(string schemaFilePath);
+    ValueTask<SchemaMetadata> AnalyzeFileAsync(string schemaFilePath, SchemaAnalysisOptions options,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Анализирует папку с SQL файлами схемы и объединяет их в единую схему
     /// </summary>
     /// <param name="schemaDirectoryPath">Путь к папке с SQL файлами</param>
+    /// <param name="options">Настройки фильтрации</param>
+    /// <param name="cancellationToken"></param>
     /// <returns>Объединённые метаданные схемы базы данных</returns>
-    ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath);
+    ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath, SchemaAnalysisOptions options,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Извлекает определения таблиц из SQL скрипта

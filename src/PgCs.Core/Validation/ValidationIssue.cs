@@ -9,6 +9,11 @@ public sealed record ValidationIssue
     /// Уровень серьезности проблемы
     /// </summary>
     public required ValidationSeverity Severity { get; init; }
+    
+    /// <summary>
+    /// Тип объекта в котором произошла ошибка
+    /// </summary>
+    public required ValidationDefinitionType DefinitionType { get; init; }
 
     /// <summary>
     /// Сообщение о проблеме
@@ -21,59 +26,14 @@ public sealed record ValidationIssue
     public required string Code { get; init; }
 
     /// <summary>
-    /// Местоположение проблемы (имя таблицы, столбца, запроса и т.д.)
+    /// Местоположение проблемы
     /// </summary>
-    public string? Location { get; init; }
+    public required ValidationLocation Location { get; init; }
 
     /// <summary>
     /// Дополнительные детали проблемы
     /// </summary>
     public IReadOnlyDictionary<string, string>? Details { get; init; }
-
-    /// <summary>
-    /// Создает ошибку валидации (Error)
-    /// </summary>
-    public static ValidationIssue Error(string code, string message, string? location = null, Dictionary<string, string>? details = null)
-    {
-        return new ValidationIssue
-        {
-            Severity = ValidationSeverity.Error,
-            Code = code,
-            Message = message,
-            Location = location,
-            Details = details
-        };
-    }
-
-    /// <summary>
-    /// Создает предупреждение валидации (Warning)
-    /// </summary>
-    public static ValidationIssue Warning(string code, string message, string? location = null, Dictionary<string, string>? details = null)
-    {
-        return new ValidationIssue
-        {
-            Severity = ValidationSeverity.Warning,
-            Code = code,
-            Message = message,
-            Location = location,
-            Details = details
-        };
-    }
-
-    /// <summary>
-    /// Создает информационное сообщение валидации (Info)
-    /// </summary>
-    public static ValidationIssue Info(string code, string message, string? location = null, Dictionary<string, string>? details = null)
-    {
-        return new ValidationIssue
-        {
-            Severity = ValidationSeverity.Info,
-            Code = code,
-            Message = message,
-            Location = location,
-            Details = details
-        };
-    }
     
     /// <summary>
     /// Уровень серьезности проблемы валидации
@@ -94,5 +54,130 @@ public sealed record ValidationIssue
         /// Ошибка (генерация должна быть прервана)
         /// </summary>
         Error
+    }
+
+    /// <summary>
+    /// Тип объекта, в котором произошла ошибка
+    /// </summary>
+    public enum ValidationDefinitionType
+    {
+        /// <summary>
+        /// Таблица
+        /// </summary>
+        Table,
+        /// <summary>
+        /// Представление
+        /// </summary>
+        View,
+        /// <summary>
+        /// Функция
+        /// </summary>
+        Function,
+        /// <summary>
+        /// Триггер
+        /// </summary>
+        Trigger,
+        /// <summary>
+        /// Ограничение
+        /// </summary>
+        Constraint,
+        /// <summary>
+        /// Индекс
+        /// </summary>
+        Index,
+        /// <summary>
+        /// Схема
+        /// </summary>
+        Schema,
+    }
+
+    /// <summary>
+    /// Локация проблемы
+    /// </summary>
+    public record ValidationLocation
+    {
+        /// <summary>
+        /// Путь к файлу
+        /// </summary>
+        public required string FilePath { get; init; }
+        /// <summary>
+        /// Сегмент кода в котором произошла ошибка
+        /// </summary>
+        public required string Segment { get; init; }
+        /// <summary>
+        /// Строка
+        /// </summary>
+        public required int Line { get; init; }
+        /// <summary>
+        /// Столбец
+        /// </summary>
+        public required int Column { get; init; }
+    }
+
+
+    /// <summary>
+    /// Создает ошибку валидации (Error)
+    /// </summary>
+    /// <param name="definitionType">Тип объекта, в котором произошла ошибка</param>
+    /// <param name="code">Код ошибка</param>
+    /// <param name="message">Сообщение</param>
+    /// <param name="location">Место положение ошибки</param>
+    /// <param name="details">Детали</param>
+    /// <returns></returns>
+    public static ValidationIssue Error(ValidationDefinitionType definitionType, string code, string message, ValidationLocation location, Dictionary<string, string>? details = null)
+    {
+        return new ValidationIssue
+        {
+            Severity = ValidationSeverity.Error,
+            DefinitionType = definitionType,
+            Code = code,
+            Message = message,
+            Location = location,
+            Details = details
+        };
+    }
+
+    /// <summary>
+    /// Создает предупреждение валидации (Warning)
+    /// </summary>
+    /// <param name="definitionType">Тип объекта, в котором произошла ошибка</param>
+    /// <param name="code">Код ошибка</param>
+    /// <param name="message">Сообщение</param>
+    /// <param name="location">Место положение ошибки</param>
+    /// <param name="details">Детали</param>
+    /// <returns></returns>
+    public static ValidationIssue Warning(ValidationDefinitionType definitionType, string code, string message, ValidationLocation location, Dictionary<string, string>? details = null)
+    {
+        return new ValidationIssue
+        {
+            Severity = ValidationSeverity.Warning,
+            DefinitionType = definitionType,
+            Code = code,
+            Message = message,
+            Location = location,
+            Details = details
+        };
+    }
+
+    /// <summary>
+    /// Создает информационное сообщение валидации (Info)
+    /// </summary>
+    /// <param name="definitionType">Тип объекта, в котором произошла ошибка</param>
+    /// <param name="code">Код ошибка</param>
+    /// <param name="message">Сообщение</param>
+    /// <param name="location">Место положение ошибки</param>
+    /// <param name="details">Детали</param>
+    /// <returns></returns>
+    public static ValidationIssue Info(ValidationDefinitionType definitionType,string code, string message, ValidationLocation location, Dictionary<string, string>? details = null)
+    {
+        return new ValidationIssue
+        {
+            Severity = ValidationSeverity.Info,
+            DefinitionType = definitionType,
+            Code = code,
+            Message = message,
+            Location = location,
+            Details = details
+        };
     }
 }

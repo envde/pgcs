@@ -2,7 +2,7 @@ using System.Reflection.Metadata;
 using PgCs.Core.SchemaAnalyzer.Definitions;
 using PgCs.Core.Validation;
 
-namespace PgCs.Core.SchemaAnalyzer;
+namespace PgCs.Core.SchemaAnalyzer.Metadata;
 
 /// <summary>
 /// Полные метаданные схемы базы данных
@@ -47,17 +47,17 @@ public sealed record SchemaMetadata
     /// <summary>
     /// Словарь комментариев к объектам базы данных (ключ: имя объекта, значение: комментарий)
     /// </summary>
-    public IReadOnlyDictionary<string, string>? Comments { get; init; }
+    public required IReadOnlyDictionary<string, string> Comments { get; init; }
     
     /// <summary>
     /// Warnings и errors собранные во время parsing schema
     /// </summary>
-    public IReadOnlyList<ValidationIssue>? ValidationIssues { get; init; }
+    public required IReadOnlyList<ValidationIssue> ValidationIssues { get; init; }
     
     /// <summary>
-    /// Путь к исходному файлу схемы (если анализировался файл или директория)
+    /// Путь к исходному файлу или файлам.
     /// </summary>
-    public required string SourcePath { get; init; }
+    public required IReadOnlyList<string> SourcePaths { get; init; }
 
     /// <summary>
     /// Время анализа схемы (UTC)

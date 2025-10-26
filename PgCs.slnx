@@ -12,7 +12,7 @@
     <Project Path="src/PgCs.QueryGenerator/PgCs.QueryGenerator.csproj" />
     <Project Path="src/PgCs.SchemaGenerator/PgCs.SchemaGenerator.csproj" />
     <Project Path="src\PgCs.Core\PgCs.Core.csproj" />
-    <Project Path="src\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" />
+    <Project Path="src\PgCs.SchemaAnalyzer.Tante\PgCs.SchemaAnalyzer.Tante.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests\PgCs.Common.Tests\PgCs.Common.Tests.csproj" Type="Classic C#" />

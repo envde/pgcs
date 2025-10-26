@@ -50,5 +50,5 @@ public sealed record TableDefinition
     /// <summary>
     /// Исходный SQL код создания таблицы
     /// </summary>
-    public string? RawSql { get; init; }
+    public required string RawSql { get; init; }
 }
