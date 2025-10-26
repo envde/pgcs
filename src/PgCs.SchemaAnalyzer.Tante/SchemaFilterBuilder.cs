@@ -1,5 +1,5 @@
-using Microsoft.CodeAnalysis;
 using PgCs.Core.SchemaAnalyzer;
+using PgCs.Core.SchemaAnalyzer.Definitions.Base;
 using PgCs.Core.SchemaAnalyzer.Options;
 
 namespace PgCs.SchemaAnalyzer.Tante;
@@ -18,7 +18,6 @@ public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
     private HashSet<TypeKind>? _includedTypeKinds;
     private HashSet<SchemaAnalysisOptions.SchemaObjectType>? _objectsToAnalyze;
     private bool _excludeSystemObjects;
-    private int _dependencyDepth;
 
     private SchemaFilterBuilder() { }
 
@@ -58,7 +57,7 @@ public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
     /// </summary>
     public ISchemaFilterBuilder ExcludeTables(params string[] patterns)
     {
-        _excludeTablePatterns ??= new List<string>();
+        _excludeTablePatterns ??= [];
         _excludeTablePatterns.AddRange(patterns);
         return this;
     }
@@ -68,7 +67,7 @@ public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
     /// </summary>
     public ISchemaFilterBuilder IncludeOnlyTables(params string[] patterns)
     {
-        _includeTablePatterns ??= new List<string>();
+        _includeTablePatterns ??= [];
         _includeTablePatterns.AddRange(patterns);
         return this;
     }
@@ -78,7 +77,7 @@ public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
     /// </summary>
     public ISchemaFilterBuilder ExcludeViews(params string[] patterns)
     {
-        _excludeViewPatterns ??= new List<string>();
+        _excludeViewPatterns ??= [];
         _excludeViewPatterns.AddRange(patterns);
         return this;
     }
@@ -88,7 +87,7 @@ public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
     /// </summary>
     public ISchemaFilterBuilder IncludeOnlyViews(params string[] patterns)
     {
-        _includeViewPatterns ??= new List<string>();
+        _includeViewPatterns ??= [];
         _includeViewPatterns.AddRange(patterns);
         return this;
     }
@@ -158,15 +157,6 @@ public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
     }
 
     /// <summary>
-    /// Установить глубину анализа зависимостей
-    /// </summary>
-    public ISchemaFilterBuilder WithDependencyDepth(int depth)
-    {
-        _dependencyDepth = depth;
-        return this;
-    }
-
-    /// <summary>
     /// Построить объект настроек
     /// </summary>
     public SchemaAnalysisOptions Build()
@@ -182,7 +172,6 @@ public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
             IncludedTypeKinds = _includedTypeKinds,
             ObjectsToAnalyze = _objectsToAnalyze,
             ExcludeSystemObjects = _excludeSystemObjects,
-            DependencyDepth = _dependencyDepth
         };
     }
 }

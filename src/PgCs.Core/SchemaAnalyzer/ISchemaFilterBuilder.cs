@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+using PgCs.Core.SchemaAnalyzer.Definitions.Base;
 using PgCs.Core.SchemaAnalyzer.Options;
 
 namespace PgCs.Core.SchemaAnalyzer;
@@ -62,11 +62,6 @@ public interface ISchemaFilterBuilder
     /// Анализировать только таблицы и представления
     /// </summary>
     ISchemaFilterBuilder OnlyTablesAndViews();
-
-    /// <summary>
-    /// Установить глубину анализа зависимостей
-    /// </summary>
-    ISchemaFilterBuilder WithDependencyDepth(int depth);
 
     /// <summary>
     /// Построить объект настроек

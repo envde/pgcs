@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+using PgCs.Core.SchemaAnalyzer.Definitions.Base;
 
 namespace PgCs.Core.SchemaAnalyzer.Options;
 

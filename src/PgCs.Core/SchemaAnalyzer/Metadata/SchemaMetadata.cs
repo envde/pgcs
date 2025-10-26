@@ -1,4 +1,3 @@
-using System.Reflection.Metadata;
 using PgCs.Core.SchemaAnalyzer.Definitions;
 using PgCs.Core.Validation;
 
