@@ -1,6 +1,6 @@
 using PgCs.Core.SchemaAnalyzer.Definitions.Base;
 
-namespace PgCs.Core.SchemaAnalyzer.Options;
+namespace PgCs.Core.SchemaAnalyzer;
 
 /// <summary>
 /// Настройки для анализа схемы базы данных
@@ -61,6 +61,26 @@ public sealed record SchemaAnalysisOptions
     /// Настройки по умолчанию (все объекты, все схемы)
     /// </summary>
     public static SchemaAnalysisOptions Default => new();
+    
+    /// <summary>
+    /// Строгий режим - генерировать ошибки для неизвестных блоков
+    /// </summary>
+    public bool StrictMode { get; init; } = false;
+    
+    /// <summary>
+    /// Включить парсинг комментариев
+    /// </summary>
+    public bool ParseComments { get; init; } = true;
+    
+    /// <summary>
+    /// Схемы для анализа (null = все схемы)
+    /// </summary>
+    public IReadOnlyList<string>? IncludeSchemas { get; init; }
+    
+    /// <summary>
+    /// Схемы для исключения
+    /// </summary>
+    public IReadOnlyList<string>? ExcludeSchemas { get; init; }
 
     /// <summary>
     /// Типы объектов базы данных для анализа

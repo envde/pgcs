@@ -1,6 +1,5 @@
 using PgCs.Core.SchemaAnalyzer;
 using PgCs.Core.SchemaAnalyzer.Definitions.Base;
-using PgCs.Core.SchemaAnalyzer.Options;
 
 namespace PgCs.SchemaAnalyzer.Tante;
 

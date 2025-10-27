@@ -1,20 +1,18 @@
+
+
 using PgCs.Core.SchemaAnalyzer;
 using PgCs.Core.SchemaAnalyzer.Definitions;
-using PgCs.Core.SchemaAnalyzer.Metadata;
-using PgCs.Core.SchemaAnalyzer.Options;
 
 namespace PgCs.SchemaAnalyzer.Tante;
 
-public class SchemaAnalyzer: ISchemaAnalyzer
+public class SchemaAnalyzer : ISchemaAnalyzer
 {
-    public async ValueTask<SchemaMetadata> AnalyzeFileAsync(string schemaFilePath, SchemaAnalysisOptions options,
-        CancellationToken cancellationToken = default)
+    public async ValueTask<SchemaMetadata> AnalyzeFileAsync(string schemaFilePath, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
     }
 
-    public async ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath, SchemaAnalysisOptions options,
-        CancellationToken cancellationToken = default)
+    public async ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
     }

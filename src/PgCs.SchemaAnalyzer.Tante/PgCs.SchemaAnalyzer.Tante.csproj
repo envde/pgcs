@@ -14,8 +14,4 @@
       <InternalsVisibleTo Include="PgCs.SchemaAnalyzer.Tests" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Extractors\" />
-    </ItemGroup>
-
 </Project>

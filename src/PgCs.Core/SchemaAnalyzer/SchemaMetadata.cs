@@ -1,7 +1,7 @@
 using PgCs.Core.SchemaAnalyzer.Definitions;
 using PgCs.Core.Validation;
 
-namespace PgCs.Core.SchemaAnalyzer.Metadata;
+namespace PgCs.Core.SchemaAnalyzer;
 
 /// <summary>
 /// Полные метаданные схемы базы данных
