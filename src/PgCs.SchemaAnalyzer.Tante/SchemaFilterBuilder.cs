@@ -1,5 +1,5 @@
-using PgCs.Core.Definitions.Schema.Base;
-using PgCs.Core.SchemaAnalyzer;
+using PgCs.Core.Schema.Analyzer;
+using PgCs.Core.Schema.Common;
 
 namespace PgCs.SchemaAnalyzer.Tante;
 
@@ -46,6 +46,11 @@ public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
     public ISchemaFilterBuilder ExcludeSystemObjects()
     {
         throw new NotImplementedException();
+    }
+
+    ISchemaFilterBuilder ISchemaFilterBuilder.WithObjects(params SchemaObjectType[] objectTypes)
+    {
+        return WithObjects(objectTypes);
     }
 
     public ISchemaFilterBuilder WithObjects(params SchemaObjectType[] objectTypes)
