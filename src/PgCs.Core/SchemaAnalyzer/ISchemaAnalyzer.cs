@@ -1,4 +1,4 @@
-using PgCs.Core.SchemaAnalyzer.Definitions;
+using PgCs.Core.Definitions.Schema;
 
 namespace PgCs.Core.SchemaAnalyzer;
 

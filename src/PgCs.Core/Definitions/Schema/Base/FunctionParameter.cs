@@ -1,4 +1,4 @@
-namespace PgCs.Core.SchemaAnalyzer.Definitions.Base;
+namespace PgCs.Core.Definitions.Schema.Base;
 
 /// <summary>
 /// Параметр функции

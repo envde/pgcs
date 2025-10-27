@@ -1,4 +1,4 @@
-using PgCs.Core.SchemaAnalyzer.Definitions.Base;
+using PgCs.Core.Definitions.Schema.Base;
 
 namespace PgCs.Core.SchemaAnalyzer;
 
@@ -50,7 +50,7 @@ public interface ISchemaFilterBuilder
     /// <summary>
     /// Указать, какие объекты анализировать
     /// </summary>
-    ISchemaFilterBuilder WithObjects(params SchemaAnalysisOptions.SchemaObjectType[] objectTypes);
+    ISchemaFilterBuilder WithObjects(params SchemaObjectType[] objectTypes);
 
     /// <summary>
     /// Анализировать только таблицы
@@ -63,7 +63,22 @@ public interface ISchemaFilterBuilder
     ISchemaFilterBuilder OnlyTablesAndViews();
 
     /// <summary>
-    /// Построить объект настроек
+    /// Установить максимальную глубину анализа зависимостей (0 = не анализировать)
     /// </summary>
-    SchemaAnalysisOptions Build();
+    ISchemaFilterBuilder WithDependencyDepth(int depth);
+
+    /// <summary>
+    /// Включить строгий режим - генерировать ошибки для неизвестных блоков
+    /// </summary>
+    ISchemaFilterBuilder WithStrictMode(bool enabled = true);
+
+    /// <summary>
+    /// Включить или отключить парсинг комментариев
+    /// </summary>
+    ISchemaFilterBuilder WithCommentParsing(bool enabled = true);
+
+    /// <summary>
+    /// Построить объект фильтра
+    /// </summary>
+    ISchemaFilter Build();
 }

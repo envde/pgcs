@@ -1,4 +1,4 @@
-namespace PgCs.Core.SchemaAnalyzer.Definitions.Base;
+namespace PgCs.Core.Definitions.Schema.Base;
 
 /// <summary>
 /// Волатильность функции (влияет на оптимизацию запросов и кэширование результатов)

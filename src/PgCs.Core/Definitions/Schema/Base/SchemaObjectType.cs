@@ -1,0 +1,47 @@
+namespace PgCs.Core.Definitions.Schema.Base;
+
+/// <summary>
+/// Типы объектов базы данных для анализа
+/// </summary>
+public enum SchemaObjectType
+{
+    /// <summary>
+    /// Не анализировать объекты
+    /// </summary>
+    None,
+    
+    /// <summary>
+    /// Таблицы
+    /// </summary>
+    Tables,
+    
+    /// <summary>
+    /// Представления (VIEW)
+    /// </summary>
+    Views,
+    
+    /// <summary>
+    /// Пользовательские типы данных
+    /// </summary>
+    Types,
+    
+    /// <summary>
+    /// Функции и процедуры
+    /// </summary>
+    Functions,
+    
+    /// <summary>
+    /// Индексы
+    /// </summary>
+    Indexes,
+    
+    /// <summary>
+    /// Триггеры
+    /// </summary>
+    Triggers,
+    
+    /// <summary>
+    /// Ограничения целостности (constraints)
+    /// </summary>
+    Constraints
+}

@@ -1,6 +1,6 @@
-using PgCs.Core.SchemaAnalyzer.Definitions.Base;
+using PgCs.Core.Definitions.Schema.Base;
 
-namespace PgCs.Core.SchemaAnalyzer.Definitions;
+namespace PgCs.Core.Definitions.Schema;
 
 /// <summary>
 /// Определение триггера

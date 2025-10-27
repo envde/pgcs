@@ -1,5 +1,5 @@
+using PgCs.Core.Definitions.Schema.Base;
 using PgCs.Core.SchemaAnalyzer;
-using PgCs.Core.SchemaAnalyzer.Definitions.Base;
 
 namespace PgCs.SchemaAnalyzer.Tante;
 
@@ -8,169 +8,78 @@ namespace PgCs.SchemaAnalyzer.Tante;
 /// </summary>
 public sealed class SchemaFilterBuilder : ISchemaFilterBuilder
 {
-    private HashSet<string>? _includedSchemas;
-    private HashSet<string>? _excludedSchemas;
-    private List<string>? _includeTablePatterns;
-    private List<string>? _excludeTablePatterns;
-    private List<string>? _includeViewPatterns;
-    private List<string>? _excludeViewPatterns;
-    private HashSet<TypeKind>? _includedTypeKinds;
-    private HashSet<SchemaAnalysisOptions.SchemaObjectType>? _objectsToAnalyze;
-    private bool _excludeSystemObjects;
-
-    private SchemaFilterBuilder() { }
-
-    /// <summary>
-    /// Создать новый билдер настроек
-    /// </summary>
-    public static ISchemaFilterBuilder Create() => new SchemaFilterBuilder();
-
-    /// <summary>
-    /// Исключить указанные схемы
-    /// </summary>
     public ISchemaFilterBuilder ExcludeSchemas(params string[] schemas)
     {
-        _excludedSchemas ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var schema in schemas)
-        {
-            _excludedSchemas.Add(schema);
-        }
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Включить только указанные схемы
-    /// </summary>
     public ISchemaFilterBuilder IncludeOnlySchemas(params string[] schemas)
     {
-        _includedSchemas ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var schema in schemas)
-        {
-            _includedSchemas.Add(schema);
-        }
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Исключить таблицы по regex паттернам
-    /// </summary>
     public ISchemaFilterBuilder ExcludeTables(params string[] patterns)
     {
-        _excludeTablePatterns ??= [];
-        _excludeTablePatterns.AddRange(patterns);
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Включить только таблицы, соответствующие паттернам
-    /// </summary>
     public ISchemaFilterBuilder IncludeOnlyTables(params string[] patterns)
     {
-        _includeTablePatterns ??= [];
-        _includeTablePatterns.AddRange(patterns);
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Исключить представления по regex паттернам
-    /// </summary>
     public ISchemaFilterBuilder ExcludeViews(params string[] patterns)
     {
-        _excludeViewPatterns ??= [];
-        _excludeViewPatterns.AddRange(patterns);
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Включить только представления, соответствующие паттернам
-    /// </summary>
     public ISchemaFilterBuilder IncludeOnlyViews(params string[] patterns)
     {
-        _includeViewPatterns ??= [];
-        _includeViewPatterns.AddRange(patterns);
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Включить только определённые виды типов
-    /// </summary>
     public ISchemaFilterBuilder IncludeOnlyTypes(params TypeKind[] kinds)
     {
-        _includedTypeKinds ??= new HashSet<TypeKind>();
-        foreach (var kind in kinds)
-        {
-            _includedTypeKinds.Add(kind);
-        }
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Исключить системные объекты (pg_catalog, information_schema и т.д.)
-    /// </summary>
     public ISchemaFilterBuilder ExcludeSystemObjects()
     {
-        _excludeSystemObjects = true;
-        ExcludeSchemas("pg_catalog", "information_schema", "pg_toast");
-        ExcludeTables("^pg_.*", "^sql_.*");
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Указать, какие объекты анализировать
-    /// </summary>
-    public ISchemaFilterBuilder WithObjects(params SchemaAnalysisOptions.SchemaObjectType[] objectTypes)
+    public ISchemaFilterBuilder WithObjects(params SchemaObjectType[] objectTypes)
     {
-        _objectsToAnalyze ??= new HashSet<SchemaAnalysisOptions.SchemaObjectType>();
-        foreach (var objectType in objectTypes)
-        {
-            if (objectType != SchemaAnalysisOptions.SchemaObjectType.None)
-            {
-                _objectsToAnalyze.Add(objectType);
-            }
-        }
-        return this;
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Анализировать только таблицы
-    /// </summary>
     public ISchemaFilterBuilder OnlyTables()
     {
-        return WithObjects(
-            SchemaAnalysisOptions.SchemaObjectType.Tables,
-            SchemaAnalysisOptions.SchemaObjectType.Indexes,
-            SchemaAnalysisOptions.SchemaObjectType.Constraints,
-            SchemaAnalysisOptions.SchemaObjectType.Triggers
-        );
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Анализировать только таблицы и представления
-    /// </summary>
     public ISchemaFilterBuilder OnlyTablesAndViews()
     {
-        return WithObjects(
-            SchemaAnalysisOptions.SchemaObjectType.Tables,
-            SchemaAnalysisOptions.SchemaObjectType.Views
-        );
+        throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Построить объект настроек
-    /// </summary>
-    public SchemaAnalysisOptions Build()
+    public ISchemaFilterBuilder WithDependencyDepth(int depth)
     {
-        return new SchemaAnalysisOptions
-        {
-            IncludedSchemas = _includedSchemas,
-            ExcludedSchemas = _excludedSchemas,
-            IncludeTablePatterns = _includeTablePatterns,
-            ExcludeTablePatterns = _excludeTablePatterns,
-            IncludeViewPatterns = _includeViewPatterns,
-            ExcludeViewPatterns = _excludeViewPatterns,
-            IncludedTypeKinds = _includedTypeKinds,
-            ObjectsToAnalyze = _objectsToAnalyze,
-            ExcludeSystemObjects = _excludeSystemObjects,
-        };
+        throw new NotImplementedException();
+    }
+
+    public ISchemaFilterBuilder WithStrictMode(bool enabled = true)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ISchemaFilterBuilder WithCommentParsing(bool enabled = true)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ISchemaFilter Build()
+    {
+        throw new NotImplementedException();
     }
 }

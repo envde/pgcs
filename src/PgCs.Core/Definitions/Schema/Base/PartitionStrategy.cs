@@ -1,4 +1,4 @@
-namespace PgCs.Core.SchemaAnalyzer.Definitions.Base;
+namespace PgCs.Core.Definitions.Schema.Base;
 
 /// <summary>
 /// Стратегия партиционирования таблицы для разделения данных на части
