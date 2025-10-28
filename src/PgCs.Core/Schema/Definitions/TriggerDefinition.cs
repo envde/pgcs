@@ -7,6 +7,10 @@ namespace PgCs.Core.Schema.Definitions;
 /// </summary>
 public sealed record TriggerDefinition: DefinitionBase
 {
+    /// <summary>
+    /// Имя триггера
+    /// </summary>
+    public required string Name { get; init; }
     
     /// <summary>
     /// Время срабатывания триггера (Before, After, InsteadOf)

@@ -65,12 +65,10 @@ CREATE TABLE users (
 
                         -- Имя пользователя
                        username VARCHAR(50) NOT NULL UNIQUE,
-                       -- Электронная почта
-                       email email NOT NULL UNIQUE,
-                       --- Хеш пароля
-                       password_hash VARCHAR(255) NOT NULL,
-                       full_name VARCHAR(255),
-                       status user_status NOT NULL DEFAULT 'active',
+                       email email NOT NULL UNIQUE, -- Электронная почта
+                       password_hash VARCHAR(255) NOT NULL, --- Хеш пароля
+                       full_name VARCHAR(255), -- Полное имя пользователя
+                       status user_status NOT NULL DEFAULT 'active', -- Статус аккаунта
 
     -- JSON данные для гибкости
                        preferences JSONB DEFAULT '{}',

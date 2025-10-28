@@ -8,6 +8,16 @@ namespace PgCs.Core.Schema.Definitions;
 public sealed record IndexDefinition: DefinitionBase
 {
     /// <summary>
+    /// Имя индекса
+    /// </summary>
+    public required string Name { get; init; }
+    
+    /// <summary>
+    /// Имя таблицы
+    /// </summary>
+    public required string TableName { get; init; }
+    
+    /// <summary>
     /// Список колонок, включенных в индекс
     /// </summary>
     public required IReadOnlyList<string> Columns { get; init; }

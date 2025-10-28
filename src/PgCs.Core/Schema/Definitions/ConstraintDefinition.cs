@@ -8,6 +8,13 @@ namespace PgCs.Core.Schema.Definitions;
 public sealed record ConstraintDefinition: DefinitionBase
 {
     /// <summary>
+    /// Имя ограничения
+    /// </summary>
+    public required string Name { get; init; }
+    
+    public required string TableName { get; init; }
+    
+    /// <summary>
     /// Тип ограничения (PrimaryKey, ForeignKey, Unique, Check, Exclude)
     /// </summary>
     public required ConstraintType Type { get; init; }

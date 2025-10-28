@@ -8,6 +8,11 @@ namespace PgCs.Core.Schema.Definitions;
 public sealed record FunctionDefinition: DefinitionBase
 {
     /// <summary>
+    /// Имя функции
+    /// </summary>
+    public required string Name { get; init; }
+    
+    /// <summary>
     /// Список параметров функции
     /// </summary>
     public required IReadOnlyList<FunctionParameter> Parameters { get; init; }

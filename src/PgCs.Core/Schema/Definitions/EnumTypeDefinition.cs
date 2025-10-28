@@ -7,5 +7,6 @@ namespace PgCs.Core.Schema.Definitions;
 /// </summary>
 public sealed record EnumTypeDefinition : DefinitionBase
 {
+    public required string Name { get; init; }
     public required IReadOnlyList<string> Values { get; init; }
 }

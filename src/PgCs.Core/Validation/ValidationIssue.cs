@@ -89,6 +89,22 @@ public sealed record ValidationIssue
         /// Схема
         /// </summary>
         Schema,
+        /// <summary>
+        /// ENUM тип
+        /// </summary>
+        Enum,
+        /// <summary>
+        /// Composite тип
+        /// </summary>
+        Composite,
+        /// <summary>
+        /// Domain тип
+        /// </summary>
+        Domain,
+        /// <summary>
+        /// Запрос
+        /// </summary>
+        Query,
     }
 
     /// <summary>
@@ -96,10 +112,6 @@ public sealed record ValidationIssue
     /// </summary>
     public record ValidationLocation
     {
-        /// <summary>
-        /// Путь к файлу
-        /// </summary>
-        public required string FilePath { get; init; }
         /// <summary>
         /// Сегмент кода в котором произошла ошибка
         /// </summary>

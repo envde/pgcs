@@ -8,6 +8,11 @@ namespace PgCs.Core.Schema.Definitions;
 public sealed record TableDefinition: DefinitionBase
 {
     /// <summary>
+    /// Имя таблицы
+    /// </summary>
+    public required string Name { get; init; }
+    
+    /// <summary>
     /// Список колонок таблицы
     /// </summary>
     public required IReadOnlyList<TableColumn> Columns { get; init; }

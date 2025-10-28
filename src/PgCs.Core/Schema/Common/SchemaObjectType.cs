@@ -31,6 +31,11 @@ public enum SchemaObjectType
     Functions,
     
     /// <summary>
+    /// Комментарий (COMMENT)
+    /// </summary>
+    Comments,
+    
+    /// <summary>
     /// Индексы
     /// </summary>
     Indexes,

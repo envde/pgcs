@@ -1,2 +1,1 @@
-﻿Console.WriteLine("Hello, World!");
-
+﻿Console.WriteLine("PgCs schema analyzer");

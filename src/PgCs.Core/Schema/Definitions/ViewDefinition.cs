@@ -7,6 +7,10 @@ namespace PgCs.Core.Schema.Definitions;
 /// </summary>
 public sealed record ViewDefinition: DefinitionBase
 {
+    /// <summary>
+    /// Имя представления
+    /// </summary>
+    public required string Name { get; init; }
     
     /// <summary>
     /// SQL запрос, определяющий представление

@@ -15,17 +15,17 @@ public class SchemaAnalyzer : ISchemaAnalyzer
         throw new NotImplementedException();
     }
 
+    public IReadOnlyList<EnumTypeDefinition> ExtractEnums(string sqlScript)
+    {
+        throw new NotImplementedException();
+    }
+
     public IReadOnlyList<TableDefinition> ExtractTables(string sqlScript)
     {
         throw new NotImplementedException();
     }
 
     public IReadOnlyList<ViewDefinition> ExtractViews(string sqlScript)
-    {
-        throw new NotImplementedException();
-    }
-
-    public IReadOnlyList<EnumTypeDefinition> ExtractEnums(string sqlScript)
     {
         throw new NotImplementedException();
     }
