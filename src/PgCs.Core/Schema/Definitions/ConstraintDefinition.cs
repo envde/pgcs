@@ -3,7 +3,8 @@ using PgCs.Core.Schema.Common;
 namespace PgCs.Core.Schema.Definitions;
 
 /// <summary>
-/// Определение ограничения (constraint)
+/// Определение ограничения целостности таблицы (CONSTRAINT)
+/// Включает PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, EXCLUDE
 /// </summary>
 public sealed record ConstraintDefinition: DefinitionBase
 {
@@ -12,6 +13,9 @@ public sealed record ConstraintDefinition: DefinitionBase
     /// </summary>
     public required string Name { get; init; }
     
+    /// <summary>
+    /// Имя таблицы, к которой применяется ограничение
+    /// </summary>
     public required string TableName { get; init; }
     
     /// <summary>

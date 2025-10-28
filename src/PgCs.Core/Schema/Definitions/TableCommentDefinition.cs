@@ -3,15 +3,17 @@ using PgCs.Core.Schema.Common;
 namespace PgCs.Core.Schema.Definitions;
 
 /// <summary>
-/// Определяет COMMENT для TABLE
+/// Определение комментария к таблице (COMMENT ON TABLE)
 /// </summary>
 public sealed record TableCommentDefinition : DefinitionBase
 {
-    
+    /// <summary>
+    /// Имя таблицы, к которой относится комментарий
+    /// </summary>
     public required string TableName { get; init; }
     
     /// <summary>
-    /// Комментарий PostgreSQL (COMMENT ON TABLE)
+    /// Текст комментария PostgreSQL (COMMENT ON TABLE)
     /// </summary>
-    public required string Comment { get; set; }
+    public required string Comment { get; init; }
 }

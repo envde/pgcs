@@ -3,7 +3,8 @@ using PgCs.Core.Schema.Common;
 namespace PgCs.Core.Schema.Definitions;
 
 /// <summary>
-/// Определение триггера
+/// Определение триггера базы данных (CREATE TRIGGER)
+/// Триггер автоматически выполняет функцию при наступлении определённых событий
 /// </summary>
 public sealed record TriggerDefinition: DefinitionBase
 {
@@ -11,6 +12,11 @@ public sealed record TriggerDefinition: DefinitionBase
     /// Имя триггера
     /// </summary>
     public required string Name { get; init; }
+    
+    /// <summary>
+    /// Имя таблицы или представления, на которое установлен триггер
+    /// </summary>
+    public required string TableName { get; init; }
     
     /// <summary>
     /// Время срабатывания триггера (Before, After, InsteadOf)

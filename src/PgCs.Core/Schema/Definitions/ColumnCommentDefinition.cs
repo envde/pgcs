@@ -3,20 +3,22 @@ using PgCs.Core.Schema.Common;
 namespace PgCs.Core.Schema.Definitions;
 
 /// <summary>
-/// Определяет COMMENT для COLUMN
+/// Определение комментария к колонке таблицы (COMMENT ON COLUMN)
 /// </summary>
 public sealed record ColumnCommentDefinition : DefinitionBase
 {
     /// <summary>
-    /// Название таблицы
+    /// Имя таблицы, к колонке которой относится комментарий
     /// </summary>
     public required string TableName { get; init; }
+    
     /// <summary>
-    /// Название колонки
+    /// Имя колонки, к которой относится комментарий
     /// </summary>
-    public required string ColumnName { get; set; }
+    public required string ColumnName { get; init; }
+    
     /// <summary>
-    /// Комментарий PostgreSQL (COMMENT ON COLUMN)
+    /// Текст комментария PostgreSQL (COMMENT ON COLUMN)
     /// </summary>
-    public required string Comment { get; set; }
+    public required string Comment { get; init; }
 }

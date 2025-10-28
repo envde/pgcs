@@ -3,14 +3,17 @@ using PgCs.Core.Schema.Common;
 namespace PgCs.Core.Schema.Definitions;
 
 /// <summary>
-/// Определение COMMENT для CONSTRAINT
+/// Определение комментария к ограничению целостности (COMMENT ON CONSTRAINT)
 /// </summary>
 public sealed record ConstraintCommentDefinition : DefinitionBase
 {
+    /// <summary>
+    /// Имя ограничения, к которому относится комментарий
+    /// </summary>
     public required string ConstraintName { get; init; }
     
     /// <summary>
-    /// Комментарий PostgreSQL (COMMENT ON CONSTRAINT)
+    /// Текст комментария PostgreSQL (COMMENT ON CONSTRAINT)
     /// </summary>
-    public required string Comment { get; set; }
+    public required string Comment { get; init; }
 }

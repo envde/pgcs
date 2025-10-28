@@ -3,14 +3,17 @@ using PgCs.Core.Schema.Common;
 namespace PgCs.Core.Schema.Definitions;
 
 /// <summary>
-/// Определение COMMENT для TYPE
+/// Определение комментария к композитному типу (COMMENT ON TYPE)
 /// </summary>
 public sealed record CompositeTypeCommentDefinition : DefinitionBase
 {
+    /// <summary>
+    /// Имя композитного типа, к которому относится комментарий
+    /// </summary>
     public required string CompositeTypeName { get; init; }
     
     /// <summary>
-    /// Комментарий PostgreSQL (COMMENT ON TYPE)
+    /// Текст комментария PostgreSQL (COMMENT ON TYPE)
     /// </summary>
-    public required string Comment { get; set; }
+    public required string Comment { get; init; }
 }

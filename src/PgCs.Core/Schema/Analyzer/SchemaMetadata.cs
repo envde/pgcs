@@ -78,10 +78,19 @@ public sealed record SchemaMetadata
     /// </summary>
     public required IReadOnlyList<IndexCommentDefinition> IndexComments { get; init; }
     
+    /// <summary>
+    /// Комментарии к триггерам
+    /// </summary>
     public required IReadOnlyList<TriggerCommentDefinition> TriggerComments { get; init; }
     
+    /// <summary>
+    /// Комментарии к функциям
+    /// </summary>
     public required IReadOnlyList<FunctionCommentDefinition> FunctionComments { get; init; }
     
+    /// <summary>
+    /// Комментарии к ограничениям целостности
+    /// </summary>
     public required IReadOnlyList<ConstraintCommentDefinition> ConstraintComments { get; init; }
     
     /// <summary>
