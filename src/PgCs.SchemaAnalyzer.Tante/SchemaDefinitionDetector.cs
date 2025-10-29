@@ -1,6 +1,4 @@
 using System.Text.RegularExpressions;
-using PgCs.Core.Extraction.Block;
-using PgCs.Core.Schema.Common;
 
 namespace PgCs.SchemaAnalyzer.Tante;
 
