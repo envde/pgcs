@@ -65,6 +65,8 @@ public sealed partial class CommentProcessor
 
         var codeBeforeComment = line[..match.Index];
         var comment = match.Groups[1].Value.Trim();
-        return (codeBeforeComment, comment);
+        
+        // Если после -- ничего нет, возвращаем null
+        return (codeBeforeComment, string.IsNullOrWhiteSpace(comment) ? null : comment);
     }
 }

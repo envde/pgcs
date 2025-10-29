@@ -111,10 +111,8 @@ public sealed class BlockExtractor : IBlockExtractor
         }
         else
         {
-            // Inline комментарий внутри блока
+            // Строка с комментарием внутри блока (полностью комментарий, не inline)
             accumulator.AddRawLine(line);
-            var commentText = _commentProcessor.ExtractCommentText(line);
-            accumulator.AddInlineComment(commentText);
         }
     }
 
@@ -142,8 +140,10 @@ public sealed class BlockExtractor : IBlockExtractor
         var (code, inlineComment) = _commentProcessor.SplitInlineComment(line);
         if (inlineComment is not null)
         {
+            // Вычисляем позицию ПЕРЕД добавлением строки в Content
+            var position = accumulator.CalculateCurrentPosition();
             accumulator.AddContentLine(code);
-            accumulator.AddInlineComment(inlineComment);
+            accumulator.AddInlineComment(position, code, inlineComment);
         }
         else
         {

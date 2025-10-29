@@ -9,7 +9,7 @@ public sealed class BlockAccumulator
     private readonly List<string> _contentLines = [];
     private readonly List<string> _rawLines = [];
     private readonly List<string> _headerComments = [];
-    private readonly Dictionary<int, string> _inlineComments = [];
+    private readonly List<InlineComment> _inlineComments = [];
     
     private int _startLine = -1;
 
@@ -65,13 +65,35 @@ public sealed class BlockAccumulator
     }
 
     /// <summary>
-    /// Добавляет inline комментарий на текущей позиции в коде.
-    /// Позиция рассчитывается автоматически на основе длины накопленного кода.
+    /// Добавляет inline комментарий на указанной позиции в коде.
     /// </summary>
-    public void AddInlineComment(string comment)
+    /// <param name="position">Позиция комментария в тексте Content</param>
+    /// <param name="codeBeforeComment">Код перед комментарием для извлечения ключа</param>
+    /// <param name="comment">Текст комментария</param>
+    public void AddInlineComment(int position, string codeBeforeComment, string comment)
     {
-        var position = CalculateCurrentPosition();
-        _inlineComments[position] = comment;
+        var key = ExtractKeyFromCode(codeBeforeComment);
+        _inlineComments.Add(new InlineComment
+        {
+            Key = key,
+            Comment = comment,
+            Position = position
+        });
+    }
+
+    /// <summary>
+    /// Извлекает ключ (имя поля, параметра) из кода перед комментарием.
+    /// </summary>
+    /// <param name="code">Код перед комментарием</param>
+    /// <returns>Последний идентификатор в коде</returns>
+    private static string ExtractKeyFromCode(string code)
+    {
+        // Убираем лишние пробелы и запятые в конце
+        var trimmed = code.Trim().TrimEnd(',', ' ', '\t');
+        
+        // Ищем последнее слово (идентификатор)
+        var parts = trimmed.Split([' ', '\t', '\n', '\r', ',', '(', ')'], StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 0 ? parts[^1] : trimmed;
     }
 
     /// <summary>
@@ -86,14 +108,24 @@ public sealed class BlockAccumulator
             : null;
 
         var content = string.Join(Environment.NewLine, _contentLines).Trim();
+        
+        // RawContent должен включать header комментарии, если они есть
         var rawContent = string.Join(Environment.NewLine, _rawLines).Trim();
+        if (headerComment is not null)
+        {
+            var headerLines = _headerComments.Select(c => $"-- {c}");
+            var headerBlock = string.Join(Environment.NewLine, headerLines);
+            rawContent = $"{headerBlock}{Environment.NewLine}{rawContent}";
+        }
 
         return new SqlBlock
         {
             Content = content,
             RawContent = rawContent,
             HeaderComment = headerComment,
-            InlineComments = _inlineComments.Count > 0 ? _inlineComments : null,
+            InlineComments = _inlineComments.Count > 0 
+                ? new List<InlineComment>(_inlineComments) 
+                : null,
             StartLine = _startLine,
             EndLine = endLine
         };

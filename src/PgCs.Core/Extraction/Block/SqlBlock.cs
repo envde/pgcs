@@ -30,7 +30,7 @@ public sealed record SqlBlock
     /// Inline-комментарии внутри блока.
     /// Ключ - позиция символа в Content, значение - текст комментария.
     /// </summary>
-    public IReadOnlyDictionary<int, string>? InlineComments { get; init; }
+    public IReadOnlyList<InlineComment>? InlineComments { get; init; }
 
     /// <summary>
     /// Номер строки начала блока в исходном файле (нумерация с 1).
