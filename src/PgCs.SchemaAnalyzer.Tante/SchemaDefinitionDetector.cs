@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using PgCs.Core.Schema.Common;
 
 namespace PgCs.SchemaAnalyzer.Tante;
 
@@ -8,169 +9,163 @@ namespace PgCs.SchemaAnalyzer.Tante;
 public static partial class SchemaDefinitionDetector
 {
     // ============================================================================
-    // CREATE TYPE
+    // Regex Patterns
     // ============================================================================
     
+    // CREATE TYPE / DOMAIN
     [GeneratedRegex(@"^\s*CREATE\s+TYPE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateTypePattern();
 
-    [GeneratedRegex(@"\s+AS\s+ENUM\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex EnumDefinitionPattern();
-
-    [GeneratedRegex(@"\s+AS\s*\([^)]*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CompositeTypePattern();
-
-    // ============================================================================
-    // CREATE DOMAIN
-    // ============================================================================
-    
     [GeneratedRegex(@"^\s*CREATE\s+DOMAIN\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateDomainPattern();
 
-    // ============================================================================
     // CREATE TABLE
-    // ============================================================================
-    
     [GeneratedRegex(@"^\s*CREATE\s+TABLE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateTablePattern();
 
-    [GeneratedRegex(@"\s+PARTITION\s+BY\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex PartitionedTablePattern();
-
-    [GeneratedRegex(@"^\s*CREATE\s+TABLE\s+\S+\s+PARTITION\s+OF\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex TablePartitionPattern();
-
-    // ============================================================================
-    // CREATE INDEX
-    // ============================================================================
-    
+    // CREATE INDEX (объединено: обычные и уникальные индексы)
     [GeneratedRegex(@"^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateIndexPattern();
 
-    [GeneratedRegex(@"^\s*CREATE\s+UNIQUE\s+INDEX\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex UniqueIndexPattern();
-
-    [GeneratedRegex(@"\s+USING\s+(BTREE|HASH|GIN|GIST|SPGIST|BRIN)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex IndexMethodPattern();
-
-    // ============================================================================
-    // CREATE VIEW
-    // ============================================================================
-    
-    [GeneratedRegex(@"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    // CREATE VIEW (объединено: обычные и материализованные)
+    [GeneratedRegex(@"^\s*CREATE\s+(?:MATERIALIZED\s+)?(?:OR\s+REPLACE\s+)?VIEW\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateViewPattern();
 
-    [GeneratedRegex(@"^\s*CREATE\s+MATERIALIZED\s+VIEW\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CreateMaterializedViewPattern();
-
-    // ============================================================================
-    // CREATE FUNCTION / PROCEDURE
-    // ============================================================================
-    
-    [GeneratedRegex(@"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    // CREATE FUNCTION/PROCEDURE (объединено)
+    [GeneratedRegex(@"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateFunctionPattern();
 
-    [GeneratedRegex(@"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?PROCEDURE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CreateProcedurePattern();
-
-    [GeneratedRegex(@"\s+RETURNS\s+TRIGGER\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex TriggerFunctionPattern();
-
-    [GeneratedRegex(@"\$\$\s+LANGUAGE\s+(\w+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex FunctionLanguagePattern();
-
-    // ============================================================================
     // CREATE TRIGGER
-    // ============================================================================
-    
     [GeneratedRegex(@"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateTriggerPattern();
 
-    [GeneratedRegex(@"\s+(BEFORE|AFTER|INSTEAD\s+OF)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex TriggerTimingPattern();
-
-    [GeneratedRegex(@"\s+(INSERT|UPDATE|DELETE|TRUNCATE)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex TriggerEventPattern();
-
-    // ============================================================================
-    // CREATE CONSTRAINT
-    // ============================================================================
-    
+    // ALTER TABLE ADD CONSTRAINT
     [GeneratedRegex(@"^\s*ALTER\s+TABLE\s+\S+\s+ADD\s+CONSTRAINT\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex AlterTableAddConstraintPattern();
 
-    [GeneratedRegex(@"\s+FOREIGN\s+KEY\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex ForeignKeyConstraintPattern();
+    // COMMENT ON (объединено в один паттерн)
+    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex CommentOnPattern();
 
-    [GeneratedRegex(@"\s+PRIMARY\s+KEY\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex PrimaryKeyConstraintPattern();
-
-    [GeneratedRegex(@"\s+CHECK\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CheckConstraintPattern();
-
-    [GeneratedRegex(@"\s+UNIQUE\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex UniqueConstraintPattern();
+    // Дополнительные паттерны для уточнения типа COMMENT ON
+    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+(TYPE|DOMAIN|TABLE|COLUMN|INDEX|VIEW|MATERIALIZED\s+VIEW|FUNCTION|PROCEDURE|TRIGGER|CONSTRAINT)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex CommentOnObjectTypePattern();
 
     // ============================================================================
-    // COMMENT ON
+    // Public API: Методы детектирования типа объекта
     // ============================================================================
-    
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+TYPE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentTypePattern();
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+DOMAIN\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnDomainPattern();
+    /// <summary>
+    /// Определяет тип объекта схемы PostgreSQL по SQL блоку
+    /// </summary>
+    /// <param name="sqlBlock">SQL блок для анализа</param>
+    /// <returns>Тип объекта схемы</returns>
+    public static SchemaObjectType DetectObjectType(string sqlBlock)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlBlock);
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+TABLE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnTablePattern();
+        // Порядок проверки важен: более специфичные паттерны проверяются первыми
+        
+        // COMMENT ON - самый приоритетный, так как относится к метаданным объектов
+        if (IsCommentOn(sqlBlock))
+            return SchemaObjectType.Comments;
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+COLUMN\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnColumnPattern();
+        // CREATE TABLE
+        if (IsCreateTable(sqlBlock))
+            return SchemaObjectType.Tables;
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+INDEX\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnIndexPattern();
+        // CREATE VIEW (включая материализованные)
+        if (IsCreateView(sqlBlock))
+            return SchemaObjectType.Views;
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+(?:MATERIALIZED\s+)?VIEW\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnViewPattern();
+        // CREATE TYPE или CREATE DOMAIN
+        if (IsCreateType(sqlBlock) || IsCreateDomain(sqlBlock))
+            return SchemaObjectType.Types;
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+FUNCTION\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnFunctionPattern();
+        // CREATE INDEX
+        if (IsCreateIndex(sqlBlock))
+            return SchemaObjectType.Indexes;
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+PROCEDURE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnProcedurePattern();
+        // CREATE FUNCTION/PROCEDURE
+        if (IsCreateFunction(sqlBlock))
+            return SchemaObjectType.Functions;
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+TRIGGER\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnTriggerPattern();
+        // CREATE TRIGGER
+        if (IsCreateTrigger(sqlBlock))
+            return SchemaObjectType.Triggers;
 
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+CONSTRAINT\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CommentOnConstraintPattern();
+        // ALTER TABLE ADD CONSTRAINT
+        if (IsAlterTableAddConstraint(sqlBlock))
+            return SchemaObjectType.Constraints;
+
+        return SchemaObjectType.None;
+    }
 
     // ============================================================================
-    // INSERT / UPDATE / DELETE (DML)
+    // Private: Методы проверки типа объекта
     // ============================================================================
-    
-    [GeneratedRegex(@"^\s*INSERT\s+INTO\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex InsertPattern();
 
-    [GeneratedRegex(@"^\s*UPDATE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex UpdatePattern();
+    /// <summary>
+    /// Проверяет, является ли блок определением TYPE (ENUM, композитный тип)
+    /// </summary>
+    private static bool IsCreateType(string sqlBlock)
+        => CreateTypePattern().IsMatch(sqlBlock);
 
-    [GeneratedRegex(@"^\s*DELETE\s+FROM\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex DeletePattern();
+    /// <summary>
+    /// Проверяет, является ли блок определением DOMAIN
+    /// </summary>
+    private static bool IsCreateDomain(string sqlBlock)
+        => CreateDomainPattern().IsMatch(sqlBlock);
 
-    // ============================================================================
-    // OTHER CREATE STATEMENTS
-    // ============================================================================
-    
-    [GeneratedRegex(@"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?SEQUENCE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CreateSequencePattern();
+    /// <summary>
+    /// Проверяет, является ли блок определением TABLE
+    /// </summary>
+    private static bool IsCreateTable(string sqlBlock)
+        => CreateTablePattern().IsMatch(sqlBlock);
 
-    [GeneratedRegex(@"^\s*CREATE\s+SCHEMA\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CreateSchemaPattern();
+    /// <summary>
+    /// Проверяет, является ли блок определением INDEX (включая UNIQUE)
+    /// </summary>
+    private static bool IsCreateIndex(string sqlBlock)
+        => CreateIndexPattern().IsMatch(sqlBlock);
 
-    [GeneratedRegex(@"^\s*CREATE\s+EXTENSION\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CreateExtensionPattern();
+    /// <summary>
+    /// Проверяет, является ли блок определением VIEW (включая MATERIALIZED VIEW)
+    /// </summary>
+    private static bool IsCreateView(string sqlBlock)
+        => CreateViewPattern().IsMatch(sqlBlock);
 
-    [GeneratedRegex(@"^\s*CREATE\s+(?:UNIQUE\s+)?(?:CONSTRAINT\s+)?(?:PRIMARY\s+KEY|FOREIGN\s+KEY|CHECK|UNIQUE)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex CreateConstraintPattern();
+    /// <summary>
+    /// Проверяет, является ли блок определением FUNCTION или PROCEDURE
+    /// </summary>
+    private static bool IsCreateFunction(string sqlBlock)
+        => CreateFunctionPattern().IsMatch(sqlBlock);
+
+    /// <summary>
+    /// Проверяет, является ли блок определением TRIGGER
+    /// </summary>
+    private static bool IsCreateTrigger(string sqlBlock)
+        => CreateTriggerPattern().IsMatch(sqlBlock);
+
+    /// <summary>
+    /// Проверяет, является ли блок командой ALTER TABLE ADD CONSTRAINT
+    /// </summary>
+    private static bool IsAlterTableAddConstraint(string sqlBlock)
+        => AlterTableAddConstraintPattern().IsMatch(sqlBlock);
+
+    /// <summary>
+    /// Проверяет, является ли блок комментарием COMMENT ON
+    /// </summary>
+    private static bool IsCommentOn(string sqlBlock)
+        => CommentOnPattern().IsMatch(sqlBlock);
+
+    /// <summary>
+    /// Извлекает тип объекта из команды COMMENT ON
+    /// Возвращает тип объекта (TYPE, TABLE, COLUMN и т.д.)
+    /// </summary>
+    public static string? ExtractCommentOnObjectType(string sqlBlock)
+    {
+        var match = CommentOnObjectTypePattern().Match(sqlBlock);
+        return match.Success ? match.Groups[1].Value.ToUpperInvariant() : null;
+    }
 }
