@@ -19,7 +19,8 @@ public interface ISchemaAnalyzer
     /// <param name="schemaDirectoryPath">Путь к папке с SQL файлами</param>
     /// <param name="cancellationToken"></param>
     /// <returns>Объединённые метаданные схемы базы данных</returns>
-    ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath, CancellationToken cancellationToken = default);
+    ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Извлекает определения таблиц из SQL скрипта
@@ -41,14 +42,14 @@ public interface ISchemaAnalyzer
     /// <param name="sqlScript">SQL скрипт</param>
     /// <returns>Список определений типов</returns>
     IReadOnlyList<EnumTypeDefinition> ExtractEnums(string sqlScript);
-    
+
     /// <summary>
     /// Извлекает определения Domain Types
     /// </summary>
     /// <param name="sqlScript">SQL скрипт</param>
     /// <returns>Список определений типов</returns>
     IReadOnlyList<DomainTypeDefinition> ExtractDomains(string sqlScript);
-    
+
     /// <summary>
     /// Извлекает определения Composite Types
     /// </summary>
