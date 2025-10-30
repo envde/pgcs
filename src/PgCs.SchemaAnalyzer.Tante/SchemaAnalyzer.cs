@@ -16,6 +16,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IEnumExtractor _enumExtractor;
     private readonly ICompositeExtractor _compositeExtractor;
     private readonly IDomainExtractor _domainExtractor;
+    private readonly ITableExtractor _tableExtractor;
+    private readonly IViewExtractor _viewExtractor;
 
     /// <summary>
     /// Создает новый экземпляр анализатора схемы с инжекцией зависимостей
@@ -24,17 +26,23 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IBlockExtractor blockExtractor,
         IEnumExtractor enumExtractor,
         ICompositeExtractor compositeExtractor,
-        IDomainExtractor domainExtractor)
+        IDomainExtractor domainExtractor,
+        ITableExtractor tableExtractor,
+        IViewExtractor viewExtractor)
     {
         ArgumentNullException.ThrowIfNull(blockExtractor);
         ArgumentNullException.ThrowIfNull(enumExtractor);
         ArgumentNullException.ThrowIfNull(compositeExtractor);
         ArgumentNullException.ThrowIfNull(domainExtractor);
+        ArgumentNullException.ThrowIfNull(tableExtractor);
+        ArgumentNullException.ThrowIfNull(viewExtractor);
         
         _blockExtractor = blockExtractor;
         _enumExtractor = enumExtractor;
         _compositeExtractor = compositeExtractor;
         _domainExtractor = domainExtractor;
+        _tableExtractor = tableExtractor;
+        _viewExtractor = viewExtractor;
     }
 
     /// <summary>
@@ -44,7 +52,9 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         new BlockExtractor(),
         new EnumExtractor(),
         new CompositeExtractor(),
-        new DomainExtractor())
+        new DomainExtractor(),
+        new TableExtractor(),
+        new ViewExtractor())
     {
     }
 
@@ -132,12 +142,50 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
     public IReadOnlyList<TableDefinition> ExtractTables(string sqlScript)
     {
-        throw new NotImplementedException();
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var tables = new List<TableDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_tableExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var tableDef = _tableExtractor.Extract(block);
+            if (tableDef is not null)
+            {
+                tables.Add(tableDef);
+            }
+        }
+
+        return tables;
     }
 
     public IReadOnlyList<ViewDefinition> ExtractViews(string sqlScript)
     {
-        throw new NotImplementedException();
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var views = new List<ViewDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_viewExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var viewDef = _viewExtractor.Extract(block);
+            if (viewDef is not null)
+            {
+                views.Add(viewDef);
+            }
+        }
+
+        return views;
     }
 
     public IReadOnlyList<DomainTypeDefinition> ExtractDomains(string sqlScript)
@@ -216,6 +264,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     /// <returns>Метаданные схемы базы данных</returns>
     private SchemaMetadata AnalyzeBlocks(IEnumerable<SqlBlock> blocks, IReadOnlyList<string> sourcePaths)
     {
+        var tables = new List<TableDefinition>();
+        var views = new List<ViewDefinition>();
         var enums = new List<EnumTypeDefinition>();
         var composites = new List<CompositeTypeDefinition>();
         var domains = new List<DomainTypeDefinition>();
@@ -227,6 +277,30 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
             switch (objectType)
             {
+                case SchemaObjectType.Tables:
+                    // Извлекаем таблицу
+                    if (_tableExtractor.CanExtract(block))
+                    {
+                        var tableDef = _tableExtractor.Extract(block);
+                        if (tableDef is not null)
+                        {
+                            tables.Add(tableDef);
+                        }
+                    }
+                    break;
+
+                case SchemaObjectType.Views:
+                    // Извлекаем представление
+                    if (_viewExtractor.CanExtract(block))
+                    {
+                        var viewDef = _viewExtractor.Extract(block);
+                        if (viewDef is not null)
+                        {
+                            views.Add(viewDef);
+                        }
+                    }
+                    break;
+
                 case SchemaObjectType.Types:
                     // Пытаемся извлечь ENUM
                     if (_enumExtractor.CanExtract(block))
@@ -258,8 +332,6 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     break;
 
                 // TODO: Добавить обработку других типов объектов
-                case SchemaObjectType.Tables:
-                case SchemaObjectType.Views:
                 case SchemaObjectType.Functions:
                 case SchemaObjectType.Indexes:
                 case SchemaObjectType.Triggers:
@@ -274,8 +346,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         return new SchemaMetadata
         {
-            Tables = [],
-            Views = [],
+            Tables = tables,
+            Views = views,
             Enums = enums,
             Composites = composites,
             Domains = domains,
