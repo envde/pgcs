@@ -1,7 +1,7 @@
 using PgCs.Core.Schema.Common;
 using PgCs.SchemaAnalyzer.Tante;
 
-namespace PgCs.SchemaAnalyzer.Tests.Unit;
+namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
 /// Тесты для SchemaDefinitionDetector - детектора типов объектов схемы
