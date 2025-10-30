@@ -25,9 +25,14 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\PgCs.Common\PgCs.Common.csproj" />
-      <ProjectReference Include="..\..\src\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" />
+      <ProjectReference Include="..\..\src\PgCs.Core\PgCs.Core.csproj" />
+      <ProjectReference Include="..\..\src\PgCs.SchemaAnalyzer.Tante\PgCs.SchemaAnalyzer.Tante.csproj" />
       <ProjectReference Include="..\..\src\PgCs.SchemaGenerator\PgCs.SchemaGenerator.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Helpers\" />
+      <Folder Include="Unit\" />
     </ItemGroup>
 
 </Project>

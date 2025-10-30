@@ -42,8 +42,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PgCs.Common\PgCs.Common.csproj" />
-    <ProjectReference Include="..\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" />
+    <ProjectReference Include="..\PgCs.Core\PgCs.Core.csproj" />
+    <ProjectReference Include="..\PgCs.SchemaAnalyzer.Tante\PgCs.SchemaAnalyzer.Tante.csproj" />
     <ProjectReference Include="..\PgCs.SchemaGenerator\PgCs.SchemaGenerator.csproj" />
     <ProjectReference Include="..\PgCs.QueryAnalyzer\PgCs.QueryAnalyzer.csproj" />
     <ProjectReference Include="..\PgCs.QueryGenerator\PgCs.QueryGenerator.csproj" />
@@ -55,11 +55,6 @@
     <None Update="Examples\**\*.yml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Examples\Generated\Models\" />
-    <Folder Include="Examples\Generated\Repository\" />
   </ItemGroup>
 
 </Project>

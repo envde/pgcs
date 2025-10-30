@@ -19,15 +19,15 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\PgCs.Common\PgCs.Common.csproj" />
+      <ProjectReference Include="..\..\src\PgCs.Core\PgCs.Core.csproj" />
       <ProjectReference Include="..\..\src\PgCs.QueryAnalyzer\PgCs.QueryAnalyzer.csproj" />
       <ProjectReference Include="..\PgCs.Tests.Shared\PgCs.Tests.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="TestData\Queries.sql">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
+      <Folder Include="Helpers\" />
+      <Folder Include="TestData\" />
+      <Folder Include="Unit\" />
     </ItemGroup>
 
 </Project>

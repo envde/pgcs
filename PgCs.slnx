@@ -1,11 +1,5 @@
 <Solution>
-  <Folder Name="/docs/">
-    <File Path="docs\EXAMPLES.md" />
-    <File Path="docs\INTEGRATION.md" />
-    <File Path="docs\IMPLEMENTATION.md" />
-    <File Path="docs\FLUENT_API_SUMMARY.md" />
-    <File Path="docs\FLUENT_API_EXAMPLES.md" />
-  </Folder>
+  <Folder Name="/docs/" />
   <Folder Name="/outline/">
     <File Path=".gitignore" />
     <File Path="NuGet.config" />
@@ -13,15 +7,15 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/PgCs.Cli/PgCs.Cli.csproj" />
-    <Project Path="src/PgCs.Common/PgCs.Common.csproj" />
     <Project Path="src/PgCs.FileWriter/PgCs.FileWriter.csproj" />
     <Project Path="src/PgCs.QueryAnalyzer/PgCs.QueryAnalyzer.csproj" />
     <Project Path="src/PgCs.QueryGenerator/PgCs.QueryGenerator.csproj" />
     <Project Path="src/PgCs.SchemaGenerator/PgCs.SchemaGenerator.csproj" />
-    <Project Path="src\PgCs.SchemaAnalyzer\PgCs.SchemaAnalyzer.csproj" />
+    <Project Path="src\PgCs.Core\PgCs.Core.csproj" />
+    <Project Path="src\PgCs.SchemaAnalyzer.Tante\PgCs.SchemaAnalyzer.Tante.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests\PgCs.Common.Tests\PgCs.Common.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\PgCs.Core.Tests\PgCs.Core.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\PgCs.QueryAnalyzer.Tests\PgCs.QueryAnalyzer.Tests.csproj" />
     <Project Path="tests\PgCs.QueryGenerator.Tests\PgCs.QueryGenerator.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\PgCs.SchemaAnalyzer.Tests\PgCs.SchemaAnalyzer.Tests.csproj" Type="Classic C#" />
