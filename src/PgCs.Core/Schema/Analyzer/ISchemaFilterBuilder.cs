@@ -63,11 +63,6 @@ public interface ISchemaFilterBuilder
     ISchemaFilterBuilder OnlyTablesAndViews();
 
     /// <summary>
-    /// Установить максимальную глубину анализа зависимостей (0 = не анализировать)
-    /// </summary>
-    ISchemaFilterBuilder WithDependencyDepth(int depth);
-
-    /// <summary>
     /// Включить строгий режим - генерировать ошибки для неизвестных блоков
     /// </summary>
     ISchemaFilterBuilder WithStrictMode(bool enabled = true);
