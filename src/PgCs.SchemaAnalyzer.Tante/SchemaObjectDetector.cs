@@ -6,7 +6,7 @@ namespace PgCs.SchemaAnalyzer.Tante;
 /// <summary>
 /// Детектор типа объекта схемы PostgreSQL по SQL блоку
 /// </summary>
-public static partial class SchemaDefinitionDetector
+public static partial class SchemaObjectDetector
 {
     // ============================================================================
     // Regex Patterns

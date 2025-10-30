@@ -1,12 +1,11 @@
 using PgCs.Core.Schema.Common;
-using PgCs.SchemaAnalyzer.Tante;
 
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
 /// Тесты для SchemaDefinitionDetector - детектора типов объектов схемы
 /// </summary>
-public sealed class SchemaDefinitionDetectorTests
+public sealed class SchemaObjectDetectorTests
 {
     [Theory]
     [InlineData("CREATE TYPE user_status AS ENUM ('active', 'inactive');", SchemaObjectType.Types)]
@@ -15,7 +14,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_CreateType_ReturnsTypes(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -27,7 +26,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_CreateTable_ReturnsTables(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -40,7 +39,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_CreateIndex_ReturnsIndexes(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -53,7 +52,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_CreateView_ReturnsViews(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -66,7 +65,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_CreateFunction_ReturnsFunctions(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -78,7 +77,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_CreateTrigger_ReturnsTriggers(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -90,7 +89,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_AlterTableAddConstraint_ReturnsConstraints(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -107,7 +106,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_CommentOn_ReturnsComments(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -121,7 +120,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_DmlStatements_ReturnsNone(string sql, SchemaObjectType expected)
     {
         // Act
-        var result = SchemaDefinitionDetector.DetectObjectType(sql);
+        var result = SchemaObjectDetector.DetectObjectType(sql);
 
         // Assert
         Assert.Equal(expected, result);
@@ -131,14 +130,14 @@ public sealed class SchemaDefinitionDetectorTests
     public void DetectObjectType_EmptyString_ThrowsArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => SchemaDefinitionDetector.DetectObjectType(""));
+        Assert.Throws<ArgumentException>(() => SchemaObjectDetector.DetectObjectType(""));
     }
 
     [Fact]
     public void DetectObjectType_WhitespaceOnly_ThrowsArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => SchemaDefinitionDetector.DetectObjectType("   \n\t  "));
+        Assert.Throws<ArgumentException>(() => SchemaObjectDetector.DetectObjectType("   \n\t  "));
     }
 
     [Theory]
@@ -154,7 +153,7 @@ public sealed class SchemaDefinitionDetectorTests
     public void ExtractCommentOnObjectType_ReturnsCorrectType(string sql, string expectedType)
     {
         // Act
-        var result = SchemaDefinitionDetector.ExtractCommentOnObjectType(sql);
+        var result = SchemaObjectDetector.ExtractCommentOnObjectType(sql);
 
         // Assert
         Assert.Equal(expectedType, result);
@@ -167,7 +166,7 @@ public sealed class SchemaDefinitionDetectorTests
         var sql = "CREATE TABLE users (id INT);";
 
         // Act
-        var result = SchemaDefinitionDetector.ExtractCommentOnObjectType(sql);
+        var result = SchemaObjectDetector.ExtractCommentOnObjectType(sql);
 
         // Assert
         Assert.Null(result);

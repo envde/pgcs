@@ -19,19 +19,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="TestData\**\*">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </Content>
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\..\src\PgCs.Core\PgCs.Core.csproj" />
       <ProjectReference Include="..\..\src\PgCs.SchemaAnalyzer.Tante\PgCs.SchemaAnalyzer.Tante.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Helpers\" />
-      <Folder Include="TestData\" />
       <Folder Include="Unit\" />
     </ItemGroup>
 
