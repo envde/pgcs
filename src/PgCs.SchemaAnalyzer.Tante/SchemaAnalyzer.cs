@@ -14,23 +14,37 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 {
     private readonly IBlockExtractor _blockExtractor;
     private readonly IEnumExtractor _enumExtractor;
+    private readonly ICompositeExtractor _compositeExtractor;
+    private readonly IDomainExtractor _domainExtractor;
 
     /// <summary>
     /// Создает новый экземпляр анализатора схемы с инжекцией зависимостей
     /// </summary>
-    public SchemaAnalyzer(IBlockExtractor blockExtractor, IEnumExtractor enumExtractor)
+    public SchemaAnalyzer(
+        IBlockExtractor blockExtractor,
+        IEnumExtractor enumExtractor,
+        ICompositeExtractor compositeExtractor,
+        IDomainExtractor domainExtractor)
     {
         ArgumentNullException.ThrowIfNull(blockExtractor);
         ArgumentNullException.ThrowIfNull(enumExtractor);
+        ArgumentNullException.ThrowIfNull(compositeExtractor);
+        ArgumentNullException.ThrowIfNull(domainExtractor);
         
         _blockExtractor = blockExtractor;
         _enumExtractor = enumExtractor;
+        _compositeExtractor = compositeExtractor;
+        _domainExtractor = domainExtractor;
     }
 
     /// <summary>
     /// Создает новый экземпляр анализатора схемы с реализациями по умолчанию
     /// </summary>
-    public SchemaAnalyzer() : this(new BlockExtractor(), new EnumExtractor())
+    public SchemaAnalyzer() : this(
+        new BlockExtractor(),
+        new EnumExtractor(),
+        new CompositeExtractor(),
+        new DomainExtractor())
     {
     }
 
@@ -128,12 +142,50 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
     public IReadOnlyList<DomainTypeDefinition> ExtractDomains(string sqlScript)
     {
-        throw new NotImplementedException();
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var domains = new List<DomainTypeDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_domainExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var domainDef = _domainExtractor.Extract(block);
+            if (domainDef is not null)
+            {
+                domains.Add(domainDef);
+            }
+        }
+
+        return domains;
     }
 
     public IReadOnlyList<CompositeTypeDefinition> ExtractComposites(string sqlScript)
     {
-        throw new NotImplementedException();
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var composites = new List<CompositeTypeDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_compositeExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var compositeDef = _compositeExtractor.Extract(block);
+            if (compositeDef is not null)
+            {
+                composites.Add(compositeDef);
+            }
+        }
+
+        return composites;
     }
 
     public IReadOnlyList<FunctionDefinition> ExtractFunctions(string sqlScript)
@@ -165,6 +217,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private SchemaMetadata AnalyzeBlocks(IEnumerable<SqlBlock> blocks, IReadOnlyList<string> sourcePaths)
     {
         var enums = new List<EnumTypeDefinition>();
+        var composites = new List<CompositeTypeDefinition>();
+        var domains = new List<DomainTypeDefinition>();
 
         foreach (var block in blocks)
         {
@@ -183,7 +237,24 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                             enums.Add(enumDef);
                         }
                     }
-                    // TODO: Добавить поддержку Composite и Domain типов
+                    // Пытаемся извлечь Composite
+                    else if (_compositeExtractor.CanExtract(block))
+                    {
+                        var compositeDef = _compositeExtractor.Extract(block);
+                        if (compositeDef is not null)
+                        {
+                            composites.Add(compositeDef);
+                        }
+                    }
+                    // Пытаемся извлечь Domain
+                    else if (_domainExtractor.CanExtract(block))
+                    {
+                        var domainDef = _domainExtractor.Extract(block);
+                        if (domainDef is not null)
+                        {
+                            domains.Add(domainDef);
+                        }
+                    }
                     break;
 
                 // TODO: Добавить обработку других типов объектов
@@ -206,8 +277,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Tables = [],
             Views = [],
             Enums = enums,
-            Composites = [],
-            Domains = [],
+            Composites = composites,
+            Domains = domains,
             Functions = [],
             Indexes = [],
             Triggers = [],

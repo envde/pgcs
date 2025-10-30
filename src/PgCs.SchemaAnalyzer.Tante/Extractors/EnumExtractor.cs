@@ -5,7 +5,7 @@ using PgCs.Core.Schema.Definitions;
 namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 
 /// <summary>
-/// Извлекатель определений ENUM типов из SQL блоков PostgreSQL.
+/// Экстрактор определений ENUM типов из SQL блоков PostgreSQL.
 /// <para>
 /// Поддерживает извлечение ENUM типов в формате:
 /// <code>
@@ -79,7 +79,7 @@ public sealed partial class EnumExtractor : IEnumExtractor
     /// <summary>
     /// Извлекает список значений ENUM из строки формата ('val1', 'val2', 'val3')
     /// </summary>
-    /// <param name="valuesText">Текст с значениями ENUM в кавычках</param>
+    /// <param name="valuesText">Текст со значениями ENUM в кавычках</param>
     /// <returns>Список значений ENUM в порядке определения</returns>
     private static IReadOnlyList<string> ExtractEnumValues(string valuesText)
     {
