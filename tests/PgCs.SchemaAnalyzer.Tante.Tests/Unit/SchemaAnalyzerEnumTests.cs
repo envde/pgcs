@@ -1,5 +1,3 @@
-using PgCs.SchemaAnalyzer.Tante;
-
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
