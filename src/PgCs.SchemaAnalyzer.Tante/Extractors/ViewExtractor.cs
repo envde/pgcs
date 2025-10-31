@@ -41,8 +41,8 @@ public sealed partial class ViewExtractor : IViewExtractor
     /// Группа: query - весь SELECT/WITH запрос до конца блока
     /// </summary>
     [GeneratedRegex(
-        @"AS\s+((?:WITH\s+.+?\s+)?SELECT\s+.+?)(?:;|\s*$)",
-        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
+        @"AS\s+((?:WITH\s+[\s\S]+?\s+)?SELECT[\s\S]+?)(?:;|\s*$)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex SelectQueryPattern();
 
@@ -79,8 +79,8 @@ public sealed partial class ViewExtractor : IViewExtractor
     /// Извлекает список колонок между SELECT и FROM
     /// </summary>
     [GeneratedRegex(
-        @"SELECT\s+(.*?)\s+FROM",
-        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
+        @"SELECT\s+([\s\S]*?)\s+FROM",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex SelectColumnsPattern();
 
@@ -89,24 +89,31 @@ public sealed partial class ViewExtractor : IViewExtractor
     // ============================================================================
 
     /// <inheritdoc />
-    public bool CanExtract(SqlBlock block)
+    public bool CanExtract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(blocks);
 
-        return CreateViewPattern().IsMatch(block.Content);
+        if (blocks.Count == 0)
+        {
+            return false;
+        }
+
+        // Проверяем первый блок на наличие VIEW
+        return CreateViewPattern().IsMatch(blocks[0].Content);
     }
 
     /// <inheritdoc />
-    public ViewDefinition? Extract(SqlBlock block)
+    public ViewDefinition? Extract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(blocks);
 
-        if (!CanExtract(block))
+        if (blocks.Count == 0 || !CanExtract(blocks))
         {
             return null;
         }
 
-        var match = CreateViewPattern().Match(block.Content);
+        var viewBlock = blocks[0];
+        var match = CreateViewPattern().Match(viewBlock.Content);
         if (!match.Success)
         {
             return null;
@@ -117,7 +124,7 @@ public sealed partial class ViewExtractor : IViewExtractor
         var isMaterialized = match.Groups[2].Success;
 
         // Извлечение SELECT запроса
-        var query = ExtractSelectQuery(block.Content);
+        var query = ExtractSelectQuery(viewBlock.Content);
         if (string.IsNullOrWhiteSpace(query))
         {
             // Если не удалось извлечь запрос, возвращаем null
@@ -125,18 +132,18 @@ public sealed partial class ViewExtractor : IViewExtractor
         }
 
         // Извлечение списка колонок (если указан явно)
-        var columnNames = ExtractColumnNames(block.Content);
+        var columnNames = ExtractColumnNames(viewBlock.Content);
 
-        // Если колонки не указаны явно, пытаемся извлечь их из SELECT запроса
+        // Если колонки не указаны явно, пытаемся извлечь их из SELECT запроса с использованием inline-комментариев
         var columns = columnNames is not null 
             ? CreateColumnsFromNames(columnNames) 
-            : ExtractColumnsFromSelect(query);
+            : ExtractColumnsFromSelect(query, viewBlock, blocks);
 
         // Извлечение WITH CHECK OPTION
-        var withCheckOption = WithCheckOptionPattern().IsMatch(block.Content);
+        var withCheckOption = WithCheckOptionPattern().IsMatch(viewBlock.Content);
 
         // Извлечение SECURITY BARRIER
-        var isSecurityBarrier = ExtractSecurityBarrier(block.Content);
+        var isSecurityBarrier = ExtractSecurityBarrier(viewBlock.Content);
 
         return new ViewDefinition
         {
@@ -148,8 +155,8 @@ public sealed partial class ViewExtractor : IViewExtractor
             Indexes = [],
             WithCheckOption = withCheckOption,
             IsSecurityBarrier = isSecurityBarrier,
-            SqlComment = block.HeaderComment,
-            RawSql = block.Content
+            SqlComment = viewBlock.HeaderComment,
+            RawSql = viewBlock.Content
         };
     }
 
@@ -239,9 +246,12 @@ public sealed partial class ViewExtractor : IViewExtractor
     }
 
     /// <summary>
-    /// Извлекает колонки из SELECT запроса
+    /// Извлекает колонки из SELECT запроса с учетом inline-комментариев и типов из таблиц
     /// </summary>
-    private static IReadOnlyList<TableColumn> ExtractColumnsFromSelect(string query)
+    private static IReadOnlyList<TableColumn> ExtractColumnsFromSelect(
+        string query, 
+        SqlBlock viewBlock, 
+        IReadOnlyList<SqlBlock> allBlocks)
     {
         var match = SelectColumnsPattern().Match(query);
         if (!match.Success)
@@ -264,19 +274,94 @@ public sealed partial class ViewExtractor : IViewExtractor
         // Простой парсер: разделяем по запятым (не учитывая запятые внутри функций)
         var columnParts = SplitColumns(columnsStr);
 
+        // Извлекаем таблицы из других блоков для получения типов
+        var tableExtractor = new TableExtractor();
+        var availableTables = new Dictionary<string, TableDefinition>();
+        
+        foreach (var block in allBlocks.Skip(1)) // Пропускаем первый блок (сам VIEW)
+        {
+            if (tableExtractor.CanExtract(block))
+            {
+                var table = tableExtractor.Extract(block);
+                if (table is not null)
+                {
+                    availableTables[table.Name.ToLowerInvariant()] = table;
+                }
+            }
+        }
+
         foreach (var part in columnParts)
         {
-            var columnName = ExtractColumnName(part.Trim());
-            if (!string.IsNullOrWhiteSpace(columnName))
+            var rawColumnExpression = part.Trim();
+            var columnName = ExtractColumnName(rawColumnExpression);
+            if (string.IsNullOrWhiteSpace(columnName))
             {
-                columns.Add(new TableColumn
-                {
-                    Name = columnName,
-                    DataType = "unknown", // Тип определяется из базовой таблицы
-                    IsNullable = true,
-                    OrdinalPosition = position++
-                });
+                continue;
             }
+
+            // Пытаемся найти inline-комментарий для этой колонки
+            // Нужно попробовать найти по полному выражению и по короткому имени
+            var inlineComment = FindInlineCommentForColumnExpression(viewBlock, rawColumnExpression, columnName);
+            var parsedComment = InlineCommentParser.Parse(inlineComment?.Comment);
+
+            string dataType = "unknown";
+            string? renameTo = null;
+            string? comment = null;
+            int? maxLength = null;
+            int? numericPrecision = null;
+            int? numericScale = null;
+            bool isArray = false;
+
+            if (parsedComment is not null)
+            {
+                // Если есть распарсенный комментарий с метаданными, используем его данные
+                dataType = parsedComment.DataType ?? "unknown";
+                renameTo = parsedComment.RenameTo;
+                comment = parsedComment.Comment;
+            }
+            else if (inlineComment is not null)
+            {
+                // Если inline-комментарий есть, но не содержит метаданных,
+                // используем его как обычный комментарий
+                comment = inlineComment.Comment;
+                // Пытаемся найти тип из таблицы
+                var sourceColumn = FindColumnFromTables(columnName, availableTables);
+                if (sourceColumn is not null)
+                {
+                    dataType = sourceColumn.DataType;
+                    maxLength = sourceColumn.MaxLength;
+                    numericPrecision = sourceColumn.NumericPrecision;
+                    numericScale = sourceColumn.NumericScale;
+                    isArray = sourceColumn.IsArray;
+                }
+            }
+            else
+            {
+                // Если комментария вообще нет, пытаемся найти тип из таблицы
+                var sourceColumn = FindColumnFromTables(columnName, availableTables);
+                if (sourceColumn is not null)
+                {
+                    dataType = sourceColumn.DataType;
+                    maxLength = sourceColumn.MaxLength;
+                    numericPrecision = sourceColumn.NumericPrecision;
+                    numericScale = sourceColumn.NumericScale;
+                    isArray = sourceColumn.IsArray;
+                }
+            }
+
+            columns.Add(new TableColumn
+            {
+                Name = columnName,
+                DataType = dataType,
+                ReName = renameTo,
+                Comment = comment,
+                IsNullable = true,
+                OrdinalPosition = position++,
+                MaxLength = maxLength,
+                NumericPrecision = numericPrecision,
+                NumericScale = numericScale,
+                IsArray = isArray
+            });
         }
 
         return columns;
@@ -355,10 +440,21 @@ public sealed partial class ViewExtractor : IViewExtractor
 
     /// <summary>
     /// Очищает имя колонки от кавычек и других символов
+    /// Также удаляет префикс таблицы/алиаса (например, "u.id" -> "id")
     /// </summary>
     private static string CleanColumnName(string name)
     {
-        return name.Trim().Trim('"', '\'', '`', '[', ']');
+        // Удаляем кавычки и скобки
+        var cleaned = name.Trim().Trim('"', '\'', '`', '[', ']');
+        
+        // Удаляем префикс таблицы/алиаса (все до последней точки)
+        var dotIndex = cleaned.LastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < cleaned.Length - 1)
+        {
+            cleaned = cleaned.Substring(dotIndex + 1);
+        }
+        
+        return cleaned;
     }
 
     /// <summary>
@@ -374,5 +470,68 @@ public sealed partial class ViewExtractor : IViewExtractor
         };
 
         return keywords.Contains(word);
+    }
+
+    /// <summary>
+    /// Ищет inline-комментарий для выражения колонки в блоке VIEW
+    /// Пытается найти комментарий по полному выражению (например, "u.id") или по короткому имени ("id")
+    /// </summary>
+    private static InlineComment? FindInlineCommentForColumnExpression(
+        SqlBlock viewBlock, 
+        string rawExpression, 
+        string cleanedColumnName)
+    {
+        if (viewBlock.InlineComments is null || viewBlock.InlineComments.Count == 0)
+        {
+            return null;
+        }
+
+        // Сначала пытаемся найти по полному выражению из кода (например, "u.id")
+        // Извлекаем последний идентификатор из rawExpression (это то, что BlockAccumulator использует как Key)
+        var key = ExtractKeyFromExpression(rawExpression);
+        
+        var comment = viewBlock.InlineComments
+            .FirstOrDefault(c => c.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+        
+        if (comment is not null)
+        {
+            return comment;
+        }
+
+        // Если не нашли, пробуем по очищенному имени колонки
+        return viewBlock.InlineComments
+            .FirstOrDefault(c => c.Key.Equals(cleanedColumnName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Извлекает ключ из выражения колонки (последний идентификатор)
+    /// Аналогично BlockAccumulator.ExtractKeyFromCode
+    /// </summary>
+    private static string ExtractKeyFromExpression(string expression)
+    {
+        var trimmed = expression.Trim().TrimEnd(',', ' ', '\t');
+        var parts = trimmed.Split([' ', '\t', '\n', '\r', ',', '(', ')'], StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 0 ? parts[^1] : trimmed;
+    }
+
+    /// <summary>
+    /// Ищет колонку в доступных таблицах
+    /// </summary>
+    private static TableColumn? FindColumnFromTables(
+        string columnName, 
+        Dictionary<string, TableDefinition> availableTables)
+    {
+        foreach (var table in availableTables.Values)
+        {
+            var column = table.Columns.FirstOrDefault(c => 
+                c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
+            
+            if (column is not null)
+            {
+                return column;
+            }
+        }
+
+        return null;
     }
 }

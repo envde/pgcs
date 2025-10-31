@@ -11,14 +11,14 @@ public interface IViewExtractor
     /// <summary>
     /// Извлекает определение представления из SQL блока
     /// </summary>
-    /// <param name="block">SQL блок с определением VIEW</param>
+    /// <param name="blocks">SQL блоки с определением VIEW и таблица для нее. Таблица нужна чтобы взять из нее типы данных для колонок View</param>
     /// <returns>Определение представления или null, если блок не содержит CREATE VIEW</returns>
-    ViewDefinition? Extract(SqlBlock block);
+    ViewDefinition? Extract(IReadOnlyList<SqlBlock> blocks);
     
     /// <summary>
     /// Проверяет, содержит ли блок определение представления
     /// </summary>
-    /// <param name="block">SQL блок для проверки</param>
+    /// <param name="blocks">SQL блоки для проверки</param>
     /// <returns>true, если блок содержит CREATE VIEW или CREATE MATERIALIZED VIEW</returns>
-    bool CanExtract(SqlBlock block);
+    bool CanExtract(IReadOnlyList<SqlBlock> blocks);
 }

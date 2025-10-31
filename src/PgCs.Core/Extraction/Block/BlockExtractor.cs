@@ -144,18 +144,26 @@ public sealed class BlockExtractor : IBlockExtractor
             var position = accumulator.CalculateCurrentPosition();
             accumulator.AddContentLine(code);
             accumulator.AddInlineComment(position, code, inlineComment);
+            
+            // Проверка завершения блока - используем код БЕЗ комментария
+            if (code.TrimEnd().EndsWith(';'))
+            {
+                blocks.Add(accumulator.BuildBlock(lineNumber));
+                accumulator.Reset();
+                state.ExitBlock();
+            }
         }
         else
         {
             accumulator.AddContentLine(line);
-        }
-
-        // Проверка завершения блока (точка с запятой в конце)
-        if (trimmed.EndsWith(";"))
-        {
-            blocks.Add(accumulator.BuildBlock(lineNumber));
-            accumulator.Reset();
-            state.ExitBlock();
+            
+            // Проверка завершения блока (точка с запятой в конце)
+            if (trimmed.EndsWith(";"))
+            {
+                blocks.Add(accumulator.BuildBlock(lineNumber));
+                accumulator.Reset();
+                state.ExitBlock();
+            }
         }
     }
 }

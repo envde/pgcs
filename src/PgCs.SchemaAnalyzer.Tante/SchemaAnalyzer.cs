@@ -168,17 +168,22 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
         
-        var blocks = _blockExtractor.Extract(sqlScript);
+        var blocks = _blockExtractor.Extract(sqlScript).ToList();
         var views = new List<ViewDefinition>();
 
-        foreach (var block in blocks)
+        for (int i = 0; i < blocks.Count; i++)
         {
-            if (!_viewExtractor.CanExtract(block))
+            var block = blocks[i];
+            
+            // Проверяем, содержит ли блок VIEW
+            if (!_viewExtractor.CanExtract([block]))
             {
                 continue;
             }
 
-            var viewDef = _viewExtractor.Extract(block);
+            // Передаем все блоки, начиная с текущего
+            var blocksToProcess = blocks.Skip(i).ToList();
+            var viewDef = _viewExtractor.Extract(blocksToProcess);
             if (viewDef is not null)
             {
                 views.Add(viewDef);
@@ -270,8 +275,12 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var composites = new List<CompositeTypeDefinition>();
         var domains = new List<DomainTypeDefinition>();
 
-        foreach (var block in blocks)
+        var blocksList = blocks.ToList();
+
+        for (int i = 0; i < blocksList.Count; i++)
         {
+            var block = blocksList[i];
+            
             // Определяем тип объекта в блоке
             var objectType = SchemaObjectDetector.DetectObjectType(block.Content);
 
@@ -290,10 +299,11 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     break;
 
                 case SchemaObjectType.Views:
-                    // Извлекаем представление
-                    if (_viewExtractor.CanExtract(block))
+                    // Извлекаем представление - передаем все блоки начиная с текущего
+                    if (_viewExtractor.CanExtract([block]))
                     {
-                        var viewDef = _viewExtractor.Extract(block);
+                        var blocksToProcess = blocksList.Skip(i).ToList();
+                        var viewDef = _viewExtractor.Extract(blocksToProcess);
                         if (viewDef is not null)
                         {
                             views.Add(viewDef);

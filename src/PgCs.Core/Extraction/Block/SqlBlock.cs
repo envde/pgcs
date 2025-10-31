@@ -29,6 +29,14 @@ public sealed record SqlBlock
     /// <summary>
     /// Inline-комментарии внутри блока.
     /// Ключ - позиция символа в Content, значение - текст комментария.
+    /// Поддерживает также служебные слова, например.
+    /// <code>
+    /// -- comment: Комментарий; type: BIGINT; rename: ID;
+    /// или
+    /// -- comment(Комментарий); type(BIGINT); rename(ID);
+    /// Где, comment - комментарий, type - тип данных, указанные пользователем, rename: переименованное
+    /// название параметра.
+    /// </code>
     /// </summary>
     public IReadOnlyList<InlineComment>? InlineComments { get; init; }
 

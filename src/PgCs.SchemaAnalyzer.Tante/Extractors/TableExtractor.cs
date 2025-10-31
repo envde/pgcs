@@ -400,13 +400,37 @@ public sealed partial class TableExtractor : ITableExtractor
         }
 
         var name = parts[0].Trim();
-        var dataType = parts[1].Trim();
-
+        
         // Проверка на ключевые слова (PRIMARY KEY, FOREIGN KEY и т.д.)
         if (IsKeyword(name))
         {
             return null;
         }
+
+        // Извлекаем тип данных - может состоять из нескольких частей (например, DECIMAL(10, 2))
+        // Собираем части до первого ключевого слова или до конца
+        var dataTypeBuilder = new System.Text.StringBuilder(parts[1]);
+        var typeEndIndex = 2;
+        for (int i = 2; i < parts.Length; i++)
+        {
+            var part = parts[i];
+            // Проверяем, является ли часть началом ключевого слова или модификатора
+            if (IsKeyword(part) || 
+                part.Equals("NOT", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("NULL", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("DEFAULT", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("REFERENCES", StringComparison.OrdinalIgnoreCase))
+            {
+                typeEndIndex = i;
+                break;
+            }
+            
+            // Добавляем часть к типу (нужно для DECIMAL(10, 2) где пробел разделяет 10, и 2))
+            dataTypeBuilder.Append(' ').Append(part);
+            typeEndIndex = i + 1;
+        }
+        
+        var dataType = dataTypeBuilder.ToString().Trim();
 
         // Извлечение параметров типа (VARCHAR(255), NUMERIC(12,2) и т.д.)
         var maxLength = ExtractMaxLength(dataType);

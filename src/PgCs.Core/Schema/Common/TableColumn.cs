@@ -11,6 +11,11 @@ public sealed record TableColumn
     public required string Name { get; init; }
     
     /// <summary>
+    /// Содержит переименованное название колонки, которое можно указать с помощью специального комментария
+    /// </summary>
+    public string? ReName { get; init; }
+    
+    /// <summary>
     /// Тип данных PostgreSQL (varchar, integer, timestamp, uuid и т.д.)
     /// </summary>
     public required string DataType { get; init; }
@@ -60,7 +65,7 @@ public sealed record TableColumn
     public int? NumericScale { get; init; }
     
     /// <summary>
-    /// Комментарий к колонке (COMMENT ON COLUMN)
+    /// Комментарий к колонке
     /// </summary>
     public string? Comment { get; init; }
     

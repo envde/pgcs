@@ -22,7 +22,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.CanExtract(block);
+        var result = _extractor.CanExtract([block]);
 
         // Assert
         Assert.True(result);
@@ -38,7 +38,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.CanExtract(block);
+        var result = _extractor.CanExtract([block]);
 
         // Assert
         Assert.True(result);
@@ -51,7 +51,7 @@ public sealed class ViewExtractorTests
         var block = CreateBlock("CREATE TABLE users (id SERIAL PRIMARY KEY);");
 
         // Act
-        var result = _extractor.CanExtract(block);
+        var result = _extractor.CanExtract([block]);
 
         // Assert
         Assert.False(result);
@@ -72,26 +72,19 @@ public sealed class ViewExtractorTests
     public void Extract_SimpleView_ReturnsValidDefinition()
     {
         // Arrange
-        // var block = CreateBlock(@"
-        //     CREATE VIEW active_users AS
-        //     SELECT id, username, email
-        //     FROM users
-        //     WHERE is_active = TRUE;
-        // ");
-        
         var bx = new BlockExtractor();
         var block = bx.Extract(@"
             CREATE VIEW active_users AS
             SELECT 
-                    id,
-                    username, 
-                    email
+                    id, -- comment: Идентификатор пользователя; type: INTEGER; rename: ID;
+                    username,  -- comment: Имя пользователя; type: VARCHAR(255);
+                    email -- Почтовый адрес
             FROM users
             WHERE is_active = TRUE;
         ").First();
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -103,7 +96,129 @@ public sealed class ViewExtractorTests
         Assert.Contains("SELECT", result.Query);
         Assert.Contains("FROM users", result.Query);
         
+        // Verify columns extracted from inline comments
         Assert.Equal(3, result.Columns.Count);
+        
+        // Column 1: id with full metadata
+        var idColumn = result.Columns[0];
+        Assert.Equal("id", idColumn.Name);
+        Assert.Equal("INTEGER", idColumn.DataType);
+        Assert.Equal("ID", idColumn.ReName);
+        Assert.Equal("Идентификатор пользователя", idColumn.Comment);
+        
+        // Column 2: username with type
+        var usernameColumn = result.Columns[1];
+        Assert.Equal("username", usernameColumn.Name);
+        Assert.Equal("VARCHAR(255)", usernameColumn.DataType);
+        Assert.Null(usernameColumn.ReName);
+        Assert.Equal("Имя пользователя", usernameColumn.Comment);
+        
+        // Column 3: email with a simple comment
+        var emailColumn = result.Columns[2];
+        Assert.Equal("email", emailColumn.Name);
+        Assert.Equal("unknown", emailColumn.DataType); // No type specified
+        Assert.Null(emailColumn.ReName);
+        Assert.Equal("Почтовый адрес", emailColumn.Comment);
+    }
+
+    [Fact]
+    public void Extract_ViewWithMultipleTablesInBlocks_ExtractsTypesFromTables()
+    {
+        // Arrange - создаем SQL с несколькими таблицами и VIEW
+        var bx = new BlockExtractor();
+        var allBlocks = bx.Extract(@"
+            -- Таблица пользователей
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(100) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
+            -- Таблица заказов
+            CREATE TABLE orders (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                order_number VARCHAR(50) NOT NULL,
+                total DECIMAL(10, 2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
+            -- VIEW объединяющий данные из обеих таблиц
+            CREATE VIEW user_order_summary AS
+            SELECT 
+                u.id,          -- Идентификатор пользователя
+                u.username,    -- Имя пользователя
+                u.email,       -- Почтовый адрес
+                o.order_number,-- Номер заказа
+                o.total,       -- Сумма заказа в долларах
+                o.status       -- Статус заказа
+            FROM users u
+            LEFT JOIN orders o ON u.id = o.user_id;
+        ").ToList();
+
+        // Проверяем, что получили 3 блока: users, orders, view
+        Assert.Equal(3, allBlocks.Count);
+        
+        // Переупорядочиваем блоки: VIEW должен быть первым, затем таблицы
+        // Это имитирует поведение SchemaAnalyzer, который передает блоки с помощью Skip(i).ToList()
+        var viewBlock = allBlocks[2]; // VIEW - третий блок
+        var tableBlocks = new[] { allBlocks[0], allBlocks[1] }; // users и orders
+        var blocks = new[] { viewBlock }.Concat(tableBlocks).ToList();
+
+        // Act - передаем блоки в ViewExtractor (VIEW первый, таблицы после)
+        var result = _extractor.Extract(blocks);
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("user_order_summary", result.Name);
+        Assert.False(result.IsMaterialized);
+        
+        // Проверяем, что извлечено 6 колонок
+        Assert.Equal(6, result.Columns.Count);
+        
+        // Проверяем id - должен быть SERIAL из users, с комментарием из VIEW
+        var idColumn = result.Columns.FirstOrDefault(c => c.Name == "id");
+        Assert.NotNull(idColumn);
+        Assert.Equal("SERIAL", idColumn.DataType.ToUpper());
+        Assert.Equal("Идентификатор пользователя", idColumn.Comment);
+        
+        // Проверяем username - должен быть VARCHAR(100)
+        var usernameColumn = result.Columns.FirstOrDefault(c => c.Name == "username");
+        Assert.NotNull(usernameColumn);
+        Assert.Equal("VARCHAR", usernameColumn.DataType.ToUpper());
+        Assert.Equal(100, usernameColumn.MaxLength);
+        Assert.Equal("Имя пользователя", usernameColumn.Comment);
+        
+        // Проверяем email - должен быть VARCHAR(255)
+        var emailColumn = result.Columns.FirstOrDefault(c => c.Name == "email");
+        Assert.NotNull(emailColumn);
+        Assert.Equal("VARCHAR", emailColumn.DataType.ToUpper());
+        Assert.Equal(255, emailColumn.MaxLength);
+        Assert.Equal("Почтовый адрес", emailColumn.Comment);
+        
+        // Проверяем order_number - должен быть VARCHAR(50)
+        var orderNumberColumn = result.Columns.FirstOrDefault(c => c.Name == "order_number");
+        Assert.NotNull(orderNumberColumn);
+        Assert.Equal("VARCHAR", orderNumberColumn.DataType.ToUpper());
+        Assert.Equal(50, orderNumberColumn.MaxLength);
+        Assert.Equal("Номер заказа", orderNumberColumn.Comment);
+        
+        // Проверяем total - должен быть DECIMAL(10, 2)
+        var totalColumn = result.Columns.FirstOrDefault(c => c.Name == "total");
+        Assert.NotNull(totalColumn);
+        Assert.Equal("DECIMAL", totalColumn.DataType.ToUpper());
+        Assert.Equal(10, totalColumn.NumericPrecision);
+        Assert.Equal(2, totalColumn.NumericScale);
+        Assert.Equal("Сумма заказа в долларах", totalColumn.Comment);
+        
+        // Проверяем status - должен быть VARCHAR(20)
+        var statusColumn = result.Columns.FirstOrDefault(c => c.Name == "status");
+        Assert.NotNull(statusColumn);
+        Assert.Equal("VARCHAR", statusColumn.DataType.ToUpper());
+        Assert.Equal(20, statusColumn.MaxLength);
+        Assert.Equal("Статус заказа", statusColumn.Comment);
     }
 
     [Fact]
@@ -116,7 +231,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -134,7 +249,7 @@ public sealed class ViewExtractorTests
         );
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -161,7 +276,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -181,7 +296,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -204,7 +319,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -229,7 +344,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -253,7 +368,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -271,7 +386,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -288,7 +403,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -303,7 +418,9 @@ public sealed class ViewExtractorTests
     public void Extract_ViewWithComplexQuery_ExtractsQueryCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        //TODO: Допиши этот тест чтобы в sql были необходимые таблицы (users, order) чтобы при создании view
+        // можно было проверить извлекаются ли данные для колонок view из связанных (необходимых) таблиц.
+        var sql = @"
             CREATE VIEW user_order_summary AS
             SELECT
                 u.id,
@@ -315,10 +432,13 @@ public sealed class ViewExtractorTests
             LEFT JOIN orders o ON u.id = o.user_id
             WHERE u.is_active = TRUE
             GROUP BY u.id, u.username, u.email;
-        ");
+        ";
+        
+        var blockExtractor = new BlockExtractor();
+        var blocks = blockExtractor.Extract(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
@@ -345,7 +465,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -371,7 +491,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -393,7 +513,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -419,7 +539,7 @@ public sealed class ViewExtractorTests
         var block = CreateBlock("CREATE TABLE test (id INT);");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.Null(result);
@@ -432,7 +552,7 @@ public sealed class ViewExtractorTests
         var block = CreateBlock("");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.Null(result);
@@ -445,7 +565,7 @@ public sealed class ViewExtractorTests
         var block = CreateBlock("CREATE VIEW incomplete_view");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.Null(result);
@@ -465,7 +585,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -482,7 +602,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -522,7 +642,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
@@ -562,7 +682,7 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract([block]);
 
         // Assert
         Assert.NotNull(result);
