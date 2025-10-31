@@ -18,6 +18,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IDomainExtractor _domainExtractor;
     private readonly ITableExtractor _tableExtractor;
     private readonly IViewExtractor _viewExtractor;
+    private readonly IFunctionExtractor _functionExtractor;
 
     /// <summary>
     /// Создает новый экземпляр анализатора схемы с инжекцией зависимостей
@@ -28,7 +29,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         ICompositeExtractor compositeExtractor,
         IDomainExtractor domainExtractor,
         ITableExtractor tableExtractor,
-        IViewExtractor viewExtractor)
+        IViewExtractor viewExtractor,
+        IFunctionExtractor functionExtractor)
     {
         ArgumentNullException.ThrowIfNull(blockExtractor);
         ArgumentNullException.ThrowIfNull(enumExtractor);
@@ -36,6 +38,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         ArgumentNullException.ThrowIfNull(domainExtractor);
         ArgumentNullException.ThrowIfNull(tableExtractor);
         ArgumentNullException.ThrowIfNull(viewExtractor);
+        ArgumentNullException.ThrowIfNull(functionExtractor);
         
         _blockExtractor = blockExtractor;
         _enumExtractor = enumExtractor;
@@ -43,6 +46,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         _domainExtractor = domainExtractor;
         _tableExtractor = tableExtractor;
         _viewExtractor = viewExtractor;
+        _functionExtractor = functionExtractor;
     }
 
     /// <summary>
@@ -54,7 +58,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         new CompositeExtractor(),
         new DomainExtractor(),
         new TableExtractor(),
-        new ViewExtractor())
+        new ViewExtractor(),
+        new FunctionExtractor())
     {
     }
 
@@ -243,7 +248,26 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
     public IReadOnlyList<FunctionDefinition> ExtractFunctions(string sqlScript)
     {
-        throw new NotImplementedException();
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var functions = new List<FunctionDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_functionExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var functionDef = _functionExtractor.Extract(block);
+            if (functionDef is not null)
+            {
+                functions.Add(functionDef);
+            }
+        }
+
+        return functions;
     }
 
     public IReadOnlyList<IndexDefinition> ExtractIndexes(string sqlScript)
@@ -274,6 +298,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var enums = new List<EnumTypeDefinition>();
         var composites = new List<CompositeTypeDefinition>();
         var domains = new List<DomainTypeDefinition>();
+        var functions = new List<FunctionDefinition>();
 
         var blocksList = blocks.ToList();
 
@@ -341,8 +366,19 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     }
                     break;
 
-                // TODO: Добавить обработку других типов объектов
                 case SchemaObjectType.Functions:
+                    // Извлекаем функцию или процедуру
+                    if (_functionExtractor.CanExtract(block))
+                    {
+                        var functionDef = _functionExtractor.Extract(block);
+                        if (functionDef is not null)
+                        {
+                            functions.Add(functionDef);
+                        }
+                    }
+                    break;
+
+                // TODO: Добавить обработку других типов объектов
                 case SchemaObjectType.Indexes:
                 case SchemaObjectType.Triggers:
                 case SchemaObjectType.Constraints:
@@ -361,7 +397,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Enums = enums,
             Composites = composites,
             Domains = domains,
-            Functions = [],
+            Functions = functions,
             Indexes = [],
             Triggers = [],
             Constraints = [],
