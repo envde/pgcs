@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace PgCs.SchemaAnalyzer.Tante.Extractors;
+namespace PgCs.Core.Extraction;
 
 /// <summary>
 /// Парсер inline-комментариев специального формата для извлечения метаданных колонок
