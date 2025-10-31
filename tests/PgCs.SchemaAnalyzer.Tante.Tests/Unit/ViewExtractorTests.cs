@@ -161,14 +161,11 @@ public sealed class ViewExtractorTests
         // Проверяем, что получили 3 блока: users, orders, view
         Assert.Equal(3, allBlocks.Count);
         
-        // Переупорядочиваем блоки: VIEW должен быть первым, затем таблицы
-        // Это имитирует поведение SchemaAnalyzer, который передает блоки с помощью Skip(i).ToList()
-        var viewBlock = allBlocks[2]; // VIEW - третий блок
-        var tableBlocks = new[] { allBlocks[0], allBlocks[1] }; // users и orders
-        var blocks = new[] { viewBlock }.Concat(tableBlocks).ToList();
+        // ViewExtractor должен найти VIEW в любой позиции и использовать остальные блоки для типов
+        // Порядок блоков не имеет значения
 
-        // Act - передаем блоки в ViewExtractor (VIEW первый, таблицы после)
-        var result = _extractor.Extract(blocks);
+        // Act - передаем блоки в ViewExtractor
+        var result = _extractor.Extract(allBlocks);
         
         // Assert
         Assert.NotNull(result);
@@ -219,6 +216,77 @@ public sealed class ViewExtractorTests
         Assert.Equal("VARCHAR", statusColumn.DataType.ToUpper());
         Assert.Equal(20, statusColumn.MaxLength);
         Assert.Equal("Статус заказа", statusColumn.Comment);
+    }
+
+    [Fact]
+    public void Extract_ViewInDifferentPositions_ExtractsCorrectly()
+    {
+        // Arrange - создаем SQL с VIEW в начале
+        var bx = new BlockExtractor();
+        var blocksViewFirst = bx.Extract(@"
+            -- VIEW первым
+            CREATE VIEW summary1 AS
+            SELECT id, name FROM users;
+
+            -- Таблица после VIEW
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL
+            );
+        ").ToList();
+
+        // Создаем SQL с VIEW в конце
+        var blocksViewLast = bx.Extract(@"
+            -- Таблица перед VIEW
+            CREATE TABLE products (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(200) NOT NULL
+            );
+
+            -- VIEW последним
+            CREATE VIEW summary2 AS
+            SELECT id, title FROM products;
+        ").ToList();
+
+        // Создаем SQL с VIEW в середине
+        var blocksViewMiddle = bx.Extract(@"
+            -- Первая таблица
+            CREATE TABLE orders (
+                id SERIAL PRIMARY KEY
+            );
+
+            -- VIEW в середине
+            CREATE VIEW summary3 AS
+            SELECT id FROM orders;
+
+            -- Вторая таблица
+            CREATE TABLE items (
+                id SERIAL PRIMARY KEY
+            );
+        ").ToList();
+
+        // Act
+        var result1 = _extractor.Extract(blocksViewFirst);
+        var result2 = _extractor.Extract(blocksViewLast);
+        var result3 = _extractor.Extract(blocksViewMiddle);
+
+        // Assert
+        Assert.NotNull(result1);
+        Assert.Equal("summary1", result1.Name);
+        Assert.Equal(2, result1.Columns.Count); // id и name
+        Assert.Equal("id", result1.Columns[0].Name);
+        Assert.Equal("name", result1.Columns[1].Name);
+
+        Assert.NotNull(result2);
+        Assert.Equal("summary2", result2.Name);
+        Assert.Equal(2, result2.Columns.Count); // id и title
+        Assert.Equal("id", result2.Columns[0].Name);
+        Assert.Equal("title", result2.Columns[1].Name);
+        
+        Assert.NotNull(result3);
+        Assert.Equal("summary3", result3.Name);
+        Assert.Single(result3.Columns); // только id
+        Assert.Equal("id", result3.Columns[0].Name);
     }
 
     [Fact]

@@ -98,8 +98,8 @@ public sealed partial class ViewExtractor : IViewExtractor
             return false;
         }
 
-        // Проверяем первый блок на наличие VIEW
-        return CreateViewPattern().IsMatch(blocks[0].Content);
+        // Ищем блок с VIEW в любой позиции списка
+        return blocks.Any(block => CreateViewPattern().IsMatch(block.Content));
     }
 
     /// <inheritdoc />
@@ -112,7 +112,13 @@ public sealed partial class ViewExtractor : IViewExtractor
             return null;
         }
 
-        var viewBlock = blocks[0];
+        // Ищем блок с VIEW в любой позиции
+        var viewBlock = blocks.FirstOrDefault(block => CreateViewPattern().IsMatch(block.Content));
+        if (viewBlock is null)
+        {
+            return null;
+        }
+
         var match = CreateViewPattern().Match(viewBlock.Content);
         if (!match.Success)
         {
@@ -274,12 +280,18 @@ public sealed partial class ViewExtractor : IViewExtractor
         // Простой парсер: разделяем по запятым (не учитывая запятые внутри функций)
         var columnParts = SplitColumns(columnsStr);
 
-        // Извлекаем таблицы из других блоков для получения типов
+        // Извлекаем таблицы из всех блоков, кроме самого VIEW
         var tableExtractor = new TableExtractor();
         var availableTables = new Dictionary<string, TableDefinition>();
         
-        foreach (var block in allBlocks.Skip(1)) // Пропускаем первый блок (сам VIEW)
+        foreach (var block in allBlocks)
         {
+            // Пропускаем сам блок с VIEW
+            if (block == viewBlock)
+            {
+                continue;
+            }
+            
             if (tableExtractor.CanExtract(block))
             {
                 var table = tableExtractor.Extract(block);
