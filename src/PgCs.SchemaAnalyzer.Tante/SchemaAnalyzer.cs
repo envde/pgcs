@@ -19,6 +19,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly ITableExtractor _tableExtractor;
     private readonly IViewExtractor _viewExtractor;
     private readonly IFunctionExtractor _functionExtractor;
+    private readonly IIndexExtractor _indexExtractor;
+    private readonly ITriggerExtractor _triggerExtractor;
     private readonly ITableCommentExtractor _tableCommentExtractor;
     private readonly IColumnCommentExtractor _columnCommentExtractor;
     private readonly IFunctionCommentExtractor _functionCommentExtractor;
@@ -38,6 +40,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         ITableExtractor tableExtractor,
         IViewExtractor viewExtractor,
         IFunctionExtractor functionExtractor,
+        IIndexExtractor indexExtractor,
+        ITriggerExtractor triggerExtractor,
         ITableCommentExtractor tableCommentExtractor,
         IColumnCommentExtractor columnCommentExtractor,
         IFunctionCommentExtractor functionCommentExtractor,
@@ -53,6 +57,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         ArgumentNullException.ThrowIfNull(tableExtractor);
         ArgumentNullException.ThrowIfNull(viewExtractor);
         ArgumentNullException.ThrowIfNull(functionExtractor);
+        ArgumentNullException.ThrowIfNull(indexExtractor);
+        ArgumentNullException.ThrowIfNull(triggerExtractor);
         ArgumentNullException.ThrowIfNull(tableCommentExtractor);
         ArgumentNullException.ThrowIfNull(columnCommentExtractor);
         ArgumentNullException.ThrowIfNull(functionCommentExtractor);
@@ -68,6 +74,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         _tableExtractor = tableExtractor;
         _viewExtractor = viewExtractor;
         _functionExtractor = functionExtractor;
+        _indexExtractor = indexExtractor;
+        _triggerExtractor = triggerExtractor;
         _tableCommentExtractor = tableCommentExtractor;
         _columnCommentExtractor = columnCommentExtractor;
         _functionCommentExtractor = functionCommentExtractor;
@@ -88,6 +96,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         new TableExtractor(),
         new ViewExtractor(),
         new FunctionExtractor(),
+        new IndexExtractor(),
+        new TriggerExtractor(),
         new TableCommentExtractor(),
         new ColumnCommentExtractor(),
         new FunctionCommentExtractor(),
@@ -475,12 +485,50 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
     public IReadOnlyList<IndexDefinition> ExtractIndexes(string sqlScript)
     {
-        throw new NotImplementedException();
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var indexes = new List<IndexDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_indexExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var indexDef = _indexExtractor.Extract(block);
+            if (indexDef is not null)
+            {
+                indexes.Add(indexDef);
+            }
+        }
+
+        return indexes;
     }
 
     public IReadOnlyList<TriggerDefinition> ExtractTriggers(string sqlScript)
     {
-        throw new NotImplementedException();
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var triggers = new List<TriggerDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_triggerExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var triggerDef = _triggerExtractor.Extract(block);
+            if (triggerDef is not null)
+            {
+                triggers.Add(triggerDef);
+            }
+        }
+
+        return triggers;
     }
 
     public IReadOnlyList<ConstraintDefinition> ExtractConstraints(string sqlScript)
@@ -502,6 +550,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var composites = new List<CompositeTypeDefinition>();
         var domains = new List<DomainTypeDefinition>();
         var functions = new List<FunctionDefinition>();
+        var indexes = new List<IndexDefinition>();
+        var triggers = new List<TriggerDefinition>();
         var tableComments = new List<TableCommentDefinition>();
         var columnComments = new List<ColumnCommentDefinition>();
         var functionComments = new List<FunctionCommentDefinition>();
@@ -588,6 +638,18 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     }
                     break;
 
+                case SchemaObjectType.Indexes:
+                    // Извлекаем индекс
+                    if (_indexExtractor.CanExtract(block))
+                    {
+                        var indexDef = _indexExtractor.Extract(block);
+                        if (indexDef is not null)
+                        {
+                            indexes.Add(indexDef);
+                        }
+                    }
+                    break;
+
                 case SchemaObjectType.Comments:
                     // Извлекаем комментарии разных типов
                     if (_tableCommentExtractor.CanExtract(block))
@@ -648,9 +710,19 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     }
                     break;
 
-                // TODO: Добавить обработку других типов объектов
-                case SchemaObjectType.Indexes:
                 case SchemaObjectType.Triggers:
+                    // Извлекаем триггер
+                    if (_triggerExtractor.CanExtract(block))
+                    {
+                        var triggerDef = _triggerExtractor.Extract(block);
+                        if (triggerDef is not null)
+                        {
+                            triggers.Add(triggerDef);
+                        }
+                    }
+                    break;
+
+                // TODO: Добавить обработку других типов объектов
                 case SchemaObjectType.Constraints:
                 case SchemaObjectType.None:
                 default:
@@ -667,8 +739,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Composites = composites,
             Domains = domains,
             Functions = functions,
-            Indexes = [],
-            Triggers = [],
+            Indexes = indexes,
+            Triggers = triggers,
             Constraints = [],
             Partitions = [],
             CompositeTypeComments = compositeTypeComments,
