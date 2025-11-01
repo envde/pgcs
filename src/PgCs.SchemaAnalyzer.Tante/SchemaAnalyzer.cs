@@ -19,6 +19,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly ITableExtractor _tableExtractor;
     private readonly IViewExtractor _viewExtractor;
     private readonly IFunctionExtractor _functionExtractor;
+    private readonly ITableCommentExtractor _tableCommentExtractor;
+    private readonly IColumnCommentExtractor _columnCommentExtractor;
+    private readonly IFunctionCommentExtractor _functionCommentExtractor;
+    private readonly IIndexCommentExtractor _indexCommentExtractor;
+    private readonly ITriggerCommentExtractor _triggerCommentExtractor;
+    private readonly IConstraintCommentExtractor _constraintCommentExtractor;
+    private readonly ICompositeTypeCommentExtractor _compositeTypeCommentExtractor;
 
     /// <summary>
     /// Создает новый экземпляр анализатора схемы с инжекцией зависимостей
@@ -30,7 +37,14 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IDomainExtractor domainExtractor,
         ITableExtractor tableExtractor,
         IViewExtractor viewExtractor,
-        IFunctionExtractor functionExtractor)
+        IFunctionExtractor functionExtractor,
+        ITableCommentExtractor tableCommentExtractor,
+        IColumnCommentExtractor columnCommentExtractor,
+        IFunctionCommentExtractor functionCommentExtractor,
+        IIndexCommentExtractor indexCommentExtractor,
+        ITriggerCommentExtractor triggerCommentExtractor,
+        IConstraintCommentExtractor constraintCommentExtractor,
+        ICompositeTypeCommentExtractor compositeTypeCommentExtractor)
     {
         ArgumentNullException.ThrowIfNull(blockExtractor);
         ArgumentNullException.ThrowIfNull(enumExtractor);
@@ -39,6 +53,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         ArgumentNullException.ThrowIfNull(tableExtractor);
         ArgumentNullException.ThrowIfNull(viewExtractor);
         ArgumentNullException.ThrowIfNull(functionExtractor);
+        ArgumentNullException.ThrowIfNull(tableCommentExtractor);
+        ArgumentNullException.ThrowIfNull(columnCommentExtractor);
+        ArgumentNullException.ThrowIfNull(functionCommentExtractor);
+        ArgumentNullException.ThrowIfNull(indexCommentExtractor);
+        ArgumentNullException.ThrowIfNull(triggerCommentExtractor);
+        ArgumentNullException.ThrowIfNull(constraintCommentExtractor);
+        ArgumentNullException.ThrowIfNull(compositeTypeCommentExtractor);
         
         _blockExtractor = blockExtractor;
         _enumExtractor = enumExtractor;
@@ -47,6 +68,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         _tableExtractor = tableExtractor;
         _viewExtractor = viewExtractor;
         _functionExtractor = functionExtractor;
+        _tableCommentExtractor = tableCommentExtractor;
+        _columnCommentExtractor = columnCommentExtractor;
+        _functionCommentExtractor = functionCommentExtractor;
+        _indexCommentExtractor = indexCommentExtractor;
+        _triggerCommentExtractor = triggerCommentExtractor;
+        _constraintCommentExtractor = constraintCommentExtractor;
+        _compositeTypeCommentExtractor = compositeTypeCommentExtractor;
     }
 
     /// <summary>
@@ -59,7 +87,14 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         new DomainExtractor(),
         new TableExtractor(),
         new ViewExtractor(),
-        new FunctionExtractor())
+        new FunctionExtractor(),
+        new TableCommentExtractor(),
+        new ColumnCommentExtractor(),
+        new FunctionCommentExtractor(),
+        new IndexCommentExtractor(),
+        new TriggerCommentExtractor(),
+        new ConstraintCommentExtractor(),
+        new CompositeTypeCommentExtractor())
     {
     }
 
@@ -270,6 +305,174 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         return functions;
     }
 
+    public IReadOnlyList<TableCommentDefinition> ExtractTableComments(string sqlScript)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var comments = new List<TableCommentDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_tableCommentExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var comment = _tableCommentExtractor.Extract(block);
+            if (comment is not null)
+            {
+                comments.Add(comment);
+            }
+        }
+
+        return comments;
+    }
+
+    public IReadOnlyList<ColumnCommentDefinition> ExtractColumnComments(string sqlScript)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var comments = new List<ColumnCommentDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_columnCommentExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var comment = _columnCommentExtractor.Extract(block);
+            if (comment is not null)
+            {
+                comments.Add(comment);
+            }
+        }
+
+        return comments;
+    }
+
+    public IReadOnlyList<FunctionCommentDefinition> ExtractFunctionComments(string sqlScript)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var comments = new List<FunctionCommentDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_functionCommentExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var comment = _functionCommentExtractor.Extract(block);
+            if (comment is not null)
+            {
+                comments.Add(comment);
+            }
+        }
+
+        return comments;
+    }
+
+    public IReadOnlyList<IndexCommentDefinition> ExtractIndexComments(string sqlScript)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var comments = new List<IndexCommentDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_indexCommentExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var comment = _indexCommentExtractor.Extract(block);
+            if (comment is not null)
+            {
+                comments.Add(comment);
+            }
+        }
+
+        return comments;
+    }
+
+    public IReadOnlyList<TriggerCommentDefinition> ExtractTriggerComments(string sqlScript)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var comments = new List<TriggerCommentDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_triggerCommentExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var comment = _triggerCommentExtractor.Extract(block);
+            if (comment is not null)
+            {
+                comments.Add(comment);
+            }
+        }
+
+        return comments;
+    }
+
+    public IReadOnlyList<ConstraintCommentDefinition> ExtractConstraintComments(string sqlScript)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var comments = new List<ConstraintCommentDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_constraintCommentExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var comment = _constraintCommentExtractor.Extract(block);
+            if (comment is not null)
+            {
+                comments.Add(comment);
+            }
+        }
+
+        return comments;
+    }
+
+    public IReadOnlyList<CompositeTypeCommentDefinition> ExtractCompositeTypeComments(string sqlScript)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var comments = new List<CompositeTypeCommentDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_compositeTypeCommentExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var comment = _compositeTypeCommentExtractor.Extract(block);
+            if (comment is not null)
+            {
+                comments.Add(comment);
+            }
+        }
+
+        return comments;
+    }
+
     public IReadOnlyList<IndexDefinition> ExtractIndexes(string sqlScript)
     {
         throw new NotImplementedException();
@@ -299,6 +502,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var composites = new List<CompositeTypeDefinition>();
         var domains = new List<DomainTypeDefinition>();
         var functions = new List<FunctionDefinition>();
+        var tableComments = new List<TableCommentDefinition>();
+        var columnComments = new List<ColumnCommentDefinition>();
+        var functionComments = new List<FunctionCommentDefinition>();
+        var indexComments = new List<IndexCommentDefinition>();
+        var triggerComments = new List<TriggerCommentDefinition>();
+        var constraintComments = new List<ConstraintCommentDefinition>();
+        var compositeTypeComments = new List<CompositeTypeCommentDefinition>();
 
         var blocksList = blocks.ToList();
 
@@ -378,11 +588,70 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     }
                     break;
 
+                case SchemaObjectType.Comments:
+                    // Извлекаем комментарии разных типов
+                    if (_tableCommentExtractor.CanExtract(block))
+                    {
+                        var comment = _tableCommentExtractor.Extract(block);
+                        if (comment is not null)
+                        {
+                            tableComments.Add(comment);
+                        }
+                    }
+                    else if (_columnCommentExtractor.CanExtract(block))
+                    {
+                        var comment = _columnCommentExtractor.Extract(block);
+                        if (comment is not null)
+                        {
+                            columnComments.Add(comment);
+                        }
+                    }
+                    else if (_functionCommentExtractor.CanExtract(block))
+                    {
+                        var comment = _functionCommentExtractor.Extract(block);
+                        if (comment is not null)
+                        {
+                            functionComments.Add(comment);
+                        }
+                    }
+                    else if (_indexCommentExtractor.CanExtract(block))
+                    {
+                        var comment = _indexCommentExtractor.Extract(block);
+                        if (comment is not null)
+                        {
+                            indexComments.Add(comment);
+                        }
+                    }
+                    else if (_triggerCommentExtractor.CanExtract(block))
+                    {
+                        var comment = _triggerCommentExtractor.Extract(block);
+                        if (comment is not null)
+                        {
+                            triggerComments.Add(comment);
+                        }
+                    }
+                    else if (_constraintCommentExtractor.CanExtract(block))
+                    {
+                        var comment = _constraintCommentExtractor.Extract(block);
+                        if (comment is not null)
+                        {
+                            constraintComments.Add(comment);
+                        }
+                    }
+                    else if (_compositeTypeCommentExtractor.CanExtract(block))
+                    {
+                        var comment = _compositeTypeCommentExtractor.Extract(block);
+                        if (comment is not null)
+                        {
+                            compositeTypeComments.Add(comment);
+                        }
+                    }
+                    break;
+
                 // TODO: Добавить обработку других типов объектов
                 case SchemaObjectType.Indexes:
                 case SchemaObjectType.Triggers:
                 case SchemaObjectType.Constraints:
-                case SchemaObjectType.Comments:
                 case SchemaObjectType.None:
                 default:
                     // Пока не реализовано
@@ -402,13 +671,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Triggers = [],
             Constraints = [],
             Partitions = [],
-            CompositeTypeComments = [],
-            TableComments = [],
-            ColumnComments = [],
-            IndexComments = [],
-            TriggerComments = [],
-            FunctionComments = [],
-            ConstraintComments = [],
+            CompositeTypeComments = compositeTypeComments,
+            TableComments = tableComments,
+            ColumnComments = columnComments,
+            IndexComments = indexComments,
+            TriggerComments = triggerComments,
+            FunctionComments = functionComments,
+            ConstraintComments = constraintComments,
             ValidationIssues = [],
             SourcePaths = sourcePaths,
             AnalyzedAt = DateTime.UtcNow
