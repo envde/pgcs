@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace PgCs.Core.Extraction;
+namespace PgCs.Core.Extraction.Parsing.SqlComment;
 
 /// <summary>
 /// Парсер inline-комментариев специального формата для извлечения метаданных колонок
@@ -13,94 +13,47 @@ namespace PgCs.Core.Extraction;
 public static partial class InlineCommentParser
 {
     /// <summary>
-    /// Результат парсинга inline-комментария
-    /// </summary>
-    public sealed record ParsedComment
-    {
-        /// <summary>
-        /// Комментарий к колонке
-        /// </summary>
-        public string? Comment { get; init; }
-        
-        /// <summary>
-        /// Тип данных колонки
-        /// </summary>
-        public string? DataType { get; init; }
-        
-        /// <summary>
-        /// Переименованное имя колонки
-        /// </summary>
-        public string? RenameTo { get; init; }
-    }
-
-    // ============================================================================
-    // Regex Patterns
-    // ============================================================================
-
-    /// <summary>
     /// Паттерн для формата: comment: значение;
     /// </summary>
-    [GeneratedRegex(
-        @"comment\s*:\s*([^;]+);?",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"comment\s*:\s*([^;]+);?", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex CommentColonPattern();
 
     /// <summary>
     /// Паттерн для формата: comment(значение)
     /// </summary>
-    [GeneratedRegex(
-        @"comment\s*\(([^)]+)\)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"comment\s*\(([^)]+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex CommentParenPattern();
 
     /// <summary>
     /// Паттерн для формата: type: значение;
     /// </summary>
-    [GeneratedRegex(
-        @"type\s*:\s*([^;]+);?",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"type\s*:\s*([^;]+);?", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TypeColonPattern();
 
     /// <summary>
     /// Паттерн для формата: type(значение)
     /// </summary>
-    [GeneratedRegex(
-        @"type\s*\(([^)]+)\)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"type\s*\(([^)]+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TypeParenPattern();
 
     /// <summary>
     /// Паттерн для формата: rename: значение;
     /// </summary>
-    [GeneratedRegex(
-        @"rename\s*:\s*([^;]+);?",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"rename\s*:\s*([^;]+);?", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex RenameColonPattern();
 
     /// <summary>
     /// Паттерн для формата: rename(значение)
     /// </summary>
-    [GeneratedRegex(
-        @"rename\s*\(([^)]+)\)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"rename\s*\(([^)]+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex RenameParenPattern();
-
-    // ============================================================================
-    // Public Methods
-    // ============================================================================
 
     /// <summary>
     /// Парсит inline-комментарий и извлекает метаданные
     /// </summary>
     /// <param name="comment">Текст комментария (без префикса --)</param>
-    /// <returns>Распарсенные данные или null, если комментарий не содержит метаданных</returns>
-    public static ParsedComment? Parse(string? comment)
+    /// <returns>Извлеченные данные или null, если комментарий не содержит метаданных</returns>
+    public static SqlComment? Parse(string? comment)
     {
         if (string.IsNullOrWhiteSpace(comment))
         {
@@ -120,17 +73,13 @@ public static partial class InlineCommentParser
             return null;
         }
 
-        return new ParsedComment
+        return new SqlComment
         {
             Comment = commentText,
             DataType = dataType,
             RenameTo = renameTo
         };
     }
-
-    // ============================================================================
-    // Private Helper Methods
-    // ============================================================================
 
     /// <summary>
     /// Извлекает текст комментария из строки

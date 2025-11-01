@@ -1,3 +1,4 @@
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Analyzer;
 using PgCs.Core.Schema.Common;
@@ -13,7 +14,7 @@ namespace PgCs.SchemaAnalyzer.Tante;
 public sealed class SchemaAnalyzer : ISchemaAnalyzer
 {
     private readonly IBlockExtractor _blockExtractor;
-    private readonly IEnumExtractor _enumExtractor;
+    private readonly IExtractor<EnumTypeDefinition> _enumExtractor;
     private readonly ICompositeExtractor _compositeExtractor;
     private readonly IDomainExtractor _domainExtractor;
     private readonly ITableExtractor _tableExtractor;
@@ -35,7 +36,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     /// </summary>
     public SchemaAnalyzer(
         IBlockExtractor blockExtractor,
-        IEnumExtractor enumExtractor,
+        IExtractor<EnumTypeDefinition> enumExtractor,
         ICompositeExtractor compositeExtractor,
         IDomainExtractor domainExtractor,
         ITableExtractor tableExtractor,
@@ -180,15 +181,17 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         foreach (var block in blocks)
         {
-            if (!_enumExtractor.CanExtract(block))
+            var blockList = new[] { block };
+            
+            if (!_enumExtractor.CanExtract(blockList))
             {
                 continue;
             }
 
-            var enumDef = _enumExtractor.Extract(block);
-            if (enumDef is not null)
+            var result = _enumExtractor.Extract(blockList);
+            if (result.IsSuccess && result.Definition is not null)
             {
-                enums.Add(enumDef);
+                enums.Add(result.Definition);
             }
         }
 
@@ -623,12 +626,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
                 case SchemaObjectType.Types:
                     // Пытаемся извлечь ENUM
-                    if (_enumExtractor.CanExtract(block))
+                    var blockList = new[] { block };
+                    if (_enumExtractor.CanExtract(blockList))
                     {
-                        var enumDef = _enumExtractor.Extract(block);
-                        if (enumDef is not null)
+                        var result = _enumExtractor.Extract(blockList);
+                        if (result.IsSuccess && result.Definition is not null)
                         {
-                            enums.Add(enumDef);
+                            enums.Add(result.Definition);
                         }
                     }
                     // Пытаемся извлечь Composite
