@@ -1,7 +1,10 @@
+using System.Text;
 using System.Text.RegularExpressions;
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 
 namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 
@@ -18,7 +21,7 @@ namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 /// </code>
 /// </para>
 /// </summary>
-public sealed partial class CompositeExtractor : ICompositeExtractor
+public sealed partial class CompositeExtractor : IExtractor<CompositeTypeDefinition>
 {
     // Regex для определения CREATE TYPE AS (...)
     [GeneratedRegex(@"^\s*CREATE\s+TYPE\s+(?:(?<schema>\w+)\.)?(?<name>\w+)\s+AS\s*\(\s*(?<attributes>.*?)\s*\)\s*;?\s*$",
@@ -33,10 +36,17 @@ public sealed partial class CompositeExtractor : ICompositeExtractor
     private static partial Regex AttributePattern();
 
     /// <inheritdoc />
-    public bool CanExtract(SqlBlock block)
+    public bool CanExtract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
-
+        ArgumentNullException.ThrowIfNull(blocks);
+        
+        // Для Composite типа достаточно одного блока
+        if (blocks.Count == 0)
+        {
+            return false;
+        }
+        
+        var block = blocks[0];
         var content = block.Content;
         return content.Contains("CREATE TYPE", StringComparison.OrdinalIgnoreCase) &&
                content.Contains(" AS ", StringComparison.OrdinalIgnoreCase) &&
@@ -45,33 +55,82 @@ public sealed partial class CompositeExtractor : ICompositeExtractor
     }
 
     /// <inheritdoc />
-    public CompositeTypeDefinition? Extract(SqlBlock block)
+    public ExtractionResult<CompositeTypeDefinition> Extract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(blocks);
 
-        if (!CanExtract(block))
+        if (!CanExtract(blocks))
         {
-            return null;
+            return ExtractionResult<CompositeTypeDefinition>.NotApplicable();
         }
+
+        var block = blocks[0];
+        var issues = new List<ValidationIssue>();
 
         var match = CompositePattern().Match(block.Content);
         if (!match.Success)
         {
-            return null;
+            return ExtractionResult<CompositeTypeDefinition>.Failure([
+                ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Composite,
+                    "COMPOSITE_PARSE_ERROR",
+                    "Failed to parse COMPOSITE type definition. Expected format: CREATE TYPE [schema.]name AS (attr1 type1, attr2 type2, ...)",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = block.Content,
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                )
+            ]);
         }
 
         var schema = match.Groups["schema"].Success ? match.Groups["schema"].Value : null;
         var name = match.Groups["name"].Value;
         var attributesText = match.Groups["attributes"].Value;
 
-        var attributes = ExtractAttributes(attributesText);
+        var attributes = ExtractAttributes(attributesText, name, block, issues);
 
         if (attributes.Count == 0)
         {
-            return null; // Composite без атрибутов не валиден
+            return ExtractionResult<CompositeTypeDefinition>.Failure([
+                ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Composite,
+                    "COMPOSITE_EMPTY_ATTRIBUTES",
+                    $"COMPOSITE type '{name}' has no valid attributes defined",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = attributesText,
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                )
+            ]);
         }
 
-        return new CompositeTypeDefinition
+        // Проверка на дубликаты атрибутов
+        var duplicates = attributes
+            .GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicates.Count > 0)
+        {
+            issues.Add(ValidationIssue.Warning(
+                ValidationIssue.ValidationDefinitionType.Composite,
+                "COMPOSITE_DUPLICATE_ATTRIBUTE",
+                $"COMPOSITE type '{name}' contains duplicate attribute names: {string.Join(", ", duplicates)}",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = attributesText,
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+        }
+
+        var definition = new CompositeTypeDefinition
         {
             Name = name,
             Schema = schema,
@@ -79,14 +138,23 @@ public sealed partial class CompositeExtractor : ICompositeExtractor
             SqlComment = block.HeaderComment,
             RawSql = block.RawContent
         };
+
+        return ExtractionResult<CompositeTypeDefinition>.Success(definition, issues);
     }
 
     /// <summary>
     /// Извлекает список атрибутов Composite типа
     /// </summary>
     /// <param name="attributesText">Текст с определениями атрибутов</param>
+    /// <param name="typeName">Имя Composite типа для сообщений об ошибках</param>
+    /// <param name="block">SQL блок для информации о местоположении ошибок</param>
+    /// <param name="issues">Список ValidationIssue для добавления предупреждений и ошибок</param>
     /// <returns>Список атрибутов Composite типа</returns>
-    private static IReadOnlyList<CompositeTypeAttribute> ExtractAttributes(string attributesText)
+    private static IReadOnlyList<CompositeTypeAttribute> ExtractAttributes(
+        string attributesText, 
+        string typeName, 
+        SqlBlock block, 
+        List<ValidationIssue> issues)
     {
         if (string.IsNullOrWhiteSpace(attributesText))
         {
@@ -109,6 +177,21 @@ public sealed partial class CompositeExtractor : ICompositeExtractor
             if (attribute is not null)
             {
                 attributes.Add(attribute);
+            }
+            else
+            {
+                // Добавляем ошибку для невалидного атрибута
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Composite,
+                    "COMPOSITE_INVALID_ATTRIBUTE",
+                    $"Failed to parse attribute definition in COMPOSITE type '{typeName}': '{line.Trim()}'",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = line,
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                ));
             }
         }
 

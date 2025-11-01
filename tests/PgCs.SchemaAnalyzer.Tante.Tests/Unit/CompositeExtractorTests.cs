@@ -1,4 +1,6 @@
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
+using PgCs.Core.Schema.Definitions;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
 
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
@@ -8,7 +10,7 @@ namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 /// </summary>
 public sealed class CompositeExtractorTests
 {
-    private readonly ICompositeExtractor _extractor = new CompositeExtractor();
+    private readonly IExtractor<CompositeTypeDefinition> _extractor = new CompositeExtractor();
 
     #region CanExtract Tests
 
@@ -16,10 +18,10 @@ public sealed class CompositeExtractorTests
     public void CanExtract_WithValidCompositeBlock_ReturnsTrue()
     {
         // Arrange
-        var block = CreateBlock("CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));");
+        var blocks = CreateBlocks("CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));");
 
         // Act
-        var result = _extractor.CanExtract(block);
+        var result = _extractor.CanExtract(blocks);
 
         // Assert
         Assert.True(result);
@@ -29,10 +31,10 @@ public sealed class CompositeExtractorTests
     public void CanExtract_WithEnumBlock_ReturnsFalse()
     {
         // Arrange
-        var block = CreateBlock("CREATE TYPE status AS ENUM ('active', 'inactive');");
+        var blocks = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive');");
 
         // Act
-        var result = _extractor.CanExtract(block);
+        var result = _extractor.CanExtract(blocks);
 
         // Assert
         Assert.False(result);
@@ -42,10 +44,10 @@ public sealed class CompositeExtractorTests
     public void CanExtract_WithTableBlock_ReturnsFalse()
     {
         // Arrange
-        var block = CreateBlock("CREATE TABLE users (id INT PRIMARY KEY);");
+        var blocks = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
 
         // Act
-        var result = _extractor.CanExtract(block);
+        var result = _extractor.CanExtract(blocks);
 
         // Assert
         Assert.False(result);
@@ -67,19 +69,20 @@ public sealed class CompositeExtractorTests
     {
         // Arrange
         var sql = "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100), zip_code VARCHAR(20));";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("address", result.Name);
-        Assert.Null(result.Schema);
-        Assert.Equal(3, result.Attributes.Count);
-        Assert.Equal("street", result.Attributes[0].Name);
-        Assert.Equal("VARCHAR", result.Attributes[0].DataType);
-        Assert.Equal(255, result.Attributes[0].MaxLength);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("address", result.Definition.Name);
+        Assert.Null(result.Definition.Schema);
+        Assert.Equal(3, result.Definition.Attributes.Count);
+        Assert.Equal("street", result.Definition.Attributes[0].Name);
+        Assert.Equal("VARCHAR", result.Definition.Attributes[0].DataType);
+        Assert.Equal(255, result.Definition.Attributes[0].MaxLength);
     }
 
     [Fact]
@@ -87,16 +90,17 @@ public sealed class CompositeExtractorTests
     {
         // Arrange
         var sql = "CREATE TYPE public.contact_info AS (phone VARCHAR(20), email VARCHAR(255));";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("contact_info", result.Name);
-        Assert.Equal("public", result.Schema);
-        Assert.Equal(2, result.Attributes.Count);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("contact_info", result.Definition.Name);
+        Assert.Equal("public", result.Definition.Schema);
+        Assert.Equal(2, result.Definition.Attributes.Count);
     }
 
     [Fact]
@@ -110,17 +114,18 @@ public sealed class CompositeExtractorTests
     zip_code VARCHAR(20),
     country VARCHAR(50)
 );";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("address", result.Name);
-        Assert.Equal(5, result.Attributes.Count);
-        Assert.Equal("street", result.Attributes[0].Name);
-        Assert.Equal("country", result.Attributes[4].Name);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("address", result.Definition.Name);
+        Assert.Equal(5, result.Definition.Attributes.Count);
+        Assert.Equal("street", result.Definition.Attributes[0].Name);
+        Assert.Equal("country", result.Definition.Attributes[4].Name);
     }
 
     #endregion
@@ -132,16 +137,17 @@ public sealed class CompositeExtractorTests
     {
         // Arrange
         var sql = "CREATE TYPE product_price AS (amount NUMERIC(12, 2), currency VARCHAR(3));";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(2, result.Attributes.Count);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(2, result.Definition.Attributes.Count);
         
-        var amountAttr = result.Attributes[0];
+        var amountAttr = result.Definition.Attributes[0];
         Assert.Equal("amount", amountAttr.Name);
         Assert.Equal("NUMERIC", amountAttr.DataType);
         Assert.Equal(12, amountAttr.NumericPrecision);
@@ -153,21 +159,22 @@ public sealed class CompositeExtractorTests
     {
         // Arrange
         var sql = "CREATE TYPE tags_info AS (tag_names VARCHAR(50)[], tag_counts INTEGER[]);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(2, result.Attributes.Count);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(2, result.Definition.Attributes.Count);
         
-        var tagNamesAttr = result.Attributes[0];
+        var tagNamesAttr = result.Definition.Attributes[0];
         Assert.Equal("tag_names", tagNamesAttr.Name);
         Assert.Equal("VARCHAR", tagNamesAttr.DataType);
         Assert.True(tagNamesAttr.IsArray);
         
-        var tagCountsAttr = result.Attributes[1];
+        var tagCountsAttr = result.Definition.Attributes[1];
         Assert.Equal("tag_counts", tagCountsAttr.Name);
         Assert.Equal("INTEGER", tagCountsAttr.DataType);
         Assert.True(tagCountsAttr.IsArray);
@@ -178,18 +185,19 @@ public sealed class CompositeExtractorTests
     {
         // Arrange
         var sql = "CREATE TYPE user_data AS (id INTEGER, name TEXT, created_at TIMESTAMP, is_active BOOLEAN);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(4, result.Attributes.Count);
-        Assert.Equal("INTEGER", result.Attributes[0].DataType);
-        Assert.Equal("TEXT", result.Attributes[1].DataType);
-        Assert.Equal("TIMESTAMP", result.Attributes[2].DataType);
-        Assert.Equal("BOOLEAN", result.Attributes[3].DataType);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(4, result.Definition.Attributes.Count);
+        Assert.Equal("INTEGER", result.Definition.Attributes[0].DataType);
+        Assert.Equal("TEXT", result.Definition.Attributes[1].DataType);
+        Assert.Equal("TIMESTAMP", result.Definition.Attributes[2].DataType);
+        Assert.Equal("BOOLEAN", result.Definition.Attributes[3].DataType);
     }
 
     #endregion
@@ -201,21 +209,22 @@ public sealed class CompositeExtractorTests
     {
         // Arrange
         var sql = "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));";
-        var block = new SqlBlock
+        var blocks = (IReadOnlyList<SqlBlock>)[new SqlBlock
         {
             Content = sql,
             RawContent = sql,
             HeaderComment = "Address type for user locations",
             StartLine = 1,
             EndLine = 1
-        };
+        }];
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("Address type for user locations", result.SqlComment);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("Address type for user locations", result.Definition.SqlComment);
     }
 
     [Fact]
@@ -224,20 +233,21 @@ public sealed class CompositeExtractorTests
         // Arrange
         var sql = "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));";
         var rawSql = "-- Address type\nCREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));";
-        var block = new SqlBlock
+        var blocks = (IReadOnlyList<SqlBlock>)[new SqlBlock
         {
             Content = sql,
             RawContent = rawSql,
             StartLine = 1,
             EndLine = 2
-        };
+        }];
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal(rawSql, result.RawSql);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(rawSql, result.Definition.RawSql);
     }
 
     #endregion
@@ -245,17 +255,20 @@ public sealed class CompositeExtractorTests
     #region Edge Cases Tests
 
     [Fact]
-    public void Extract_CompositeWithEmptyAttributes_ReturnsNull()
+    public void Extract_CompositeWithEmptyAttributes_ReturnsFailure()
     {
         // Arrange
         var sql = "CREATE TYPE empty_type AS ();";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Definition);
+        Assert.NotEmpty(result.ValidationIssues);
+        Assert.Contains(result.ValidationIssues, i => i.Code == "COMPOSITE_EMPTY_ATTRIBUTES");
     }
 
     [Fact]
@@ -263,15 +276,16 @@ public sealed class CompositeExtractorTests
     {
         // Arrange
         var sql = "CREATE TYPE simple_type AS (value INTEGER);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Single(result.Attributes);
-        Assert.Equal("value", result.Attributes[0].Name);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Single(result.Definition.Attributes);
+        Assert.Equal("value", result.Definition.Attributes[0].Name);
     }
 
     #endregion
@@ -286,16 +300,17 @@ public sealed class CompositeExtractorTests
     }
 
     [Fact]
-    public void Extract_NonCompositeBlock_ReturnsNull()
+    public void Extract_NonCompositeBlock_ReturnsNotApplicable()
     {
         // Arrange
-        var block = CreateBlock("CREATE TABLE users (id INT PRIMARY KEY);");
+        var blocks = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Definition);
     }
 
     #endregion
@@ -313,21 +328,22 @@ public sealed class CompositeExtractorTests
     zip_code VARCHAR(20),
     country VARCHAR(50)
 );";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("address", result.Name);
-        Assert.Equal(5, result.Attributes.Count);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("address", result.Definition.Name);
+        Assert.Equal(5, result.Definition.Attributes.Count);
         
-        Assert.Equal("street", result.Attributes[0].Name);
-        Assert.Equal("VARCHAR", result.Attributes[0].DataType);
-        Assert.Equal(255, result.Attributes[0].MaxLength);
+        Assert.Equal("street", result.Definition.Attributes[0].Name);
+        Assert.Equal("VARCHAR", result.Definition.Attributes[0].DataType);
+        Assert.Equal(255, result.Definition.Attributes[0].MaxLength);
         
-        Assert.Equal("zip_code", result.Attributes[3].Name);
+        Assert.Equal("zip_code", result.Definition.Attributes[3].Name);
     }
 
     [Fact]
@@ -340,32 +356,33 @@ public sealed class CompositeExtractorTests
     telegram VARCHAR(50),
     preferred_method VARCHAR(20)
 );";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("contact_info", result.Name);
-        Assert.Equal(4, result.Attributes.Count);
-        Assert.Contains(result.Attributes, a => a.Name == "phone");
-        Assert.Contains(result.Attributes, a => a.Name == "telegram");
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("contact_info", result.Definition.Name);
+        Assert.Equal(4, result.Definition.Attributes.Count);
+        Assert.Contains(result.Definition.Attributes, a => a.Name == "phone");
+        Assert.Contains(result.Definition.Attributes, a => a.Name == "telegram");
     }
 
     #endregion
 
     #region Helper Methods
 
-    private static SqlBlock CreateBlock(string sql)
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql)
     {
-        return new SqlBlock
+        return [new SqlBlock
         {
             Content = sql,
             RawContent = sql,
             StartLine = 1,
             EndLine = 1
-        };
+        }];
     }
 
     #endregion

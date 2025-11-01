@@ -15,7 +15,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 {
     private readonly IBlockExtractor _blockExtractor;
     private readonly IExtractor<EnumTypeDefinition> _enumExtractor;
-    private readonly ICompositeExtractor _compositeExtractor;
+    private readonly IExtractor<CompositeTypeDefinition> _compositeExtractor;
     private readonly IExtractor<DomainTypeDefinition> _domainExtractor;
     private readonly ITableExtractor _tableExtractor;
     private readonly IViewExtractor _viewExtractor;
@@ -31,7 +31,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public SchemaAnalyzer(
         IBlockExtractor blockExtractor,
         IExtractor<EnumTypeDefinition> enumExtractor,
-        ICompositeExtractor compositeExtractor,
+        IExtractor<CompositeTypeDefinition> compositeExtractor,
         IExtractor<DomainTypeDefinition> domainExtractor,
         ITableExtractor tableExtractor,
         IViewExtractor viewExtractor,
@@ -251,15 +251,15 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         foreach (var block in blocks)
         {
-            if (!_compositeExtractor.CanExtract(block))
+            if (!_compositeExtractor.CanExtract([block]))
             {
                 continue;
             }
 
-            var compositeDef = _compositeExtractor.Extract(block);
-            if (compositeDef is not null)
+            var result = _compositeExtractor.Extract([block]);
+            if (result.IsSuccess && result.Definition is not null)
             {
-                composites.Add(compositeDef);
+                composites.Add(result.Definition);
             }
         }
 
@@ -455,12 +455,12 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                         }
                     }
                     // Пытаемся извлечь Composite
-                    else if (_compositeExtractor.CanExtract(block))
+                    else if (_compositeExtractor.CanExtract(blockList))
                     {
-                        var compositeDef = _compositeExtractor.Extract(block);
-                        if (compositeDef is not null)
+                        var compositeResult = _compositeExtractor.Extract(blockList);
+                        if (compositeResult.IsSuccess && compositeResult.Definition is not null)
                         {
-                            composites.Add(compositeDef);
+                            composites.Add(compositeResult.Definition);
                         }
                     }
                     // Пытаемся извлечь Domain
