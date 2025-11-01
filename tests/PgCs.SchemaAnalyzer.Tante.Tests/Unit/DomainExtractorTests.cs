@@ -1,4 +1,7 @@
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
+using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
 
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
@@ -8,7 +11,7 @@ namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 /// </summary>
 public sealed class DomainExtractorTests
 {
-    private readonly IDomainExtractor _extractor = new DomainExtractor();
+    private readonly IExtractor<DomainTypeDefinition> _extractor = new DomainExtractor();
 
     #region CanExtract Tests
 
@@ -16,10 +19,10 @@ public sealed class DomainExtractorTests
     public void CanExtract_WithValidDomainBlock_ReturnsTrue()
     {
         // Arrange
-        var block = CreateBlock("CREATE DOMAIN email AS VARCHAR(255);");
+        var blocks = CreateBlocks("CREATE DOMAIN email AS VARCHAR(255);");
 
         // Act
-        var result = _extractor.CanExtract(block);
+        var result = _extractor.CanExtract(blocks);
 
         // Assert
         Assert.True(result);
@@ -29,17 +32,17 @@ public sealed class DomainExtractorTests
     public void CanExtract_WithTableBlock_ReturnsFalse()
     {
         // Arrange
-        var block = CreateBlock("CREATE TABLE users (id INT PRIMARY KEY);");
+        var blocks = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
 
         // Act
-        var result = _extractor.CanExtract(block);
+        var result = _extractor.CanExtract(blocks);
 
         // Assert
         Assert.False(result);
     }
 
     [Fact]
-    public void CanExtract_WithNullBlock_ThrowsArgumentNullException()
+    public void CanExtract_WithNullBlocks_ThrowsArgumentNullException()
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
@@ -54,17 +57,19 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN email AS VARCHAR(255);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("email", result.Name);
-        Assert.Null(result.Schema);
-        Assert.Equal("VARCHAR(255)", result.BaseType);
-        Assert.Equal(255, result.MaxLength);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("email", result.Definition.Name);
+        Assert.Null(result.Definition.Schema);
+        Assert.Equal("VARCHAR(255)", result.Definition.BaseType);
+        Assert.Equal(255, result.Definition.MaxLength);
     }
 
     [Fact]
@@ -72,15 +77,17 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN public.email AS VARCHAR(255);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("email", result.Name);
-        Assert.Equal("public", result.Schema);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("email", result.Definition.Name);
+        Assert.Equal("public", result.Definition.Schema);
     }
 
     [Fact]
@@ -88,17 +95,19 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN positive_numeric AS NUMERIC(12, 2);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("positive_numeric", result.Name);
-        Assert.Equal("NUMERIC(12, 2)", result.BaseType);
-        Assert.Equal(12, result.NumericPrecision);
-        Assert.Equal(2, result.NumericScale);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("positive_numeric", result.Definition.Name);
+        Assert.Equal("NUMERIC(12, 2)", result.Definition.BaseType);
+        Assert.Equal(12, result.Definition.NumericPrecision);
+        Assert.Equal(2, result.Definition.NumericScale);
     }
 
     #endregion
@@ -110,14 +119,16 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN email AS VARCHAR(255) NOT NULL;";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.True(result.IsNotNull);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.True(result.Definition.IsNotNull);
     }
 
     [Fact]
@@ -125,14 +136,16 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN status AS VARCHAR(20) DEFAULT 'active';";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("'active'", result.DefaultValue);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("'active'", result.Definition.DefaultValue);
     }
 
     [Fact]
@@ -140,15 +153,17 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN positive_int AS INTEGER CHECK (VALUE > 0);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Single(result.CheckConstraints);
-        Assert.Equal("VALUE > 0", result.CheckConstraints[0]);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Single(result.Definition.CheckConstraints);
+        Assert.Equal("VALUE > 0", result.Definition.CheckConstraints[0]);
     }
 
     [Fact]
@@ -156,16 +171,18 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN percentage AS NUMERIC(5, 2) CHECK (VALUE >= 0) CHECK (VALUE <= 100);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(2, result.CheckConstraints.Count);
-        Assert.Contains("VALUE >= 0", result.CheckConstraints);
-        Assert.Contains("VALUE <= 100", result.CheckConstraints);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(2, result.Definition.CheckConstraints.Count);
+        Assert.Contains("VALUE >= 0", result.Definition.CheckConstraints);
+        Assert.Contains("VALUE <= 100", result.Definition.CheckConstraints);
     }
 
     [Fact]
@@ -173,14 +190,16 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN case_insensitive_text AS TEXT COLLATE \"en_US\";";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("en_US", result.Collation);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("en_US", result.Definition.Collation);
     }
 
     #endregion
@@ -195,19 +214,21 @@ public sealed class DomainExtractorTests
     DEFAULT 0
     NOT NULL
     CHECK (VALUE >= 0);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("positive_numeric", result.Name);
-        Assert.Equal("NUMERIC(12, 2)", result.BaseType);
-        Assert.Equal("0", result.DefaultValue);
-        Assert.True(result.IsNotNull);
-        Assert.Single(result.CheckConstraints);
-        Assert.Equal("VALUE >= 0", result.CheckConstraints[0]);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("positive_numeric", result.Definition.Name);
+        Assert.Equal("NUMERIC(12, 2)", result.Definition.BaseType);
+        Assert.Equal("0", result.Definition.DefaultValue);
+        Assert.True(result.Definition.IsNotNull);
+        Assert.Single(result.Definition.CheckConstraints);
+        Assert.Equal("VALUE >= 0", result.Definition.CheckConstraints[0]);
     }
 
     [Fact]
@@ -215,15 +236,17 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN email AS VARCHAR(255) CHECK (VALUE ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$');";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Single(result.CheckConstraints);
-        Assert.Contains("~*", result.CheckConstraints[0]);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Single(result.Definition.CheckConstraints);
+        Assert.Contains("~*", result.Definition.CheckConstraints[0]);
     }
 
     #endregion
@@ -243,13 +266,16 @@ public sealed class DomainExtractorTests
             StartLine = 1,
             EndLine = 1
         };
+        var blocks = new[] { block };
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("Email address with validation", result.SqlComment);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("Email address with validation", result.Definition.SqlComment);
     }
 
     [Fact]
@@ -265,13 +291,120 @@ public sealed class DomainExtractorTests
             StartLine = 1,
             EndLine = 2
         };
+        var blocks = new[] { block };
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(rawSql, result.RawSql);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(rawSql, result.Definition.RawSql);
+    }
+
+    #endregion
+
+    #region ValidationIssues Tests
+
+    [Fact]
+    public void Extract_WithExcessiveStringLength_ReturnsWarning()
+    {
+        // Arrange
+        var sql = "CREATE DOMAIN huge_text AS VARCHAR(50000);";
+        var blocks = CreateBlocks(sql);
+
+        // Act
+        var result = _extractor.Extract(blocks);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccess); // Still succeeds, but with warning
+        Assert.NotNull(result.Definition);
+        Assert.NotEmpty(result.ValidationIssues);
+        var warning = result.ValidationIssues.First(i => i.Code == "DOMAIN_EXCESSIVE_LENGTH");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, warning.Severity);
+        Assert.Contains("50000", warning.Message);
+    }
+
+    [Fact]
+    public void Extract_WithInvalidNumericScale_ReturnsWarning()
+    {
+        // Arrange - scale > precision
+        var sql = "CREATE DOMAIN bad_numeric AS NUMERIC(5, 10);";
+        var blocks = CreateBlocks(sql);
+
+        // Act
+        var result = _extractor.Extract(blocks);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccess); // Still succeeds, but with warning
+        Assert.NotNull(result.Definition);
+        Assert.NotEmpty(result.ValidationIssues);
+        var warning = result.ValidationIssues.First(i => i.Code == "DOMAIN_INVALID_NUMERIC_PARAMS");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, warning.Severity);
+        Assert.Contains("scale", warning.Message);
+    }
+
+    [Fact]
+    public void Extract_WithExcessivePrecision_ReturnsWarning()
+    {
+        // Arrange
+        var sql = "CREATE DOMAIN huge_numeric AS NUMERIC(2000, 2);";
+        var blocks = CreateBlocks(sql);
+
+        // Act
+        var result = _extractor.Extract(blocks);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccess); // Still succeeds, but with warning
+        Assert.NotNull(result.Definition);
+        Assert.NotEmpty(result.ValidationIssues);
+        var warning = result.ValidationIssues.First(i => i.Code == "DOMAIN_EXCESSIVE_PRECISION");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, warning.Severity);
+        Assert.Contains("2000", warning.Message);
+    }
+
+    [Fact]
+    public void Extract_WithTooManyCheckConstraints_ReturnsWarning()
+    {
+        // Arrange
+        var sql = "CREATE DOMAIN complex AS INTEGER CHECK (VALUE > 0) CHECK (VALUE < 100) CHECK (VALUE != 50) CHECK (VALUE != 75) CHECK (VALUE != 25) CHECK (VALUE != 10);";
+        var blocks = CreateBlocks(sql);
+
+        // Act
+        var result = _extractor.Extract(blocks);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccess); // Still succeeds, but with warning
+        Assert.NotNull(result.Definition);
+        Assert.NotEmpty(result.ValidationIssues);
+        var warning = result.ValidationIssues.First(i => i.Code == "DOMAIN_TOO_MANY_CHECKS");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, warning.Severity);
+        Assert.Contains("6", warning.Message);
+    }
+
+    [Fact]
+    public void Extract_WithMultipleIssues_ReturnsAllWarnings()
+    {
+        // Arrange - excessive precision + too many checks
+        var sql = "CREATE DOMAIN complex AS NUMERIC(2000, 2) CHECK (VALUE > 0) CHECK (VALUE < 100) CHECK (VALUE != 50) CHECK (VALUE != 75) CHECK (VALUE != 25) CHECK (VALUE != 10);";
+        var blocks = CreateBlocks(sql);
+
+        // Act
+        var result = _extractor.Extract(blocks);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccess); // Still succeeds, but with warnings
+        Assert.NotNull(result.Definition);
+        Assert.NotEmpty(result.ValidationIssues);
+        Assert.Equal(2, result.ValidationIssues.Count);
+        Assert.Contains(result.ValidationIssues, i => i.Code == "DOMAIN_EXCESSIVE_PRECISION");
+        Assert.Contains(result.ValidationIssues, i => i.Code == "DOMAIN_TOO_MANY_CHECKS");
     }
 
     #endregion
@@ -279,23 +412,43 @@ public sealed class DomainExtractorTests
     #region Invalid Input Tests
 
     [Fact]
-    public void Extract_WithNullBlock_ThrowsArgumentNullException()
+    public void Extract_WithNullBlocks_ThrowsArgumentNullException()
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
     }
 
     [Fact]
-    public void Extract_NonDomainBlock_ReturnsNull()
+    public void Extract_NonDomainBlock_ReturnsNotApplicable()
     {
         // Arrange
-        var block = CreateBlock("CREATE TABLE users (id INT PRIMARY KEY);");
+        var blocks = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.Null(result);
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Definition);
+    }
+
+    [Fact]
+    public void Extract_InvalidDomainSyntax_ReturnsFailure()
+    {
+        // Arrange
+        var blocks = CreateBlocks("CREATE DOMAIN INVALID SYNTAX");
+
+        // Act
+        var result = _extractor.Extract(blocks);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Definition);
+        Assert.NotEmpty(result.ValidationIssues);
+        var error = result.ValidationIssues.First(i => i.Code == "DOMAIN_PARSE_ERROR");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Error, error.Severity);
     }
 
     #endregion
@@ -307,16 +460,18 @@ public sealed class DomainExtractorTests
     {
         // Arrange - Пример из реального Schema.sql
         var sql = "CREATE DOMAIN email AS VARCHAR(255) CHECK (VALUE ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$');";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("email", result.Name);
-        Assert.Equal("VARCHAR(255)", result.BaseType);
-        Assert.Single(result.CheckConstraints);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("email", result.Definition.Name);
+        Assert.Equal("VARCHAR(255)", result.Definition.BaseType);
+        Assert.Single(result.Definition.CheckConstraints);
     }
 
     [Fact]
@@ -324,19 +479,21 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN positive_numeric AS NUMERIC(12, 2) CHECK (VALUE >= 0);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("positive_numeric", result.Name);
-        Assert.Equal("NUMERIC(12, 2)", result.BaseType);
-        Assert.Equal(12, result.NumericPrecision);
-        Assert.Equal(2, result.NumericScale);
-        Assert.Single(result.CheckConstraints);
-        Assert.Equal("VALUE >= 0", result.CheckConstraints[0]);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("positive_numeric", result.Definition.Name);
+        Assert.Equal("NUMERIC(12, 2)", result.Definition.BaseType);
+        Assert.Equal(12, result.Definition.NumericPrecision);
+        Assert.Equal(2, result.Definition.NumericScale);
+        Assert.Single(result.Definition.CheckConstraints);
+        Assert.Equal("VALUE >= 0", result.Definition.CheckConstraints[0]);
     }
 
     [Fact]
@@ -344,17 +501,19 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN percentage AS NUMERIC(5, 2) CHECK (VALUE >= 0 AND VALUE <= 100);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("percentage", result.Name);
-        Assert.Equal("NUMERIC(5, 2)", result.BaseType);
-        Assert.Single(result.CheckConstraints);
-        Assert.Contains("VALUE >= 0 AND VALUE <= 100", result.CheckConstraints[0]);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("percentage", result.Definition.Name);
+        Assert.Equal("NUMERIC(5, 2)", result.Definition.BaseType);
+        Assert.Single(result.Definition.CheckConstraints);
+        Assert.Contains("VALUE >= 0 AND VALUE <= 100", result.Definition.CheckConstraints[0]);
     }
 
     [Fact]
@@ -362,17 +521,19 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN username_slug AS VARCHAR(50) CHECK (VALUE ~* '^[a-z0-9_-]+$');";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("username_slug", result.Name);
-        Assert.Equal("VARCHAR(50)", result.BaseType);
-        Assert.Equal(50, result.MaxLength);
-        Assert.Single(result.CheckConstraints);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("username_slug", result.Definition.Name);
+        Assert.Equal("VARCHAR(50)", result.Definition.BaseType);
+        Assert.Equal(50, result.Definition.MaxLength);
+        Assert.Single(result.Definition.CheckConstraints);
     }
 
     #endregion
@@ -384,15 +545,17 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN description AS TEXT NOT NULL;";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("TEXT", result.BaseType);
-        Assert.True(result.IsNotNull);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("TEXT", result.Definition.BaseType);
+        Assert.True(result.Definition.IsNotNull);
     }
 
     [Fact]
@@ -400,14 +563,16 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN age AS INTEGER CHECK (VALUE >= 0 AND VALUE <= 150);";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("INTEGER", result.BaseType);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("INTEGER", result.Definition.BaseType);
     }
 
     [Fact]
@@ -415,30 +580,35 @@ public sealed class DomainExtractorTests
     {
         // Arrange
         var sql = "CREATE DOMAIN created_timestamp AS TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL;";
-        var block = CreateBlock(sql);
+        var blocks = CreateBlocks(sql);
 
         // Act
-        var result = _extractor.Extract(block);
+        var result = _extractor.Extract(blocks);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("TIMESTAMP", result.BaseType);
-        Assert.Equal("CURRENT_TIMESTAMP", result.DefaultValue);
-        Assert.True(result.IsNotNull);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("TIMESTAMP", result.Definition.BaseType);
+        Assert.Equal("CURRENT_TIMESTAMP", result.Definition.DefaultValue);
+        Assert.True(result.Definition.IsNotNull);
     }
 
     #endregion
 
     #region Helper Methods
 
-    private static SqlBlock CreateBlock(string sql)
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql)
     {
-        return new SqlBlock
+        return new[]
         {
-            Content = sql,
-            RawContent = sql,
-            StartLine = 1,
-            EndLine = 1
+            new SqlBlock
+            {
+                Content = sql,
+                RawContent = sql,
+                StartLine = 1,
+                EndLine = 1
+            }
         };
     }
 

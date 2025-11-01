@@ -16,7 +16,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IBlockExtractor _blockExtractor;
     private readonly IExtractor<EnumTypeDefinition> _enumExtractor;
     private readonly ICompositeExtractor _compositeExtractor;
-    private readonly IDomainExtractor _domainExtractor;
+    private readonly IExtractor<DomainTypeDefinition> _domainExtractor;
     private readonly ITableExtractor _tableExtractor;
     private readonly IViewExtractor _viewExtractor;
     private readonly IFunctionExtractor _functionExtractor;
@@ -38,7 +38,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IBlockExtractor blockExtractor,
         IExtractor<EnumTypeDefinition> enumExtractor,
         ICompositeExtractor compositeExtractor,
-        IDomainExtractor domainExtractor,
+        IExtractor<DomainTypeDefinition> domainExtractor,
         ITableExtractor tableExtractor,
         IViewExtractor viewExtractor,
         IFunctionExtractor functionExtractor,
@@ -260,15 +260,12 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         foreach (var block in blocks)
         {
-            if (!_domainExtractor.CanExtract(block))
+            var blockList = new[] { block };
+            var result = _domainExtractor.Extract(blockList);
+            
+            if (result.IsSuccess && result.Definition is not null)
             {
-                continue;
-            }
-
-            var domainDef = _domainExtractor.Extract(block);
-            if (domainDef is not null)
-            {
-                domains.Add(domainDef);
+                domains.Add(result.Definition);
             }
         }
 
@@ -645,12 +642,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                         }
                     }
                     // Пытаемся извлечь Domain
-                    else if (_domainExtractor.CanExtract(block))
+                    else
                     {
-                        var domainDef = _domainExtractor.Extract(block);
-                        if (domainDef is not null)
+                        var domainBlocks = new[] { block };
+                        var domainResult = _domainExtractor.Extract(domainBlocks);
+                        if (domainResult.IsSuccess && domainResult.Definition is not null)
                         {
-                            domains.Add(domainDef);
+                            domains.Add(domainResult.Definition);
                         }
                     }
                     break;
