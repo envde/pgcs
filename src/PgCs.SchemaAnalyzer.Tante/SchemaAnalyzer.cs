@@ -17,8 +17,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IExtractor<EnumTypeDefinition> _enumExtractor;
     private readonly IExtractor<CompositeTypeDefinition> _compositeExtractor;
     private readonly IExtractor<DomainTypeDefinition> _domainExtractor;
-    private readonly ITableExtractor _tableExtractor;
-    private readonly IViewExtractor _viewExtractor;
+    private readonly IExtractor<TableDefinition> _tableExtractor;
+    private readonly IExtractor<ViewDefinition> _viewExtractor;
     private readonly IExtractor<FunctionDefinition> _functionExtractor;
     private readonly IIndexExtractor _indexExtractor;
     private readonly ITriggerExtractor _triggerExtractor;
@@ -33,8 +33,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IExtractor<EnumTypeDefinition> enumExtractor,
         IExtractor<CompositeTypeDefinition> compositeExtractor,
         IExtractor<DomainTypeDefinition> domainExtractor,
-        ITableExtractor tableExtractor,
-        IViewExtractor viewExtractor,
+        IExtractor<TableDefinition> tableExtractor,
+        IExtractor<ViewDefinition> viewExtractor,
         IExtractor<FunctionDefinition> functionExtractor,
         IIndexExtractor indexExtractor,
         ITriggerExtractor triggerExtractor,
@@ -177,15 +177,15 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         foreach (var block in blocks)
         {
-            if (!_tableExtractor.CanExtract(block))
+            if (!_tableExtractor.CanExtract([block]))
             {
                 continue;
             }
 
-            var tableDef = _tableExtractor.Extract(block);
-            if (tableDef is not null)
+            var result = _tableExtractor.Extract([block]);
+            if (result.IsSuccess && result.Definition is not null)
             {
-                tables.Add(tableDef);
+                tables.Add(result.Definition);
             }
         }
 
@@ -211,10 +211,10 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
             // Передаем все блоки, начиная с текущего
             var blocksToProcess = blocks.Skip(i).ToList();
-            var viewDef = _viewExtractor.Extract(blocksToProcess);
-            if (viewDef is not null)
+            var result = _viewExtractor.Extract(blocksToProcess);
+            if (result.IsSuccess && result.Definition is not null)
             {
-                views.Add(viewDef);
+                views.Add(result.Definition);
             }
         }
 
@@ -420,12 +420,12 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             {
                 case SchemaObjectType.Tables:
                     // Извлекаем таблицу
-                    if (_tableExtractor.CanExtract(block))
+                    if (_tableExtractor.CanExtract([block]))
                     {
-                        var tableDef = _tableExtractor.Extract(block);
-                        if (tableDef is not null)
+                        var tableResult = _tableExtractor.Extract([block]);
+                        if (tableResult.IsSuccess && tableResult.Definition is not null)
                         {
-                            tables.Add(tableDef);
+                            tables.Add(tableResult.Definition);
                         }
                     }
                     break;
@@ -435,10 +435,10 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     if (_viewExtractor.CanExtract([block]))
                     {
                         var blocksToProcess = blocksList.Skip(i).ToList();
-                        var viewDef = _viewExtractor.Extract(blocksToProcess);
-                        if (viewDef is not null)
+                        var result = _viewExtractor.Extract(blocksToProcess);
+                        if (result.IsSuccess && result.Definition is not null)
                         {
-                            views.Add(viewDef);
+                            views.Add(result.Definition);
                         }
                     }
                     break;

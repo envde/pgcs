@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 
 namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 
@@ -19,7 +21,7 @@ namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 /// - Storage parameters (WITH)
 /// </para>
 /// </summary>
-public sealed partial class TableExtractor : ITableExtractor
+public sealed partial class TableExtractor : IExtractor<TableDefinition>
 {
     // ============================================================================
     // Regex Patterns
@@ -121,35 +123,57 @@ public sealed partial class TableExtractor : ITableExtractor
     // ============================================================================
 
     /// <inheritdoc />
-    public bool CanExtract(SqlBlock block)
+    public bool CanExtract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(blocks);
 
+        // Для таблиц достаточно одного блока
+        if (blocks.Count == 0)
+        {
+            return false;
+        }
+
+        var block = blocks[0];
         return CreateTablePattern().IsMatch(block.Content) || 
                PartitionOfPattern().IsMatch(block.Content);
     }
 
     /// <inheritdoc />
-    public TableDefinition? Extract(SqlBlock block)
+    public ExtractionResult<TableDefinition> Extract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(blocks);
 
-        if (!CanExtract(block))
+        if (!CanExtract(blocks))
         {
-            return null;
+            return ExtractionResult<TableDefinition>.NotApplicable();
         }
+
+        var block = blocks[0];
+        var issues = new List<ValidationIssue>();
 
         // Проверяем, это партиция или обычная таблица
         var partitionOfMatch = PartitionOfPattern().Match(block.Content);
         if (partitionOfMatch.Success)
         {
-            return ExtractPartitionTable(block, partitionOfMatch);
+            return ExtractPartitionTable(block, partitionOfMatch, issues);
         }
 
         var match = CreateTablePattern().Match(block.Content);
         if (!match.Success)
         {
-            return null;
+            return ExtractionResult<TableDefinition>.Failure([
+                ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Table,
+                    "TABLE_PARSE_ERROR",
+                    "Failed to parse TABLE definition. Expected format: CREATE TABLE [schema.]name (...)",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = block.Content,
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                )
+            ]);
         }
 
         var schema = match.Groups[3].Success ? match.Groups[3].Value : null;
@@ -161,7 +185,46 @@ public sealed partial class TableExtractor : ITableExtractor
                         match.Groups[1].Value.Equals("UNLOGGED", StringComparison.OrdinalIgnoreCase);
 
         // Извлечение колонок
-        var columns = ExtractColumns(block.Content);
+        var columns = ExtractColumns(block.Content, name, block, issues);
+
+        if (columns.Count == 0)
+        {
+            return ExtractionResult<TableDefinition>.Failure([
+                ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Table,
+                    "TABLE_NO_COLUMNS",
+                    $"TABLE '{name}' has no valid columns defined",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = block.Content,
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                )
+            ]);
+        }
+
+        // Проверка на дубликаты колонок
+        var duplicateColumns = columns
+            .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateColumns.Count > 0)
+        {
+            issues.Add(ValidationIssue.Warning(
+                ValidationIssue.ValidationDefinitionType.Table,
+                "TABLE_DUPLICATE_COLUMN",
+                $"TABLE '{name}' contains duplicate column names: {string.Join(", ", duplicateColumns)}",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.Content,
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+        }
 
         // Извлечение партиционирования
         var partitionInfo = ExtractPartitionInfo(block.Content);
@@ -175,7 +238,7 @@ public sealed partial class TableExtractor : ITableExtractor
         // Извлечение storage parameters
         var storageParameters = ExtractStorageParameters(block.Content);
 
-        return new TableDefinition
+        var definition = new TableDefinition
         {
             Name = name,
             Schema = schema,
@@ -194,6 +257,8 @@ public sealed partial class TableExtractor : ITableExtractor
             SqlComment = block.HeaderComment,
             RawSql = block.Content
         };
+
+        return ExtractionResult<TableDefinition>.Success(definition, issues);
     }
 
     // ============================================================================
@@ -203,13 +268,16 @@ public sealed partial class TableExtractor : ITableExtractor
     /// <summary>
     /// Извлекает определение таблицы-партиции (PARTITION OF)
     /// </summary>
-    private TableDefinition? ExtractPartitionTable(SqlBlock block, Match partitionOfMatch)
+    private ExtractionResult<TableDefinition> ExtractPartitionTable(
+        SqlBlock block, 
+        Match partitionOfMatch, 
+        List<ValidationIssue> issues)
     {
         var schema = partitionOfMatch.Groups[2].Success ? partitionOfMatch.Groups[2].Value : null;
         var name = partitionOfMatch.Groups[1].Value;
         var parentTable = partitionOfMatch.Groups[3].Value;
 
-        return new TableDefinition
+        var definition = new TableDefinition
         {
             Name = name,
             Schema = schema,
@@ -228,6 +296,8 @@ public sealed partial class TableExtractor : ITableExtractor
             SqlComment = block.HeaderComment,
             RawSql = block.Content
         };
+
+        return ExtractionResult<TableDefinition>.Success(definition, issues);
     }
 
     /// <summary>
@@ -339,7 +409,11 @@ public sealed partial class TableExtractor : ITableExtractor
     /// Извлекает колонки таблицы
     /// Упрощенная версия - извлекает только базовую информацию
     /// </summary>
-    private IReadOnlyList<TableColumn> ExtractColumns(string sql)
+    private IReadOnlyList<TableColumn> ExtractColumns(
+        string sql, 
+        string tableName, 
+        SqlBlock block, 
+        List<ValidationIssue> issues)
     {
         var columns = new List<TableColumn>();
 
@@ -378,6 +452,21 @@ public sealed partial class TableExtractor : ITableExtractor
             if (column != null)
             {
                 columns.Add(column);
+            }
+            else
+            {
+                // Добавляем предупреждение для невалидной колонки
+                issues.Add(ValidationIssue.Warning(
+                    ValidationIssue.ValidationDefinitionType.Table,
+                    "TABLE_INVALID_COLUMN",
+                    $"Failed to parse column definition in TABLE '{tableName}': '{trimmedLine.TrimEnd(',').Trim()}'",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = trimmedLine,
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                ));
             }
         }
 

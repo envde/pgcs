@@ -4,6 +4,7 @@ using PgCs.Core.Extraction.Block;
 using PgCs.Core.Extraction.Parsing.SqlComment;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 
 namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 
@@ -18,7 +19,7 @@ namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 /// - OR REPLACE
 /// </para>
 /// </summary>
-public sealed partial class ViewExtractor : IViewExtractor
+public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
 {
     // ============================================================================
     // Regex Patterns
@@ -105,26 +106,41 @@ public sealed partial class ViewExtractor : IViewExtractor
     }
 
     /// <inheritdoc />
-    public ViewDefinition? Extract(IReadOnlyList<SqlBlock> blocks)
+    public ExtractionResult<ViewDefinition> Extract(IReadOnlyList<SqlBlock> blocks)
     {
         ArgumentNullException.ThrowIfNull(blocks);
 
-        if (blocks.Count == 0 || !CanExtract(blocks))
+        var issues = new List<ValidationIssue>();
+
+        if (blocks.Count == 0)
         {
-            return null;
+            return ExtractionResult<ViewDefinition>.NotApplicable();
         }
 
         // Ищем блок с VIEW в любой позиции
         var viewBlock = blocks.FirstOrDefault(block => CreateViewPattern().IsMatch(block.Content));
         if (viewBlock is null)
         {
-            return null;
+            return ExtractionResult<ViewDefinition>.NotApplicable();
         }
 
         var match = CreateViewPattern().Match(viewBlock.Content);
         if (!match.Success)
         {
-            return null;
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.View,
+                "VIEW_PARSE_ERROR",
+                "Failed to parse CREATE VIEW statement",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = viewBlock.Content.Length > 100 
+                        ? viewBlock.Content[..100] + "..." 
+                        : viewBlock.Content,
+                    Line = viewBlock.StartLine,
+                    Column = 1
+                }
+            ));
+            return ExtractionResult<ViewDefinition>.Failure(issues);
         }
 
         var schema = match.Groups[3].Success ? match.Groups[3].Value : null;
@@ -135,8 +151,20 @@ public sealed partial class ViewExtractor : IViewExtractor
         var query = ExtractSelectQuery(viewBlock.Content);
         if (string.IsNullOrWhiteSpace(query))
         {
-            // Если не удалось извлечь запрос, возвращаем null
-            return null;
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.View,
+                "VIEW_NO_QUERY",
+                $"No SELECT query found in VIEW definition for '{name}'",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = viewBlock.Content.Length > 100 
+                        ? viewBlock.Content[..100] + "..." 
+                        : viewBlock.Content,
+                    Line = viewBlock.StartLine,
+                    Column = 1
+                }
+            ));
+            return ExtractionResult<ViewDefinition>.Failure(issues);
         }
 
         // Извлечение списка колонок (если указан явно)
@@ -145,7 +173,7 @@ public sealed partial class ViewExtractor : IViewExtractor
         // Если колонки не указаны явно, пытаемся извлечь их из SELECT запроса с использованием inline-комментариев
         var columns = columnNames is not null 
             ? CreateColumnsFromNames(columnNames) 
-            : ExtractColumnsFromSelect(query, viewBlock, blocks);
+            : ExtractColumnsFromSelect(query, viewBlock, blocks, issues);
 
         // Извлечение WITH CHECK OPTION
         var withCheckOption = WithCheckOptionPattern().IsMatch(viewBlock.Content);
@@ -153,7 +181,7 @@ public sealed partial class ViewExtractor : IViewExtractor
         // Извлечение SECURITY BARRIER
         var isSecurityBarrier = ExtractSecurityBarrier(viewBlock.Content);
 
-        return new ViewDefinition
+        var definition = new ViewDefinition
         {
             Name = name,
             Schema = schema,
@@ -166,6 +194,8 @@ public sealed partial class ViewExtractor : IViewExtractor
             SqlComment = viewBlock.HeaderComment,
             RawSql = viewBlock.Content
         };
+
+        return ExtractionResult<ViewDefinition>.Success(definition, issues);
     }
 
     // ============================================================================
@@ -259,7 +289,8 @@ public sealed partial class ViewExtractor : IViewExtractor
     private static IReadOnlyList<TableColumn> ExtractColumnsFromSelect(
         string query, 
         SqlBlock viewBlock, 
-        IReadOnlyList<SqlBlock> allBlocks)
+        IReadOnlyList<SqlBlock> allBlocks,
+        List<ValidationIssue> issues)
     {
         var match = SelectColumnsPattern().Match(query);
         if (!match.Success)
@@ -294,12 +325,12 @@ public sealed partial class ViewExtractor : IViewExtractor
                 continue;
             }
             
-            if (tableExtractor.CanExtract(block))
+            if (tableExtractor.CanExtract([block]))
             {
-                var table = tableExtractor.Extract(block);
-                if (table is not null)
+                var result = tableExtractor.Extract([block]);
+                if (result.IsSuccess && result.Definition is not null)
                 {
-                    availableTables[table.Name.ToLowerInvariant()] = table;
+                    availableTables[result.Definition.Name.ToLowerInvariant()] = result.Definition;
                 }
             }
         }

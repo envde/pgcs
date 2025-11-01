@@ -1,4 +1,6 @@
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
+using PgCs.Core.Schema.Definitions;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
 
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
@@ -8,7 +10,7 @@ namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 /// </summary>
 public sealed class ViewExtractorTests
 {
-    private readonly IViewExtractor _extractor = new ViewExtractor();
+    private readonly IExtractor<ViewDefinition> _extractor = new ViewExtractor();
 
     #region CanExtract Tests
 
@@ -16,13 +18,13 @@ public sealed class ViewExtractorTests
     public void CanExtract_WithValidViewBlock_ReturnsTrue()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW my_view AS
             SELECT id, name FROM users;
         ");
 
         // Act
-        var result = _extractor.CanExtract([block]);
+        var result = _extractor.CanExtract(blocks);
 
         // Assert
         Assert.True(result);
@@ -32,13 +34,13 @@ public sealed class ViewExtractorTests
     public void CanExtract_WithMaterializedView_ReturnsTrue()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE MATERIALIZED VIEW my_mat_view AS
             SELECT * FROM orders;
         ");
 
         // Act
-        var result = _extractor.CanExtract([block]);
+        var result = _extractor.CanExtract(blocks);
 
         // Assert
         Assert.True(result);
@@ -48,10 +50,10 @@ public sealed class ViewExtractorTests
     public void CanExtract_WithTableBlock_ReturnsFalse()
     {
         // Arrange
-        var block = CreateBlock("CREATE TABLE users (id SERIAL PRIMARY KEY);");
+        var blocks = CreateBlocks("CREATE TABLE users (id SERIAL PRIMARY KEY);");
 
         // Act
-        var result = _extractor.CanExtract([block]);
+        var result = _extractor.CanExtract(blocks);
 
         // Assert
         Assert.False(result);
@@ -73,7 +75,7 @@ public sealed class ViewExtractorTests
     {
         // Arrange
         var bx = new BlockExtractor();
-        var block = bx.Extract(@"
+        var blocks = bx.Extract(@"
             CREATE VIEW active_users AS
             SELECT 
                     id, -- comment: Идентификатор пользователя; type: INTEGER; rename: ID;
@@ -81,40 +83,41 @@ public sealed class ViewExtractorTests
                     email -- Почтовый адрес
             FROM users
             WHERE is_active = TRUE;
-        ").First();
+        ").ToList();
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("active_users", result.Name);
-        Assert.Null(result.Schema);
-        Assert.False(result.IsMaterialized);
-        Assert.False(result.WithCheckOption);
-        Assert.False(result.IsSecurityBarrier);
-        Assert.Contains("SELECT", result.Query);
-        Assert.Contains("FROM users", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("active_users", result.Definition.Name);
+        Assert.Null(result.Definition.Schema);
+        Assert.False(result.Definition.IsMaterialized);
+        Assert.False(result.Definition.WithCheckOption);
+        Assert.False(result.Definition.IsSecurityBarrier);
+        Assert.Contains("SELECT", result.Definition.Query);
+        Assert.Contains("FROM users", result.Definition.Query);
         
         // Verify columns extracted from inline comments
-        Assert.Equal(3, result.Columns.Count);
+        Assert.Equal(3, result.Definition.Columns.Count);
         
         // Column 1: id with full metadata
-        var idColumn = result.Columns[0];
+        var idColumn = result.Definition.Columns[0];
         Assert.Equal("id", idColumn.Name);
         Assert.Equal("INTEGER", idColumn.DataType);
         Assert.Equal("ID", idColumn.ReName);
         Assert.Equal("Идентификатор пользователя", idColumn.Comment);
         
         // Column 2: username with type
-        var usernameColumn = result.Columns[1];
+        var usernameColumn = result.Definition.Columns[1];
         Assert.Equal("username", usernameColumn.Name);
         Assert.Equal("VARCHAR(255)", usernameColumn.DataType);
         Assert.Null(usernameColumn.ReName);
         Assert.Equal("Имя пользователя", usernameColumn.Comment);
         
         // Column 3: email with a simple comment
-        var emailColumn = result.Columns[2];
+        var emailColumn = result.Definition.Columns[2];
         Assert.Equal("email", emailColumn.Name);
         Assert.Equal("unknown", emailColumn.DataType); // No type specified
         Assert.Null(emailColumn.ReName);
@@ -168,42 +171,43 @@ public sealed class ViewExtractorTests
         var result = _extractor.Extract(allBlocks);
         
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("user_order_summary", result.Name);
-        Assert.False(result.IsMaterialized);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("user_order_summary", result.Definition.Name);
+        Assert.False(result.Definition.IsMaterialized);
         
         // Проверяем, что извлечено 6 колонок
-        Assert.Equal(6, result.Columns.Count);
+        Assert.Equal(6, result.Definition.Columns.Count);
         
         // Проверяем id - должен быть SERIAL из users, с комментарием из VIEW
-        var idColumn = result.Columns.FirstOrDefault(c => c.Name == "id");
+        var idColumn = result.Definition.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(idColumn);
         Assert.Equal("SERIAL", idColumn.DataType.ToUpper());
         Assert.Equal("Идентификатор пользователя", idColumn.Comment);
         
         // Проверяем username - должен быть VARCHAR(100)
-        var usernameColumn = result.Columns.FirstOrDefault(c => c.Name == "username");
+        var usernameColumn = result.Definition.Columns.FirstOrDefault(c => c.Name == "username");
         Assert.NotNull(usernameColumn);
         Assert.Equal("VARCHAR", usernameColumn.DataType.ToUpper());
         Assert.Equal(100, usernameColumn.MaxLength);
         Assert.Equal("Имя пользователя", usernameColumn.Comment);
         
         // Проверяем email - должен быть VARCHAR(255)
-        var emailColumn = result.Columns.FirstOrDefault(c => c.Name == "email");
+        var emailColumn = result.Definition.Columns.FirstOrDefault(c => c.Name == "email");
         Assert.NotNull(emailColumn);
         Assert.Equal("VARCHAR", emailColumn.DataType.ToUpper());
         Assert.Equal(255, emailColumn.MaxLength);
         Assert.Equal("Почтовый адрес", emailColumn.Comment);
         
         // Проверяем order_number - должен быть VARCHAR(50)
-        var orderNumberColumn = result.Columns.FirstOrDefault(c => c.Name == "order_number");
+        var orderNumberColumn = result.Definition.Columns.FirstOrDefault(c => c.Name == "order_number");
         Assert.NotNull(orderNumberColumn);
         Assert.Equal("VARCHAR", orderNumberColumn.DataType.ToUpper());
         Assert.Equal(50, orderNumberColumn.MaxLength);
         Assert.Equal("Номер заказа", orderNumberColumn.Comment);
         
         // Проверяем total - должен быть DECIMAL(10, 2)
-        var totalColumn = result.Columns.FirstOrDefault(c => c.Name == "total");
+        var totalColumn = result.Definition.Columns.FirstOrDefault(c => c.Name == "total");
         Assert.NotNull(totalColumn);
         Assert.Equal("DECIMAL", totalColumn.DataType.ToUpper());
         Assert.Equal(10, totalColumn.NumericPrecision);
@@ -211,7 +215,7 @@ public sealed class ViewExtractorTests
         Assert.Equal("Сумма заказа в долларах", totalColumn.Comment);
         
         // Проверяем status - должен быть VARCHAR(20)
-        var statusColumn = result.Columns.FirstOrDefault(c => c.Name == "status");
+        var statusColumn = result.Definition.Columns.FirstOrDefault(c => c.Name == "status");
         Assert.NotNull(statusColumn);
         Assert.Equal("VARCHAR", statusColumn.DataType.ToUpper());
         Assert.Equal(20, statusColumn.MaxLength);
@@ -271,58 +275,63 @@ public sealed class ViewExtractorTests
         var result3 = _extractor.Extract(blocksViewMiddle);
 
         // Assert
-        Assert.NotNull(result1);
-        Assert.Equal("summary1", result1.Name);
-        Assert.Equal(2, result1.Columns.Count); // id и name
-        Assert.Equal("id", result1.Columns[0].Name);
-        Assert.Equal("name", result1.Columns[1].Name);
+        Assert.True(result1.IsSuccess);
+        Assert.NotNull(result1.Definition);
+        Assert.Equal("summary1", result1.Definition.Name);
+        Assert.Equal(2, result1.Definition.Columns.Count); // id и name
+        Assert.Equal("id", result1.Definition.Columns[0].Name);
+        Assert.Equal("name", result1.Definition.Columns[1].Name);
 
-        Assert.NotNull(result2);
-        Assert.Equal("summary2", result2.Name);
-        Assert.Equal(2, result2.Columns.Count); // id и title
-        Assert.Equal("id", result2.Columns[0].Name);
-        Assert.Equal("title", result2.Columns[1].Name);
+        Assert.True(result2.IsSuccess);
+        Assert.NotNull(result2.Definition);
+        Assert.Equal("summary2", result2.Definition.Name);
+        Assert.Equal(2, result2.Definition.Columns.Count); // id и title
+        Assert.Equal("id", result2.Definition.Columns[0].Name);
+        Assert.Equal("title", result2.Definition.Columns[1].Name);
         
-        Assert.NotNull(result3);
-        Assert.Equal("summary3", result3.Name);
-        Assert.Single(result3.Columns); // только id
-        Assert.Equal("id", result3.Columns[0].Name);
+        Assert.True(result3.IsSuccess);
+        Assert.NotNull(result3.Definition);
+        Assert.Equal("summary3", result3.Definition.Name);
+        Assert.Single(result3.Definition.Columns); // только id
+        Assert.Equal("id", result3.Definition.Columns[0].Name);
     }
 
     [Fact]
     public void Extract_ViewWithSchema_ExtractsSchemaCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW app.user_summary AS
             SELECT id, username FROM users;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("user_summary", result.Name);
-        Assert.Equal("app", result.Schema);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("user_summary", result.Definition.Name);
+        Assert.Equal("app", result.Definition.Schema);
     }
 
     [Fact]
     public void Extract_ViewWithComment_ExtractsCommentCorrectly()
     {
         // Arrange
-        var block = CreateBlock(
+        var blocks = CreateBlocks(
             @"CREATE VIEW summary AS SELECT * FROM data;",
             "Summary of all data"
         );
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("summary", result.Name);
-        Assert.Equal("Summary of all data", result.SqlComment);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("summary", result.Definition.Name);
+        Assert.Equal("Summary of all data", result.Definition.SqlComment);
     }
 
     #endregion
@@ -333,7 +342,7 @@ public sealed class ViewExtractorTests
     public void Extract_MaterializedView_SetsMaterializedFlag()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE MATERIALIZED VIEW order_stats AS
             SELECT 
                 user_id,
@@ -344,33 +353,35 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("order_stats", result.Name);
-        Assert.True(result.IsMaterialized);
-        Assert.Contains("SELECT", result.Query);
-        Assert.Contains("GROUP BY", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("order_stats", result.Definition.Name);
+        Assert.True(result.Definition.IsMaterialized);
+        Assert.Contains("SELECT", result.Definition.Query);
+        Assert.Contains("GROUP BY", result.Definition.Query);
     }
 
     [Fact]
     public void Extract_MaterializedViewWithSchema_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE MATERIALIZED VIEW analytics.daily_stats AS
             SELECT date, count(*) FROM events GROUP BY date;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("daily_stats", result.Name);
-        Assert.Equal("analytics", result.Schema);
-        Assert.True(result.IsMaterialized);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("daily_stats", result.Definition.Name);
+        Assert.Equal("analytics", result.Definition.Schema);
+        Assert.True(result.Definition.IsMaterialized);
     }
 
     #endregion
@@ -381,18 +392,19 @@ public sealed class ViewExtractorTests
     public void Extract_ViewWithOrReplace_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE OR REPLACE VIEW user_list AS
             SELECT id, name FROM users;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("user_list", result.Name);
-        Assert.Contains("SELECT id, name", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("user_list", result.Definition.Name);
+        Assert.Contains("SELECT id, name", result.Definition.Query);
     }
 
     #endregion
@@ -403,7 +415,7 @@ public sealed class ViewExtractorTests
     public void Extract_ViewWithCheckOption_SetsFlag()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW active_products AS
             SELECT id, name, price
             FROM products
@@ -412,14 +424,15 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("active_products", result.Name);
-        Assert.True(result.WithCheckOption);
-        Assert.Contains("WHERE is_active = TRUE", result.Query);
-        Assert.DoesNotContain("WITH CHECK OPTION", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("active_products", result.Definition.Name);
+        Assert.True(result.Definition.WithCheckOption);
+        Assert.Contains("WHERE is_active = TRUE", result.Definition.Query);
+        Assert.DoesNotContain("WITH CHECK OPTION", result.Definition.Query);
     }
 
     #endregion
@@ -430,52 +443,55 @@ public sealed class ViewExtractorTests
     public void Extract_ViewWithSecurityBarrierTrue_SetsFlag()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW secure_data WITH (security_barrier = true) AS
             SELECT id, data FROM sensitive_table;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("secure_data", result.Name);
-        Assert.True(result.IsSecurityBarrier);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("secure_data", result.Definition.Name);
+        Assert.True(result.Definition.IsSecurityBarrier);
     }
 
     [Fact]
     public void Extract_ViewWithSecurityBarrierOn_SetsFlag()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW secure_view WITH (security_barrier = on) AS
             SELECT * FROM users;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSecurityBarrier);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.True(result.Definition.IsSecurityBarrier);
     }
 
     [Fact]
     public void Extract_ViewWithSecurityBarrierFalse_DoesNotSetFlag()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW normal_view WITH (security_barrier = false) AS
             SELECT * FROM public_data;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.False(result.IsSecurityBarrier);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.False(result.Definition.IsSecurityBarrier);
     }
 
     #endregion
@@ -509,18 +525,19 @@ public sealed class ViewExtractorTests
         var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("user_order_summary", result.Name);
-        Assert.Contains("COUNT(DISTINCT o.id)", result.Query);
-        Assert.Contains("LEFT JOIN", result.Query);
-        Assert.Contains("GROUP BY", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("user_order_summary", result.Definition.Name);
+        Assert.Contains("COUNT(DISTINCT o.id)", result.Definition.Query);
+        Assert.Contains("LEFT JOIN", result.Definition.Query);
+        Assert.Contains("GROUP BY", result.Definition.Query);
     }
 
     [Fact]
     public void Extract_ViewWithSubquery_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW high_value_customers AS
             SELECT id, username
             FROM (
@@ -533,20 +550,21 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("high_value_customers", result.Name);
-        Assert.Contains("SELECT id, username", result.Query);
-        Assert.Contains("FROM (", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("high_value_customers", result.Definition.Name);
+        Assert.Contains("SELECT id, username", result.Definition.Query);
+        Assert.Contains("FROM (", result.Definition.Query);
     }
 
     [Fact]
     public void Extract_ViewWithCTE_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW monthly_sales AS
             WITH monthly_totals AS (
                 SELECT 
@@ -559,12 +577,13 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("monthly_sales", result.Name);
-        Assert.Contains("WITH monthly_totals AS", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("monthly_sales", result.Definition.Name);
+        Assert.Contains("WITH monthly_totals AS", result.Definition.Query);
     }
 
     #endregion
@@ -575,18 +594,19 @@ public sealed class ViewExtractorTests
     public void Extract_ViewWithExplicitColumns_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW user_info (user_id, user_name, user_email) AS
             SELECT id, name, email FROM users;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("user_info", result.Name);
-        Assert.Contains("SELECT id, name, email", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("user_info", result.Definition.Name);
+        Assert.Contains("SELECT id, name, email", result.Definition.Query);
     }
 
     #endregion
@@ -601,42 +621,46 @@ public sealed class ViewExtractorTests
     }
 
     [Fact]
-    public void Extract_WithNonViewBlock_ReturnsNull()
+    public void Extract_WithNonViewBlock_ReturnsNotApplicable()
     {
         // Arrange
-        var block = CreateBlock("CREATE TABLE test (id INT);");
+        var blocks = CreateBlocks("CREATE TABLE test (id INT);");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Definition);
     }
 
     [Fact]
-    public void Extract_WithEmptyBlock_ReturnsNull()
+    public void Extract_WithEmptyBlock_ReturnsNotApplicable()
     {
         // Arrange
-        var block = CreateBlock("");
+        var blocks = CreateBlocks("");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Definition);
     }
 
     [Fact]
-    public void Extract_ViewWithoutSelectQuery_ReturnsNull()
+    public void Extract_ViewWithoutSelectQuery_ReturnsFailure()
     {
         // Arrange
-        var block = CreateBlock("CREATE VIEW incomplete_view");
+        var blocks = CreateBlocks("CREATE VIEW incomplete_view");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Definition);
+        Assert.NotEmpty(result.ValidationIssues);
     }
 
     #endregion
@@ -647,34 +671,36 @@ public sealed class ViewExtractorTests
     public void Extract_WithUppercaseSQL_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW USER_LIST AS
             SELECT ID, NAME FROM USERS;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("USER_LIST", result.Name);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("USER_LIST", result.Definition.Name);
     }
 
     [Fact]
     public void Extract_WithMixedCase_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CrEaTe ViEw MyView As
             SeLeCt * FrOm data;
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("MyView", result.Name);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("MyView", result.Definition.Name);
     }
 
     #endregion
@@ -685,7 +711,7 @@ public sealed class ViewExtractorTests
     public void Extract_RealWorldViewFromExample_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE VIEW active_users_with_orders AS
             SELECT
                 u.id,
@@ -710,22 +736,23 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("active_users_with_orders", result.Name);
-        Assert.False(result.IsMaterialized);
-        Assert.Contains("COUNT(DISTINCT o.id)", result.Query);
-        Assert.Contains("ARRAY_AGG", result.Query);
-        Assert.Contains("GROUP BY", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("active_users_with_orders", result.Definition.Name);
+        Assert.False(result.Definition.IsMaterialized);
+        Assert.Contains("COUNT(DISTINCT o.id)", result.Definition.Query);
+        Assert.Contains("ARRAY_AGG", result.Definition.Query);
+        Assert.Contains("GROUP BY", result.Definition.Query);
     }
 
     [Fact]
     public void Extract_RealWorldMaterializedViewFromExample_ExtractsCorrectly()
     {
         // Arrange
-        var block = CreateBlock(@"
+        var blocks = CreateBlocks(@"
             CREATE MATERIALIZED VIEW category_statistics AS
             SELECT
                 c.id,
@@ -750,30 +777,31 @@ public sealed class ViewExtractorTests
         ");
 
         // Act
-        var result = _extractor.Extract([block]);
+        var result = _extractor.Extract(blocks);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Equal("category_statistics", result.Name);
-        Assert.True(result.IsMaterialized);
-        Assert.Contains("LEFT JOIN", result.Query);
-        Assert.Contains("WHERE c.is_active = TRUE", result.Query);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("category_statistics", result.Definition.Name);
+        Assert.True(result.Definition.IsMaterialized);
+        Assert.Contains("LEFT JOIN", result.Definition.Query);
+        Assert.Contains("WHERE c.is_active = TRUE", result.Definition.Query);
     }
 
     #endregion
 
     #region Helper Methods
 
-    private static SqlBlock CreateBlock(string sql, string? comment = null)
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? comment = null)
     {
-        return new SqlBlock
+        return [new SqlBlock
         {
             Content = sql,
             RawContent = sql,
             HeaderComment = comment,
             StartLine = 1,
             EndLine = sql.Split('\n').Length
-        };
+        }];
     }
 
     #endregion
