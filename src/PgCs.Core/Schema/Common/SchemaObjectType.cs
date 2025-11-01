@@ -48,5 +48,10 @@ public enum SchemaObjectType
     /// <summary>
     /// Ограничения целостности (constraints)
     /// </summary>
-    Constraints
+    Constraints,
+    
+    /// <summary>
+    /// Колонки в таблице
+    /// </summary>
+    Columns,
 }

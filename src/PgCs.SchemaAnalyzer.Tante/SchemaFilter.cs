@@ -92,13 +92,7 @@ internal sealed class SchemaFilter : ISchemaFilter
             Triggers = FilterTriggers(metadata.Triggers),
             Constraints = FilterConstraints(metadata.Constraints),
             Partitions = FilterPartitions(metadata.Partitions),
-            CompositeTypeComments = FilterCompositeTypeComments(metadata.CompositeTypeComments),
-            TableComments = FilterTableComments(metadata.TableComments),
-            ColumnComments = FilterColumnComments(metadata.ColumnComments),
-            IndexComments = FilterIndexComments(metadata.IndexComments),
-            TriggerComments = FilterTriggerComments(metadata.TriggerComments),
-            FunctionComments = FilterFunctionComments(metadata.FunctionComments),
-            ConstraintComments = FilterConstraintComments(metadata.ConstraintComments),
+            CommentDefinition = FilterComments(metadata.CommentDefinition),
             ValidationIssues = metadata.ValidationIssues,
             SourcePaths = metadata.SourcePaths,
             AnalyzedAt = metadata.AnalyzedAt
@@ -246,125 +240,64 @@ internal sealed class SchemaFilter : ISchemaFilter
     }
 
     /// <summary>
-    /// Фильтрует комментарии к композитным типам
+    /// Фильтрует комментарии согласно настройкам
     /// </summary>
-    private IReadOnlyList<CompositeTypeCommentDefinition> FilterCompositeTypeComments(
-        IReadOnlyList<CompositeTypeCommentDefinition> comments)
+    private IReadOnlyList<CommentDefinition> FilterComments(
+        IReadOnlyList<CommentDefinition> comments)
     {
         if (!_parseComments || !_objectTypes.Contains(SchemaObjectType.Comments))
             return [];
 
-        if (!_objectTypes.Contains(SchemaObjectType.Types))
-            return [];
-
         return comments
             .Where(c => ShouldIncludeBySchema(c.Schema))
+            .Where(c => ShouldIncludeCommentByObjectType(c))
+            .Where(c => ShouldIncludeCommentByTargetObject(c))
             .ToList();
     }
 
     /// <summary>
-    /// Фильтрует комментарии к таблицам
+    /// Проверяет, должен ли комментарий быть включен по типу объекта
     /// </summary>
-    private IReadOnlyList<TableCommentDefinition> FilterTableComments(
-        IReadOnlyList<TableCommentDefinition> comments)
+    private bool ShouldIncludeCommentByObjectType(CommentDefinition comment)
     {
-        if (!_parseComments || !_objectTypes.Contains(SchemaObjectType.Comments))
-            return [];
-
-        if (!_objectTypes.Contains(SchemaObjectType.Tables))
-            return [];
-
-        return comments
-            .Where(c => ShouldIncludeBySchema(c.Schema))
-            .Where(c => ShouldIncludeTable(c.TableName))
-            .ToList();
+        return _objectTypes.Contains(comment.ObjectType);
     }
 
     /// <summary>
-    /// Фильтрует комментарии к колонкам
+    /// Проверяет, должен ли комментарий быть включен по целевому объекту (таблица, представление)
     /// </summary>
-    private IReadOnlyList<ColumnCommentDefinition> FilterColumnComments(
-        IReadOnlyList<ColumnCommentDefinition> comments)
+    private bool ShouldIncludeCommentByTargetObject(CommentDefinition comment)
     {
-        if (!_parseComments || !_objectTypes.Contains(SchemaObjectType.Comments))
-            return [];
+        // Для комментариев к таблицам и колонкам проверяем имя таблицы
+        if (comment.ObjectType == SchemaObjectType.Tables ||
+            comment.ObjectType == SchemaObjectType.Columns)
+        {
+            var tableName = comment.ObjectType == SchemaObjectType.Tables 
+                ? comment.Name 
+                : comment.TableName;
+            
+            return tableName is not null && ShouldIncludeTable(tableName);
+        }
 
-        if (!_objectTypes.Contains(SchemaObjectType.Tables))
-            return [];
+        // Для комментариев к представлениям проверяем имя представления
+        if (comment.ObjectType == SchemaObjectType.Views)
+        {
+            return ShouldIncludeView(comment.Name);
+        }
 
-        return comments
-            .Where(c => ShouldIncludeBySchema(c.Schema))
-            .Where(c => ShouldIncludeTable(c.TableName))
-            .ToList();
+        // Для остальных типов (триггеры, ограничения) проверяем по таблице, если она есть
+        if (comment.TableName is not null)
+        {
+            return ShouldIncludeTable(comment.TableName);
+        }
+
+        // Для остальных комментариев (индексы, функции, типы) - включаем всегда
+        return true;
     }
 
     /// <summary>
-    /// Фильтрует комментарии к индексам
+    /// Проверяет, должна ли быть включена схема по имени
     /// </summary>
-    private IReadOnlyList<IndexCommentDefinition> FilterIndexComments(
-        IReadOnlyList<IndexCommentDefinition> comments)
-    {
-        if (!_parseComments || !_objectTypes.Contains(SchemaObjectType.Comments))
-            return [];
-
-        if (!_objectTypes.Contains(SchemaObjectType.Indexes))
-            return [];
-
-        return comments
-            .Where(c => ShouldIncludeBySchema(c.Schema))
-            .ToList();
-    }
-
-    /// <summary>
-    /// Фильтрует комментарии к триггерам
-    /// </summary>
-    private IReadOnlyList<TriggerCommentDefinition> FilterTriggerComments(
-        IReadOnlyList<TriggerCommentDefinition> comments)
-    {
-        if (!_parseComments || !_objectTypes.Contains(SchemaObjectType.Comments))
-            return [];
-
-        if (!_objectTypes.Contains(SchemaObjectType.Triggers))
-            return [];
-
-        return comments
-            .Where(c => ShouldIncludeBySchema(c.Schema))
-            .ToList();
-    }
-
-    /// <summary>
-    /// Фильтрует комментарии к функциям
-    /// </summary>
-    private IReadOnlyList<FunctionCommentDefinition> FilterFunctionComments(
-        IReadOnlyList<FunctionCommentDefinition> comments)
-    {
-        if (!_parseComments || !_objectTypes.Contains(SchemaObjectType.Comments))
-            return [];
-
-        if (!_objectTypes.Contains(SchemaObjectType.Functions))
-            return [];
-
-        return comments
-            .Where(c => ShouldIncludeBySchema(c.Schema))
-            .ToList();
-    }
-
-    /// <summary>
-    /// Фильтрует комментарии к ограничениям
-    /// </summary>
-    private IReadOnlyList<ConstraintCommentDefinition> FilterConstraintComments(
-        IReadOnlyList<ConstraintCommentDefinition> comments)
-    {
-        if (!_parseComments || !_objectTypes.Contains(SchemaObjectType.Comments))
-            return [];
-
-        if (!_objectTypes.Contains(SchemaObjectType.Constraints))
-            return [];
-
-        return comments
-            .Where(c => ShouldIncludeBySchema(c.Schema))
-            .ToList();
-    }
 
     /// <summary>
     /// Проверяет, должна ли быть включена схема по имени

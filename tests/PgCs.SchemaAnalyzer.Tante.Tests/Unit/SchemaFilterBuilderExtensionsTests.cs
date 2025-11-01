@@ -111,7 +111,7 @@ public sealed class SchemaFilterBuilderExtensionsTests
         // Arrange
         var metadata = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
-            tableComments: [CreateTableComment("users", "public", "User table")]
+            comments: [CreateTableComment("users", "public", "User table")]
         );
 
         // Act
@@ -119,7 +119,7 @@ public sealed class SchemaFilterBuilderExtensionsTests
         var result = filter.ApplyFilter(metadata);
 
         // Assert
-        Assert.Single(result.TableComments);
+        Assert.Single(result.CommentDefinition);
     }
 
     #endregion
@@ -189,7 +189,7 @@ public sealed class SchemaFilterBuilderExtensionsTests
                 CreateView("user_view", "public"),
                 CreateView("temp_view", "public")
             ],
-            tableComments: [CreateTableComment("users", "public", "User table")]
+            comments: [CreateTableComment("users", "public", "User table")]
         );
 
         // Act
@@ -199,7 +199,7 @@ public sealed class SchemaFilterBuilderExtensionsTests
         // Assert - TablesAndViewsFilter не включает WithCommentParsing
         Assert.Equal(2, result.Tables.Count);
         Assert.Equal(2, result.Views.Count);
-        Assert.Empty(result.TableComments); // Комментарии не включены
+        Assert.Empty(result.CommentDefinition); // Комментарии не включены
     }
 
     #endregion
@@ -288,7 +288,7 @@ public sealed class SchemaFilterBuilderExtensionsTests
         // Arrange
         var metadata = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
-            tableComments: [CreateTableComment("users", "public", "User table")]
+            comments: [CreateTableComment("users", "public", "User table")]
         );
 
         // Act
@@ -296,7 +296,7 @@ public sealed class SchemaFilterBuilderExtensionsTests
         var result = filter.ApplyFilter(metadata);
 
         // Assert
-        Assert.Single(result.TableComments);
+        Assert.Single(result.CommentDefinition);
     }
 
     #endregion
@@ -508,7 +508,7 @@ public sealed class SchemaFilterBuilderExtensionsTests
         IReadOnlyList<TriggerDefinition>? triggers = null,
         IReadOnlyList<ConstraintDefinition>? constraints = null,
         IReadOnlyList<PartitionDefinition>? partitions = null,
-        IReadOnlyList<TableCommentDefinition>? tableComments = null)
+        IReadOnlyList<CommentDefinition>? comments = null)
     {
         return new SchemaMetadata
         {
@@ -522,13 +522,7 @@ public sealed class SchemaFilterBuilderExtensionsTests
             Triggers = triggers ?? [],
             Constraints = constraints ?? [],
             Partitions = partitions ?? [],
-            CompositeTypeComments = [],
-            TableComments = tableComments ?? [],
-            ColumnComments = [],
-            IndexComments = [],
-            TriggerComments = [],
-            FunctionComments = [],
-            ConstraintComments = [],
+            CommentDefinition = comments ?? [],
             ValidationIssues = [],
             SourcePaths = [],
             AnalyzedAt = DateTime.UtcNow
@@ -623,11 +617,12 @@ public sealed class SchemaFilterBuilderExtensionsTests
             Strategy = PartitionStrategy.Range
         };
 
-    private static TableCommentDefinition CreateTableComment(string tableName, string? schema, string comment) =>
+    private static CommentDefinition CreateTableComment(string tableName, string? schema, string comment) =>
         new()
         {
+            ObjectType = SchemaObjectType.Tables,
             Schema = schema,
-            TableName = tableName,
+            Name = tableName,
             Comment = comment
         };
 

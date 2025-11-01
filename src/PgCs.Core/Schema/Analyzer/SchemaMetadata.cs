@@ -59,39 +59,10 @@ public sealed record SchemaMetadata
     public required IReadOnlyList<PartitionDefinition> Partitions { get; init; }
     
     /// <summary>
-    /// Комментарии для всех композитных типов
+    /// Комментарии для всех типов объектов
     /// </summary>
-    public required IReadOnlyList<CompositeTypeCommentDefinition> CompositeTypeComments { get; init; }
+    public required IReadOnlyList<CommentDefinition> CommentDefinition { get; init; }
     
-    /// <summary>
-    /// Комментарии к таблицам
-    /// </summary>
-    public required IReadOnlyList<TableCommentDefinition> TableComments { get; init; }
-    
-    /// <summary>
-    /// Комментарии к колонкам таблиц
-    /// </summary>
-    public required IReadOnlyList<ColumnCommentDefinition> ColumnComments { get; init; }
-    
-    /// <summary>
-    /// Комментарии для индексов
-    /// </summary>
-    public required IReadOnlyList<IndexCommentDefinition> IndexComments { get; init; }
-    
-    /// <summary>
-    /// Комментарии к триггерам
-    /// </summary>
-    public required IReadOnlyList<TriggerCommentDefinition> TriggerComments { get; init; }
-    
-    /// <summary>
-    /// Комментарии к функциям
-    /// </summary>
-    public required IReadOnlyList<FunctionCommentDefinition> FunctionComments { get; init; }
-    
-    /// <summary>
-    /// Комментарии к ограничениям целостности
-    /// </summary>
-    public required IReadOnlyList<ConstraintCommentDefinition> ConstraintComments { get; init; }
     
     /// <summary>
     /// Warnings и errors собранные во время parsing schema

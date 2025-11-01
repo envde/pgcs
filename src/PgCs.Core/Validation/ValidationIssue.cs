@@ -105,6 +105,10 @@ public sealed record ValidationIssue
         /// Запрос
         /// </summary>
         Query,
+        /// <summary>
+        /// Комментарий
+        /// </summary>
+        Comment,
     }
 
     /// <summary>

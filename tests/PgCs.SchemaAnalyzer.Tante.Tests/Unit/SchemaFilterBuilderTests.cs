@@ -419,7 +419,7 @@ public sealed class SchemaFilterBuilderTests
         var builder = new SchemaFilterBuilder();
         var metadata = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
-            tableComments: [CreateTableComment("users", "public", "User table")]
+            comments: [CreateTableComment("users", "public", "User table")]
         );
 
         // Act
@@ -429,7 +429,7 @@ public sealed class SchemaFilterBuilderTests
         var result = filter.ApplyFilter(metadata);
 
         // Assert
-        Assert.Single(result.TableComments);
+        Assert.Single(result.CommentDefinition);
     }
 
     [Fact]
@@ -439,7 +439,7 @@ public sealed class SchemaFilterBuilderTests
         var builder = new SchemaFilterBuilder();
         var metadata = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
-            tableComments: [CreateTableComment("users", "public", "User table")]
+            comments: [CreateTableComment("users", "public", "User table")]
         );
 
         // Act
@@ -449,7 +449,7 @@ public sealed class SchemaFilterBuilderTests
         var result = filter.ApplyFilter(metadata);
 
         // Assert
-        Assert.Empty(result.TableComments);
+        Assert.Empty(result.CommentDefinition);
     }
 
     #endregion
@@ -586,7 +586,7 @@ public sealed class SchemaFilterBuilderTests
         IReadOnlyList<TriggerDefinition>? triggers = null,
         IReadOnlyList<ConstraintDefinition>? constraints = null,
         IReadOnlyList<PartitionDefinition>? partitions = null,
-        IReadOnlyList<TableCommentDefinition>? tableComments = null)
+        IReadOnlyList<CommentDefinition>? comments = null)
     {
         return new SchemaMetadata
         {
@@ -600,13 +600,7 @@ public sealed class SchemaFilterBuilderTests
             Triggers = triggers ?? [],
             Constraints = constraints ?? [],
             Partitions = partitions ?? [],
-            CompositeTypeComments = [],
-            TableComments = tableComments ?? [],
-            ColumnComments = [],
-            IndexComments = [],
-            TriggerComments = [],
-            FunctionComments = [],
-            ConstraintComments = [],
+            CommentDefinition = comments ?? [],
             ValidationIssues = [],
             SourcePaths = [],
             AnalyzedAt = DateTime.UtcNow
@@ -692,11 +686,12 @@ public sealed class SchemaFilterBuilderTests
             Type = ConstraintType.PrimaryKey
         };
 
-    private static TableCommentDefinition CreateTableComment(string tableName, string? schema, string comment) =>
+    private static CommentDefinition CreateTableComment(string tableName, string? schema, string comment) =>
         new()
         {
+            ObjectType = SchemaObjectType.Tables,
             Schema = schema,
-            TableName = tableName,
+            Name = tableName,
             Comment = comment
         };
 
