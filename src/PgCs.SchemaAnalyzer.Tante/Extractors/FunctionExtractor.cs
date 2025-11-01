@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 
 namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 
@@ -17,7 +19,7 @@ namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 /// - Волатильность (VOLATILE, STABLE, IMMUTABLE)
 /// </para>
 /// </summary>
-public sealed partial class FunctionExtractor : IFunctionExtractor
+public sealed partial class FunctionExtractor : IExtractor<FunctionDefinition>
 {
     // ============================================================================
     // Regex Patterns
@@ -65,50 +67,56 @@ public sealed partial class FunctionExtractor : IFunctionExtractor
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex LanguagePattern();
 
-    /// <summary>
-    /// Паттерн для извлечения параметров функции
-    /// </summary>
-    [GeneratedRegex(
-        @"\(\s*([^)]*)\s*\)",
-        RegexOptions.Singleline | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
-    private static partial Regex ParametersPattern();
-
     // ============================================================================
     // Public Methods
     // ============================================================================
 
     /// <inheritdoc />
-    public bool CanExtract(SqlBlock block)
+    public bool CanExtract(IReadOnlyList<SqlBlock> blocks)
     {
-        if (block == null)
+        ArgumentNullException.ThrowIfNull(blocks);
+
+        // Для функций достаточно одного блока
+        if (blocks.Count == 0)
         {
             return false;
         }
 
+        var block = blocks[0];
         return CreateFunctionPattern().IsMatch(block.Content);
     }
 
     /// <inheritdoc />
-    public FunctionDefinition? Extract(SqlBlock block)
+    public ExtractionResult<FunctionDefinition> Extract(IReadOnlyList<SqlBlock> blocks)
     {
-        if (block == null)
+        ArgumentNullException.ThrowIfNull(blocks);
+
+        if (!CanExtract(blocks))
         {
-            return null;
+            return ExtractionResult<FunctionDefinition>.NotApplicable();
         }
 
-        if (!CanExtract(block))
-        {
-            return null;
-        }
-
+        var block = blocks[0];
+        var issues = new List<ValidationIssue>();
+        
         var match = CreateFunctionPattern().Match(block.Content);
         if (!match.Success)
         {
-            return null;
+            return ExtractionResult<FunctionDefinition>.Failure([
+                ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Function,
+                    "FUNCTION_PARSE_ERROR",
+                    "Failed to parse FUNCTION/PROCEDURE definition",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = block.Content,
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                )
+            ]);
         }
 
-        var isOrReplace = match.Groups[1].Success;
         var type = match.Groups[2].Value.ToUpperInvariant();
         var schema = match.Groups[3].Success ? match.Groups[3].Value : null;
         var name = match.Groups[4].Value;
@@ -119,9 +127,42 @@ public sealed partial class FunctionExtractor : IFunctionExtractor
 
         // Извлечение возвращаемого типа (только для функций)
         var returnType = isProcedure ? null : ExtractReturnType(block.Content);
+        
+        // Проверка: функция должна иметь RETURNS
+        if (!isProcedure && string.IsNullOrWhiteSpace(returnType))
+        {
+            issues.Add(ValidationIssue.Warning(
+                ValidationIssue.ValidationDefinitionType.Function,
+                "FUNCTION_NO_RETURN_TYPE",
+                $"Function '{name}' has no RETURNS clause. This may cause issues",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.Content,
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+        }
 
         // Извлечение языка
         var language = ExtractLanguage(block.Content);
+        
+        // Предупреждение: язык не указан
+        if (string.IsNullOrWhiteSpace(language))
+        {
+            issues.Add(ValidationIssue.Warning(
+                ValidationIssue.ValidationDefinitionType.Function,
+                "FUNCTION_NO_LANGUAGE",
+                $"Function '{name}' has no LANGUAGE specified. Defaulting to 'sql'",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.Content,
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+            language = "sql";
+        }
 
         // Извлечение волатильности
         var volatility = ExtractVolatility(block.Content);
@@ -129,25 +170,72 @@ public sealed partial class FunctionExtractor : IFunctionExtractor
         // Извлечение тела функции
         var body = ExtractBody(block.Content);
         
-        // Если Body null, возвращаем null для всей функции
-        if (body is null)
+        // Ошибка: тело функции отсутствует
+        if (string.IsNullOrWhiteSpace(body))
         {
-            return null;
+            return ExtractionResult<FunctionDefinition>.Failure([
+                ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Function,
+                    "FUNCTION_NO_BODY",
+                    $"Function '{name}' has no body defined",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = block.Content,
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                )
+            ]);
+        }
+        
+        // Предупреждение: слишком много параметров
+        if (parameters.Count > 10)
+        {
+            issues.Add(ValidationIssue.Warning(
+                ValidationIssue.ValidationDefinitionType.Function,
+                "FUNCTION_TOO_MANY_PARAMETERS",
+                $"Function '{name}' has {parameters.Count} parameters. Consider refactoring for better maintainability",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.Content,
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+        }
+        
+        // Предупреждение: очень длинное тело функции
+        var bodyLines = body.Split('\n').Length;
+        if (bodyLines > 200)
+        {
+            issues.Add(ValidationIssue.Warning(
+                ValidationIssue.ValidationDefinitionType.Function,
+                "FUNCTION_TOO_LONG",
+                $"Function '{name}' has {bodyLines} lines of code. Consider breaking it into smaller functions",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.Content,
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
         }
 
-        return new FunctionDefinition
+        var definition = new FunctionDefinition
         {
             Name = name,
             Schema = schema,
             Parameters = parameters,
             ReturnType = returnType,
-            Language = language ?? "sql",
+            Language = language,
             Volatility = volatility,
             IsProcedure = isProcedure,
             Body = body,
             SqlComment = block.HeaderComment,
             RawSql = block.Content
         };
+
+        return ExtractionResult<FunctionDefinition>.Success(definition, issues);
     }
 
     // ============================================================================

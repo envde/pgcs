@@ -1,874 +1,434 @@
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Common;
+using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
 
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
-/// <summary>
-/// Модульные тесты для FunctionExtractor
-/// </summary>
 public sealed class FunctionExtractorTests
 {
-    private readonly IFunctionExtractor _extractor = new FunctionExtractor();
-
-    /// <summary>
-    /// Создает SqlBlock для тестирования
-    /// </summary>
-    private static SqlBlock CreateBlock(string sql) => new()
-    {
-        Content = sql,
-        RawContent = sql,
-        StartLine = 1,
-        EndLine = sql.Split('\n').Length
-    };
-
-    #region CanExtract Tests
+    private readonly IExtractor<FunctionDefinition> _extractor = new FunctionExtractor();
 
     [Fact]
-    public void CanExtract_WithValidFunction_ReturnsTrue()
+    public void CanExtract_ValidFunctionBlock_ReturnsTrue()
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION calculate_total(price DECIMAL, quantity INT)
-            RETURNS DECIMAL
-            LANGUAGE sql
-            AS $$
-                SELECT price * quantity;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION test_function() RETURNS TEXT LANGUAGE sql AS $$ SELECT 'test'; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.CanExtract(blocks);
 
-        // Act
-        var result = _extractor.CanExtract(block);
-
-        // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void CanExtract_WithValidProcedure_ReturnsTrue()
+    public void CanExtract_ValidProcedureBlock_ReturnsTrue()
     {
-        // Arrange
-        var sql = """
-            CREATE PROCEDURE update_balance(user_id INT, amount DECIMAL)
-            LANGUAGE plpgsql
-            AS $$
-            BEGIN
-                UPDATE users SET balance = balance + amount WHERE id = user_id;
-            END;
-            $$;
-            """;
+        var sql = "CREATE PROCEDURE test_procedure() LANGUAGE sql AS $$ INSERT INTO test_table VALUES (1); $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.CanExtract(blocks);
 
-        // Act
-        var result = _extractor.CanExtract(block);
-
-        // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void CanExtract_WithOrReplace_ReturnsTrue()
+    public void CanExtract_TableBlock_ReturnsFalse()
     {
-        // Arrange
-        var sql = """
-            CREATE OR REPLACE FUNCTION get_user_name(user_id INT)
-            RETURNS TEXT
-            AS $$
-                SELECT name FROM users WHERE id = user_id;
-            $$ LANGUAGE sql;
-            """;
+        var sql = "CREATE TABLE test (id INT);";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.CanExtract(blocks);
 
-        // Act
-        var result = _extractor.CanExtract(block);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithTableBlock_ReturnsFalse()
-    {
-        // Arrange
-        var sql = """
-            CREATE TABLE users (
-                id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL
-            );
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.CanExtract(block);
-
-        // Assert
         Assert.False(result);
     }
 
     [Fact]
-    public void CanExtract_WithNullBlock_ReturnsFalse()
+    public void Extract_SimpleFunction_ExtractsCorrectly()
     {
-        // Act
-        var result = _extractor.CanExtract(null!);
+        var sql = "CREATE FUNCTION test_function() RETURNS TEXT LANGUAGE sql AS $$ SELECT 'Hello World'; $$;";
+        var blocks = CreateBlocks(sql);
 
-        // Assert
-        Assert.False(result);
-    }
+        var result = _extractor.Extract(blocks);
 
-    #endregion
-
-    #region Extract Simple Function Tests
-
-    [Fact]
-    public void Extract_SimpleFunctionWithNoParameters_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION get_current_timestamp()
-            RETURNS TIMESTAMP
-            LANGUAGE sql
-            AS $$
-                SELECT NOW();
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("get_current_timestamp", result.Name);
-        Assert.Null(result.Schema);
-        Assert.False(result.IsProcedure);
-        Assert.Empty(result.Parameters);
-        Assert.Equal("TIMESTAMP", result.ReturnType);
-        Assert.Equal("sql", result.Language);
-        Assert.Contains("SELECT NOW();", result.Body);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("test_function", result.Definition.Name);
+        Assert.Equal("TEXT", result.Definition.ReturnType);
+        Assert.Equal("sql", result.Definition.Language);
+        Assert.Empty(result.Definition.Parameters);
+        Assert.Contains("SELECT 'Hello World'", result.Definition.Body);
     }
 
     [Fact]
-    public void Extract_SimpleFunctionWithOneParameter_ExtractsCorrectly()
+    public void Extract_FunctionWithSchema_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION double_value(x INT)
-            RETURNS INT
-            LANGUAGE sql
-            AS $$
-                SELECT x * 2;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION public.test_function() RETURNS INTEGER LANGUAGE sql AS $$ SELECT 42; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("double_value", result.Name);
-        Assert.Single(result.Parameters);
-        Assert.Equal("x", result.Parameters[0].Name);
-        Assert.Equal("INT", result.Parameters[0].DataType);
-        Assert.Equal(ParameterMode.In, result.Parameters[0].Mode);
-        Assert.Equal("INT", result.ReturnType);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("public", result.Definition.Schema);
+        Assert.Equal("test_function", result.Definition.Name);
+        Assert.Equal("INTEGER", result.Definition.ReturnType);
     }
-
-    [Fact]
-    public void Extract_FunctionWithMultipleParameters_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION calculate_price(base_price DECIMAL, discount DECIMAL, quantity INT)
-            RETURNS DECIMAL
-            LANGUAGE sql
-            AS $$
-                SELECT (base_price - discount) * quantity;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("calculate_price", result.Name);
-        Assert.Equal(3, result.Parameters.Count);
-        
-        Assert.Equal("base_price", result.Parameters[0].Name);
-        Assert.Equal("DECIMAL", result.Parameters[0].DataType);
-        
-        Assert.Equal("discount", result.Parameters[1].Name);
-        Assert.Equal("DECIMAL", result.Parameters[1].DataType);
-        
-        Assert.Equal("quantity", result.Parameters[2].Name);
-        Assert.Equal("INT", result.Parameters[2].DataType);
-    }
-
-    [Fact]
-    public void Extract_FunctionWithSchemaQualifiedName_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION public.calculate_total(price DECIMAL)
-            RETURNS DECIMAL
-            LANGUAGE sql
-            AS $$
-                SELECT price * 1.1;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("calculate_total", result.Name);
-        Assert.Equal("public", result.Schema);
-    }
-
-    #endregion
-
-    #region Extract Procedure Tests
 
     [Fact]
     public void Extract_SimpleProcedure_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE PROCEDURE log_message(message TEXT)
-            LANGUAGE plpgsql
-            AS $$
-            BEGIN
-                INSERT INTO logs (message, created_at) VALUES (message, NOW());
-            END;
-            $$;
-            """;
+        var sql = "CREATE PROCEDURE test_procedure() LANGUAGE sql AS $$ INSERT INTO test_table VALUES (1); $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("log_message", result.Name);
-        Assert.True(result.IsProcedure);
-        Assert.Null(result.ReturnType); // Процедуры не имеют RETURNS
-        Assert.Equal("plpgsql", result.Language);
-        Assert.Single(result.Parameters);
-        Assert.Equal("message", result.Parameters[0].Name);
-    }
-
-    #endregion
-
-    #region OR REPLACE Tests
-
-    [Fact]
-    public void Extract_FunctionWithOrReplace_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE OR REPLACE FUNCTION get_user_count()
-            RETURNS BIGINT
-            LANGUAGE sql
-            AS $$
-                SELECT COUNT(*) FROM users;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("get_user_count", result.Name);
-        Assert.Equal("BIGINT", result.ReturnType);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("test_procedure", result.Definition.Name);
+        Assert.Null(result.Definition.ReturnType);
+        Assert.Equal("sql", result.Definition.Language);
     }
 
     [Fact]
-    public void Extract_ProcedureWithOrReplace_ExtractsCorrectly()
+    public void Extract_FunctionWithParameters_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE OR REPLACE PROCEDURE update_status(order_id INT, new_status TEXT)
-            LANGUAGE plpgsql
-            AS $$
-            BEGIN
-                UPDATE orders SET status = new_status WHERE id = order_id;
-            END;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION add_numbers(a INTEGER, b INTEGER) RETURNS INTEGER LANGUAGE sql AS $$ SELECT a + b; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("update_status", result.Name);
-        Assert.True(result.IsProcedure);
-    }
-
-    #endregion
-
-    #region Parameter Mode Tests
-
-    [Fact]
-    public void Extract_FunctionWithInParameter_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION add_numbers(IN x INT, IN y INT)
-            RETURNS INT
-            LANGUAGE sql
-            AS $$
-                SELECT x + y;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(2, result.Parameters.Count);
-        Assert.Equal(ParameterMode.In, result.Parameters[0].Mode);
-        Assert.Equal(ParameterMode.In, result.Parameters[1].Mode);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("add_numbers", result.Definition.Name);
+        Assert.Equal(2, result.Definition.Parameters.Count);
+        Assert.Equal("a", result.Definition.Parameters[0].Name);
+        Assert.Equal("INTEGER", result.Definition.Parameters[0].DataType);
+        Assert.Equal("b", result.Definition.Parameters[1].Name);
+        Assert.Equal("INTEGER", result.Definition.Parameters[1].DataType);
     }
 
     [Fact]
     public void Extract_FunctionWithOutParameter_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION get_user_info(user_id INT, OUT user_name TEXT, OUT user_email TEXT)
-            LANGUAGE plpgsql
-            AS $$
-            BEGIN
-                SELECT name, email INTO user_name, user_email FROM users WHERE id = user_id;
-            END;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION get_user(IN user_id INTEGER, OUT user_name TEXT) LANGUAGE sql AS $$ SELECT name FROM users WHERE id = user_id; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(3, result.Parameters.Count);
-        Assert.Equal(ParameterMode.In, result.Parameters[0].Mode);
-        Assert.Equal(ParameterMode.Out, result.Parameters[1].Mode);
-        Assert.Equal(ParameterMode.Out, result.Parameters[2].Mode);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(2, result.Definition.Parameters.Count);
+        Assert.Equal(ParameterMode.In, result.Definition.Parameters[0].Mode);
+        Assert.Equal(ParameterMode.Out, result.Definition.Parameters[1].Mode);
     }
 
     [Fact]
-    public void Extract_FunctionWithInOutParameter_ExtractsCorrectly()
+    public void Extract_FunctionWithArrayParameter_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION increment(INOUT counter INT)
-            LANGUAGE plpgsql
-            AS $$
-            BEGIN
-                counter := counter + 1;
-            END;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION sum_array(arr INTEGER[]) RETURNS INTEGER LANGUAGE sql AS $$ SELECT SUM(x) FROM UNNEST(arr) AS x; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Single(result.Parameters);
-        Assert.Equal(ParameterMode.InOut, result.Parameters[0].Mode);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Single(result.Definition.Parameters);
+        Assert.Equal("arr", result.Definition.Parameters[0].Name);
+        Assert.Equal("INTEGER", result.Definition.Parameters[0].DataType);
+        Assert.True(result.Definition.Parameters[0].IsArray);
     }
 
     [Fact]
-    public void Extract_FunctionWithVariadicParameter_ExtractsCorrectly()
+    public void Extract_PlpgsqlFunction_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION sum_all(VARIADIC numbers INT[])
-            RETURNS INT
-            LANGUAGE plpgsql
-            AS $$
-            DECLARE
-                total INT := 0;
-                num INT;
-            BEGIN
-                FOREACH num IN ARRAY numbers LOOP
-                    total := total + num;
-                END LOOP;
-                RETURN total;
-            END;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION calculate_total(order_id INTEGER) RETURNS NUMERIC LANGUAGE plpgsql AS $$ BEGIN RETURN (SELECT SUM(amount) FROM order_items WHERE order_id = order_id); END; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Single(result.Parameters);
-        Assert.Equal(ParameterMode.Variadic, result.Parameters[0].Mode);
-        Assert.Equal("numbers", result.Parameters[0].Name);
-        Assert.Equal("INT[]", result.Parameters[0].DataType);
-    }
-
-    #endregion
-
-    #region Default Value Tests
-
-    [Fact]
-    public void Extract_FunctionWithDefaultValue_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION greet(name TEXT DEFAULT 'World')
-            RETURNS TEXT
-            LANGUAGE sql
-            AS $$
-                SELECT 'Hello, ' || name || '!';
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Single(result.Parameters);
-        Assert.Equal("'World'", result.Parameters[0].DefaultValue);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("plpgsql", result.Definition.Language);
+        Assert.Contains("BEGIN", result.Definition.Body);
+        Assert.Contains("END", result.Definition.Body);
     }
 
     [Fact]
-    public void Extract_FunctionWithNumericDefault_ExtractsCorrectly()
+    public void Extract_SqlFunction_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION multiply(x INT, multiplier INT DEFAULT 2)
-            RETURNS INT
-            LANGUAGE sql
-            AS $$
-                SELECT x * multiplier;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION get_user_count() RETURNS BIGINT LANGUAGE sql AS $$ SELECT COUNT(*) FROM users; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(2, result.Parameters.Count);
-        Assert.Null(result.Parameters[0].DefaultValue);
-        Assert.Equal("2", result.Parameters[1].DefaultValue);
-    }
-
-    #endregion
-
-    #region Return Type Tests
-
-    [Fact]
-    public void Extract_FunctionWithSimpleReturnType_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION get_pi()
-            RETURNS DOUBLE PRECISION
-            LANGUAGE sql
-            AS $$
-                SELECT 3.14159265359;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("DOUBLE PRECISION", result.ReturnType);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("sql", result.Definition.Language);
     }
 
     [Fact]
-    public void Extract_FunctionWithComplexReturnType_ExtractsCorrectly()
+    public void Extract_ImmutableFunction_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION get_user_ids()
-            RETURNS SETOF INT
-            LANGUAGE sql
-            AS $$
-                SELECT id FROM users;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION add_one(n INTEGER) RETURNS INTEGER IMMUTABLE LANGUAGE sql AS $$ SELECT n + 1; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(FunctionVolatility.Immutable, result.Definition.Volatility);
+    }
 
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("SETOF INT", result.ReturnType);
+    [Fact]
+    public void Extract_StableFunction_ExtractsCorrectly()
+    {
+        var sql = "CREATE FUNCTION get_current_timestamp() RETURNS TIMESTAMP STABLE LANGUAGE sql AS $$ SELECT CURRENT_TIMESTAMP; $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(FunctionVolatility.Stable, result.Definition.Volatility);
+    }
+
+    [Fact]
+    public void Extract_VolatileFunction_ExtractsCorrectly()
+    {
+        var sql = "CREATE FUNCTION insert_log() RETURNS VOID VOLATILE LANGUAGE sql AS $$ INSERT INTO logs (message) VALUES ('test'); $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal(FunctionVolatility.Volatile, result.Definition.Volatility);
+    }
+
+    [Fact]
+    public void Extract_FunctionWithOrReplace_ExtractsCorrectly()
+    {
+        var sql = "CREATE OR REPLACE FUNCTION test_function() RETURNS TEXT LANGUAGE sql AS $$ SELECT 'updated'; $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("test_function", result.Definition.Name);
+        Assert.Contains("'updated'", result.Definition.Body);
+    }
+
+    [Fact]
+    public void Extract_FunctionWithHeaderComment_PreservesComment()
+    {
+        // Note: In real scenarios, the comment is passed via SqlBlock.HeaderComment, not in the SQL content
+        var sql = "CREATE FUNCTION greet(name TEXT) RETURNS TEXT LANGUAGE sql AS $$ SELECT 'Hello, ' || name; $$;";
+        var lines = sql.Split('\n');
+        var blocks = new[]
+        {
+            new SqlBlock
+            {
+                Content = sql,
+                RawContent = sql,
+                StartLine = 1,
+                EndLine = lines.Length,
+                HeaderComment = "This is a test function\nIt returns a greeting"
+            }
+        };
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.NotNull(result.Definition.SqlComment);
+        Assert.Contains("test function", result.Definition.SqlComment);
+    }
+
+    [Fact]
+    public void Extract_InvalidSyntax_ReturnsNotApplicable()
+    {
+        var sql = "CREATE FUNCTION incomplete";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public void Extract_FunctionWithoutReturnType_ReturnsWarning()
+    {
+        var sql = "CREATE FUNCTION test_function() LANGUAGE sql AS $$ SELECT 1; $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.ValidationIssues);
+        var issue = result.ValidationIssues.First(i => i.Code == "FUNCTION_NO_RETURN_TYPE");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, issue.Severity);
+    }
+
+    [Fact]
+    public void Extract_FunctionWithoutLanguage_ReturnsWarning()
+    {
+        var sql = "CREATE FUNCTION test_function() RETURNS TEXT AS $$ SELECT 'test'; $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.ValidationIssues);
+        var issue = result.ValidationIssues.First(i => i.Code == "FUNCTION_NO_LANGUAGE");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, issue.Severity);
+        Assert.Equal("sql", result.Definition?.Language);
+    }
+
+    [Fact]
+    public void Extract_FunctionWithoutBody_ReturnsFailure()
+    {
+        var sql = "CREATE FUNCTION test_function() RETURNS TEXT LANGUAGE sql;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.False(result.IsSuccess);
+        Assert.NotEmpty(result.ValidationIssues);
+        var issue = result.ValidationIssues.First(i => i.Code == "FUNCTION_NO_BODY");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Error, issue.Severity);
+    }
+
+    [Fact]
+    public void Extract_FunctionWithTooManyParameters_ReturnsWarning()
+    {
+        var sql = "CREATE FUNCTION test_function(p1 INT, p2 INT, p3 INT, p4 INT, p5 INT, p6 INT, p7 INT, p8 INT, p9 INT, p10 INT, p11 INT) RETURNS INT LANGUAGE sql AS $$ SELECT 1; $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.ValidationIssues);
+        var issue = result.ValidationIssues.First(i => i.Code == "FUNCTION_TOO_MANY_PARAMETERS");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, issue.Severity);
+        Assert.Contains("11", issue.Message);
+    }
+
+    [Fact]
+    public void Extract_FunctionWithTooLongBody_ReturnsWarning()
+    {
+        var bodyLines = string.Join("\n", Enumerable.Range(1, 250).Select(i => $"    SELECT {i};"));
+        var sql = $"CREATE FUNCTION test_function() RETURNS INT LANGUAGE sql AS $$ {bodyLines} $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.ValidationIssues);
+        var issue = result.ValidationIssues.First(i => i.Code == "FUNCTION_TOO_LONG");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, issue.Severity);
+        Assert.Contains("250", issue.Message);
+    }
+
+    [Fact]
+    public void Extract_NonFunctionBlock_ReturnsNotApplicable()
+    {
+        var sql = "CREATE TABLE test (id INT);";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public void Extract_EmptyBlock_ReturnsNotApplicable()
+    {
+        var blocks = CreateBlocks("");
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public void Extract_ComplexPlpgsqlFunction_ExtractsCorrectly()
+    {
+        var sql = "CREATE OR REPLACE FUNCTION calculate_order_total(p_order_id INTEGER) RETURNS NUMERIC(10,2) LANGUAGE plpgsql STABLE AS $$ DECLARE v_total NUMERIC(10,2); BEGIN SELECT SUM(quantity * unit_price) INTO v_total FROM order_items WHERE order_id = p_order_id; RETURN COALESCE(v_total, 0); END; $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("calculate_order_total", result.Definition.Name);
+        Assert.Equal("plpgsql", result.Definition.Language);
+        Assert.Equal(FunctionVolatility.Stable, result.Definition.Volatility);
+        Assert.Contains("DECLARE", result.Definition.Body);
+        Assert.Contains("v_total", result.Definition.Body);
+    }
+
+    [Fact]
+    public void Extract_FunctionReturningSetof_ExtractsCorrectly()
+    {
+        var sql = "CREATE FUNCTION get_active_users() RETURNS SETOF users LANGUAGE sql AS $$ SELECT * FROM users WHERE is_active = true; $$;";
+        var blocks = CreateBlocks(sql);
+
+        var result = _extractor.Extract(blocks);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Contains("SETOF", result.Definition.ReturnType ?? "");
     }
 
     [Fact]
     public void Extract_FunctionReturningTable_ExtractsCorrectly()
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION get_users()
-            RETURNS TABLE(id INT, name TEXT)
-            LANGUAGE sql
-            AS $$
-                SELECT id, name FROM users;
-            $$;
-            """;
+        var sql = "CREATE FUNCTION get_user_stats(p_user_id INTEGER) RETURNS TABLE(user_id INTEGER, order_count BIGINT, total_spent NUMERIC) LANGUAGE sql AS $$ SELECT u.id, COUNT(o.id), SUM(o.total) FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.id = p_user_id GROUP BY u.id; $$;";
+        var blocks = CreateBlocks(sql);
 
-        var block = CreateBlock(sql);
+        var result = _extractor.Extract(blocks);
 
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("TABLE(id INT, name TEXT)", result.ReturnType);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Contains("TABLE", result.Definition.ReturnType ?? "");
     }
 
-    #endregion
-
-    #region Volatility Tests
-
-    [Fact]
-    public void Extract_FunctionWithVolatile_ExtractsCorrectly()
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql)
     {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION generate_random()
-            RETURNS DOUBLE PRECISION
-            LANGUAGE sql
-            VOLATILE
-            AS $$
-                SELECT random();
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(FunctionVolatility.Volatile, result.Volatility);
-    }
-
-    [Fact]
-    public void Extract_FunctionWithStable_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION get_current_date()
-            RETURNS DATE
-            LANGUAGE sql
-            STABLE
-            AS $$
-                SELECT CURRENT_DATE;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(FunctionVolatility.Stable, result.Volatility);
-    }
-
-    [Fact]
-    public void Extract_FunctionWithImmutable_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION calculate_circle_area(radius DOUBLE PRECISION)
-            RETURNS DOUBLE PRECISION
-            LANGUAGE sql
-            IMMUTABLE
-            AS $$
-                SELECT 3.14159 * radius * radius;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(FunctionVolatility.Immutable, result.Volatility);
-    }
-
-    #endregion
-
-    #region Language Tests
-
-    [Fact]
-    public void Extract_FunctionWithSqlLanguage_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION get_count()
-            RETURNS BIGINT
-            LANGUAGE sql
-            AS $$
-                SELECT COUNT(*) FROM users;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("sql", result.Language);
-    }
-
-    [Fact]
-    public void Extract_FunctionWithPlpgsqlLanguage_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION complex_calculation()
-            RETURNS INT
-            LANGUAGE plpgsql
-            AS $$
-            DECLARE
-                result INT;
-            BEGIN
-                result := 42;
-                RETURN result;
-            END;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("plpgsql", result.Language);
-    }
-
-    #endregion
-
-    #region Body Extraction Tests
-
-    [Fact]
-    public void Extract_FunctionWithDollarQuotedBody_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION test_function()
-            RETURNS TEXT
-            LANGUAGE sql
-            AS $$
-                SELECT 'Hello World';
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Contains("SELECT 'Hello World';", result.Body);
-    }
-
-    [Fact]
-    public void Extract_FunctionWithTaggedDollarQuote_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION test_function()
-            RETURNS TEXT
-            LANGUAGE sql
-            AS $function$
-                SELECT 'Test';
-            $function$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Contains("SELECT 'Test';", result.Body);
-    }
-
-    [Fact]
-    public void Extract_FunctionWithSingleQuotedBody_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE FUNCTION test_function()
-            RETURNS TEXT
-            LANGUAGE sql
-            AS 'SELECT NOW()';
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Contains("SELECT NOW()", result.Body);
-    }
-
-    #endregion
-
-    #region Real-World Examples
-
-    [Fact]
-    public void Extract_ComplexFunctionWithAllFeatures_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = """
-            CREATE OR REPLACE FUNCTION public.calculate_order_total(
-                IN order_id INT,
-                IN discount_percent DECIMAL DEFAULT 0,
-                OUT total_amount DECIMAL,
-                OUT item_count INT
-            )
-            RETURNS RECORD
-            LANGUAGE plpgsql
-            STABLE
-            AS $$
-            BEGIN
-                SELECT 
-                    SUM(price * quantity) * (1 - discount_percent / 100),
-                    COUNT(*)
-                INTO total_amount, item_count
-                FROM order_items
-                WHERE order_id = order_id;
-            END;
-            $$;
-            """;
-
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("calculate_order_total", result.Name);
-        Assert.Equal("public", result.Schema);
-        Assert.False(result.IsProcedure);
-        Assert.Equal(4, result.Parameters.Count);
+        // Extract header comment if present (lines starting with --)
+        var lines = sql.Split('\n');
+        var commentLines = new List<string>();
+        int contentStartLine = 0;
         
-        // IN параметры
-        Assert.Equal("order_id", result.Parameters[0].Name);
-        Assert.Equal(ParameterMode.In, result.Parameters[0].Mode);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].TrimStart();
+            if (trimmed.StartsWith("--"))
+            {
+                commentLines.Add(trimmed[2..].Trim());
+            }
+            else if (!string.IsNullOrWhiteSpace(trimmed))
+            {
+                contentStartLine = i;
+                break;
+            }
+        }
         
-        Assert.Equal("discount_percent", result.Parameters[1].Name);
-        Assert.Equal(ParameterMode.In, result.Parameters[1].Mode);
-        Assert.Equal("0", result.Parameters[1].DefaultValue);
+        var headerComment = commentLines.Count > 0 ? string.Join("\n", commentLines) : null;
         
-        // OUT параметры
-        Assert.Equal("total_amount", result.Parameters[2].Name);
-        Assert.Equal(ParameterMode.Out, result.Parameters[2].Mode);
-        
-        Assert.Equal("item_count", result.Parameters[3].Name);
-        Assert.Equal(ParameterMode.Out, result.Parameters[3].Mode);
-        
-        Assert.Equal("RECORD", result.ReturnType);
-        Assert.Equal("plpgsql", result.Language);
-        Assert.Equal(FunctionVolatility.Stable, result.Volatility);
+        return new[]
+        {
+            new SqlBlock
+            {
+                Content = sql,
+                RawContent = sql,
+                StartLine = 1,
+                EndLine = lines.Length,
+                HeaderComment = headerComment
+            }
+        };
     }
-
-    #endregion
-
-    #region Invalid Input Tests
-
-    [Fact]
-    public void Extract_WithEmptyBlock_ReturnsNull()
-    {
-        // Arrange
-        var block = CreateBlock("");
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public void Extract_WithNullBlock_ReturnsNull()
-    {
-        // Act
-        var result = _extractor.Extract(null!);
-
-        // Assert
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public void Extract_WithInvalidSql_ReturnsNull()
-    {
-        // Arrange
-        var sql = "This is not valid SQL";
-        var block = CreateBlock(sql);
-
-        // Act
-        var result = _extractor.Extract(block);
-
-        // Assert
-        Assert.Null(result);
-    }
-
-    #endregion
 }

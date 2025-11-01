@@ -19,7 +19,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IExtractor<DomainTypeDefinition> _domainExtractor;
     private readonly ITableExtractor _tableExtractor;
     private readonly IViewExtractor _viewExtractor;
-    private readonly IFunctionExtractor _functionExtractor;
+    private readonly IExtractor<FunctionDefinition> _functionExtractor;
     private readonly IIndexExtractor _indexExtractor;
     private readonly ITriggerExtractor _triggerExtractor;
     private readonly IConstraintExtractor _constraintExtractor;
@@ -41,7 +41,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IExtractor<DomainTypeDefinition> domainExtractor,
         ITableExtractor tableExtractor,
         IViewExtractor viewExtractor,
-        IFunctionExtractor functionExtractor,
+        IExtractor<FunctionDefinition> functionExtractor,
         IIndexExtractor indexExtractor,
         ITriggerExtractor triggerExtractor,
         IConstraintExtractor constraintExtractor,
@@ -305,15 +305,12 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         foreach (var block in blocks)
         {
-            if (!_functionExtractor.CanExtract(block))
+            var blockList = new[] { block };
+            var result = _functionExtractor.Extract(blockList);
+            
+            if (result.IsSuccess && result.Definition is not null)
             {
-                continue;
-            }
-
-            var functionDef = _functionExtractor.Extract(block);
-            if (functionDef is not null)
-            {
-                functions.Add(functionDef);
+                functions.Add(result.Definition);
             }
         }
 
@@ -655,13 +652,11 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
                 case SchemaObjectType.Functions:
                     // Извлекаем функцию или процедуру
-                    if (_functionExtractor.CanExtract(block))
+                    var functionBlocks = new[] { block };
+                    var functionResult = _functionExtractor.Extract(functionBlocks);
+                    if (functionResult.IsSuccess && functionResult.Definition is not null)
                     {
-                        var functionDef = _functionExtractor.Extract(block);
-                        if (functionDef is not null)
-                        {
-                            functions.Add(functionDef);
-                        }
+                        functions.Add(functionResult.Definition);
                     }
                     break;
 
