@@ -1,19 +1,27 @@
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 
 namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 
 /// <summary>
 /// Экстрактор для извлечения определений триггеров из SQL-скриптов
 /// </summary>
-public sealed class TriggerExtractor : ITriggerExtractor
+public sealed class TriggerExtractor : IExtractor<TriggerDefinition>
 {
     /// <inheritdoc />
-    public bool CanExtract(SqlBlock block)
+    public bool CanExtract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(blocks);
         
+        if (blocks.Count == 0)
+        {
+            return false;
+        }
+
+        var block = blocks[0];
         var content = block.Content;
         
         // Быстрая проверка на наличие CREATE и TRIGGER
@@ -22,13 +30,22 @@ public sealed class TriggerExtractor : ITriggerExtractor
     }
 
     /// <inheritdoc />
-    public TriggerDefinition? Extract(SqlBlock block)
+    public ExtractionResult<TriggerDefinition> Extract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
-        
-        if (!CanExtract(block))
+        ArgumentNullException.ThrowIfNull(blocks);
+
+        var issues = new List<ValidationIssue>();
+
+        if (blocks.Count == 0)
         {
-            return null;
+            return ExtractionResult<TriggerDefinition>.NotApplicable();
+        }
+
+        var block = blocks[0];
+        
+        if (!CanExtract(blocks))
+        {
+            return ExtractionResult<TriggerDefinition>.NotApplicable();
         }
 
         var content = block.Content.Trim();
@@ -42,14 +59,36 @@ public sealed class TriggerExtractor : ITriggerExtractor
             var createIndex = content.IndexOf("CREATE", StringComparison.OrdinalIgnoreCase);
             if (createIndex < 0)
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Trigger,
+                    "TRIGGER_PARSE_ERROR",
+                    "Failed to parse CREATE TRIGGER statement",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = content.Length > 100 ? content[..100] + "..." : content,
+                        Line = block.StartLine,
+                        Column = 1
+                    }
+                ));
+                return ExtractionResult<TriggerDefinition>.Failure(issues);
             }
 
             var afterCreate = content[createIndex..];
             var triggerIndex = afterCreate.IndexOf("TRIGGER", StringComparison.OrdinalIgnoreCase);
             if (triggerIndex < 0)
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Trigger,
+                    "TRIGGER_PARSE_ERROR",
+                    "TRIGGER keyword not found after CREATE",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = content.Length > 100 ? content[..100] + "..." : content,
+                        Line = block.StartLine,
+                        Column = 1
+                    }
+                ));
+                return ExtractionResult<TriggerDefinition>.Failure(issues);
             }
 
             var afterTrigger = afterCreate[(triggerIndex + 7)..].TrimStart();
@@ -58,7 +97,18 @@ public sealed class TriggerExtractor : ITriggerExtractor
             var tokens = afterTrigger.Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
             if (tokens.Length < 1)
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Trigger,
+                    "TRIGGER_PARSE_ERROR",
+                    "Trigger name not found",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = content.Length > 100 ? content[..100] + "..." : content,
+                        Line = block.StartLine,
+                        Column = 1
+                    }
+                ));
+                return ExtractionResult<TriggerDefinition>.Failure(issues);
             }
 
             var triggerName = tokens[0];
@@ -76,21 +126,54 @@ public sealed class TriggerExtractor : ITriggerExtractor
             var timing = ExtractTiming(content);
             if (timing is null)
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Trigger,
+                    "TRIGGER_NO_TIMING",
+                    $"Trigger timing (BEFORE/AFTER/INSTEAD OF) not found for trigger '{triggerName}'",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = content.Length > 100 ? content[..100] + "..." : content,
+                        Line = block.StartLine,
+                        Column = 1
+                    }
+                ));
+                return ExtractionResult<TriggerDefinition>.Failure(issues);
             }
             
             // Находим события (INSERT/UPDATE/DELETE/TRUNCATE)
             var events = ExtractEvents(content);
             if (events.Count == 0)
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Trigger,
+                    "TRIGGER_NO_EVENTS",
+                    $"No trigger events (INSERT/UPDATE/DELETE/TRUNCATE) found for trigger '{triggerName}'",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = content.Length > 100 ? content[..100] + "..." : content,
+                        Line = block.StartLine,
+                        Column = 1
+                    }
+                ));
+                return ExtractionResult<TriggerDefinition>.Failure(issues);
             }
             
             // Находим таблицу (ON table_name)
             var tableName = ExtractTableName(content);
             if (string.IsNullOrWhiteSpace(tableName))
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Trigger,
+                    "TRIGGER_NO_TABLE",
+                    $"Table name not found for trigger '{triggerName}'",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = content.Length > 100 ? content[..100] + "..." : content,
+                        Line = block.StartLine,
+                        Column = 1
+                    }
+                ));
+                return ExtractionResult<TriggerDefinition>.Failure(issues);
             }
             
             // Извлекаем схему таблицы если есть
@@ -109,7 +192,18 @@ public sealed class TriggerExtractor : ITriggerExtractor
             var functionName = ExtractFunctionName(content);
             if (string.IsNullOrWhiteSpace(functionName))
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Trigger,
+                    "TRIGGER_NO_FUNCTION",
+                    $"Function name not found for trigger '{triggerName}'",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = content.Length > 100 ? content[..100] + "..." : content,
+                        Line = block.StartLine,
+                        Column = 1
+                    }
+                ));
+                return ExtractionResult<TriggerDefinition>.Failure(issues);
             }
             
             // Извлекаем WHEN условие если есть
@@ -118,7 +212,7 @@ public sealed class TriggerExtractor : ITriggerExtractor
             // Извлекаем UPDATE OF колонки если есть
             var updateColumns = ExtractUpdateColumns(content);
 
-            return new TriggerDefinition
+            var definition = new TriggerDefinition
             {
                 Name = triggerName,
                 TableName = tableName,
@@ -132,10 +226,23 @@ public sealed class TriggerExtractor : ITriggerExtractor
                 SqlComment = block.HeaderComment,
                 RawSql = block.RawContent
             };
+
+            return ExtractionResult<TriggerDefinition>.Success(definition, issues);
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.Trigger,
+                "TRIGGER_PARSE_ERROR",
+                $"Unexpected error parsing trigger: {ex.Message}",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = content.Length > 100 ? content[..100] + "..." : content,
+                    Line = block.StartLine,
+                    Column = 1
+                }
+            ));
+            return ExtractionResult<TriggerDefinition>.Failure(issues);
         }
     }
 

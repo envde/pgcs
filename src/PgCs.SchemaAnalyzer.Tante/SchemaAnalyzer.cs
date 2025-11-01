@@ -21,7 +21,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IExtractor<ViewDefinition> _viewExtractor;
     private readonly IExtractor<FunctionDefinition> _functionExtractor;
     private readonly IIndexExtractor _indexExtractor;
-    private readonly ITriggerExtractor _triggerExtractor;
+    private readonly IExtractor<TriggerDefinition> _triggerExtractor;
     private readonly IConstraintExtractor _constraintExtractor;
     private readonly IExtractor<CommentDefinition> _commentExtractor;
 
@@ -37,7 +37,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IExtractor<ViewDefinition> viewExtractor,
         IExtractor<FunctionDefinition> functionExtractor,
         IIndexExtractor indexExtractor,
-        ITriggerExtractor triggerExtractor,
+        IExtractor<TriggerDefinition> triggerExtractor,
         IConstraintExtractor constraintExtractor,
         IExtractor<CommentDefinition> commentExtractor)
     {
@@ -349,15 +349,15 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         foreach (var block in blocks)
         {
-            if (!_triggerExtractor.CanExtract(block))
+            if (!_triggerExtractor.CanExtract([block]))
             {
                 continue;
             }
 
-            var triggerDef = _triggerExtractor.Extract(block);
-            if (triggerDef is not null)
+            var result = _triggerExtractor.Extract([block]);
+            if (result.IsSuccess && result.Definition is not null)
             {
-                triggers.Add(triggerDef);
+                triggers.Add(result.Definition);
             }
         }
 
@@ -512,12 +512,12 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
                 case SchemaObjectType.Triggers:
                     // Извлекаем триггер
-                    if (_triggerExtractor.CanExtract(block))
+                    if (_triggerExtractor.CanExtract([block]))
                     {
-                        var triggerDef = _triggerExtractor.Extract(block);
-                        if (triggerDef is not null)
+                        var result = _triggerExtractor.Extract([block]);
+                        if (result.IsSuccess && result.Definition is not null)
                         {
-                            triggers.Add(triggerDef);
+                            triggers.Add(result.Definition);
                         }
                     }
                     break;
