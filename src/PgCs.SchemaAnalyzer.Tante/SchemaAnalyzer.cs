@@ -21,6 +21,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IFunctionExtractor _functionExtractor;
     private readonly IIndexExtractor _indexExtractor;
     private readonly ITriggerExtractor _triggerExtractor;
+    private readonly IConstraintExtractor _constraintExtractor;
     private readonly ITableCommentExtractor _tableCommentExtractor;
     private readonly IColumnCommentExtractor _columnCommentExtractor;
     private readonly IFunctionCommentExtractor _functionCommentExtractor;
@@ -42,6 +43,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IFunctionExtractor functionExtractor,
         IIndexExtractor indexExtractor,
         ITriggerExtractor triggerExtractor,
+        IConstraintExtractor constraintExtractor,
         ITableCommentExtractor tableCommentExtractor,
         IColumnCommentExtractor columnCommentExtractor,
         IFunctionCommentExtractor functionCommentExtractor,
@@ -59,6 +61,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         ArgumentNullException.ThrowIfNull(functionExtractor);
         ArgumentNullException.ThrowIfNull(indexExtractor);
         ArgumentNullException.ThrowIfNull(triggerExtractor);
+        ArgumentNullException.ThrowIfNull(constraintExtractor);
         ArgumentNullException.ThrowIfNull(tableCommentExtractor);
         ArgumentNullException.ThrowIfNull(columnCommentExtractor);
         ArgumentNullException.ThrowIfNull(functionCommentExtractor);
@@ -76,6 +79,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         _functionExtractor = functionExtractor;
         _indexExtractor = indexExtractor;
         _triggerExtractor = triggerExtractor;
+        _constraintExtractor = constraintExtractor;
         _tableCommentExtractor = tableCommentExtractor;
         _columnCommentExtractor = columnCommentExtractor;
         _functionCommentExtractor = functionCommentExtractor;
@@ -98,6 +102,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         new FunctionExtractor(),
         new IndexExtractor(),
         new TriggerExtractor(),
+        new ConstraintExtractor(),
         new TableCommentExtractor(),
         new ColumnCommentExtractor(),
         new FunctionCommentExtractor(),
@@ -533,7 +538,26 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
     public IReadOnlyList<ConstraintDefinition> ExtractConstraints(string sqlScript)
     {
-        throw new NotImplementedException();
+        ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
+        
+        var blocks = _blockExtractor.Extract(sqlScript);
+        var constraints = new List<ConstraintDefinition>();
+
+        foreach (var block in blocks)
+        {
+            if (!_constraintExtractor.CanExtract(block))
+            {
+                continue;
+            }
+
+            var constraintDef = _constraintExtractor.Extract(block);
+            if (constraintDef is not null)
+            {
+                constraints.Add(constraintDef);
+            }
+        }
+
+        return constraints;
     }
 
     /// <summary>
@@ -552,6 +576,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var functions = new List<FunctionDefinition>();
         var indexes = new List<IndexDefinition>();
         var triggers = new List<TriggerDefinition>();
+        var constraints = new List<ConstraintDefinition>();
         var tableComments = new List<TableCommentDefinition>();
         var columnComments = new List<ColumnCommentDefinition>();
         var functionComments = new List<FunctionCommentDefinition>();
@@ -722,8 +747,18 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     }
                     break;
 
-                // TODO: Добавить обработку других типов объектов
                 case SchemaObjectType.Constraints:
+                    // Извлекаем ограничение целостности
+                    if (_constraintExtractor.CanExtract(block))
+                    {
+                        var constraintDef = _constraintExtractor.Extract(block);
+                        if (constraintDef is not null)
+                        {
+                            constraints.Add(constraintDef);
+                        }
+                    }
+                    break;
+
                 case SchemaObjectType.None:
                 default:
                     // Пока не реализовано
@@ -741,7 +776,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Functions = functions,
             Indexes = indexes,
             Triggers = triggers,
-            Constraints = [],
+            Constraints = constraints,
             Partitions = [],
             CompositeTypeComments = compositeTypeComments,
             TableComments = tableComments,
