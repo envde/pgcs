@@ -1,6 +1,8 @@
+using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 
 namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 
@@ -8,14 +10,19 @@ namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 /// Экстрактор для извлечения определений ограничений целостности из SQL-скриптов
 /// Поддерживает PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, EXCLUDE
 /// </summary>
-public sealed class ConstraintExtractor : IConstraintExtractor
+public sealed class ConstraintExtractor : IExtractor<ConstraintDefinition>
 {
     /// <inheritdoc />
-    public bool CanExtract(SqlBlock block)
+    public bool CanExtract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(blocks);
         
-        var content = block.Content;
+        if (blocks.Count == 0)
+        {
+            return false;
+        }
+        
+        var content = blocks[0].Content;
         
         // Быстрая проверка на наличие ALTER TABLE и CONSTRAINT
         return content.Contains("ALTER TABLE", StringComparison.OrdinalIgnoreCase) &&
@@ -23,16 +30,24 @@ public sealed class ConstraintExtractor : IConstraintExtractor
     }
 
     /// <inheritdoc />
-    public ConstraintDefinition? Extract(SqlBlock block)
+    public ExtractionResult<ConstraintDefinition> Extract(IReadOnlyList<SqlBlock> blocks)
     {
-        ArgumentNullException.ThrowIfNull(block);
+        ArgumentNullException.ThrowIfNull(blocks);
         
-        if (!CanExtract(block))
+        if (blocks.Count == 0)
         {
-            return null;
+            return ExtractionResult<ConstraintDefinition>.NotApplicable();
+        }
+        
+        var block = blocks[0];
+        
+        if (!CanExtract(blocks))
+        {
+            return ExtractionResult<ConstraintDefinition>.NotApplicable();
         }
 
         var content = block.Content.Trim();
+        var issues = new List<ValidationIssue>();
         
         try
         {
@@ -42,7 +57,18 @@ public sealed class ConstraintExtractor : IConstraintExtractor
             var tableName = ExtractTableName(content);
             if (string.IsNullOrWhiteSpace(tableName))
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Constraint,
+                    "CONSTRAINT_NO_TABLE",
+                    "Table name not found in ALTER TABLE statement",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = block.SourcePath ?? "unknown",
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                ));
+                return ExtractionResult<ConstraintDefinition>.Failure(issues);
             }
             
             // Извлекаем схему таблицы если есть
@@ -58,30 +84,70 @@ public sealed class ConstraintExtractor : IConstraintExtractor
             var constraintName = ExtractConstraintName(content);
             if (string.IsNullOrWhiteSpace(constraintName))
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Constraint,
+                    "CONSTRAINT_NO_NAME",
+                    "Constraint name not found after CONSTRAINT keyword",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = block.SourcePath ?? "unknown",
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                ));
+                return ExtractionResult<ConstraintDefinition>.Failure(issues);
             }
             
             // Определяем тип ограничения
             var constraintType = DetermineConstraintType(content);
             if (constraintType is null)
             {
-                return null;
+                issues.Add(ValidationIssue.Error(
+                    ValidationIssue.ValidationDefinitionType.Constraint,
+                    "CONSTRAINT_NO_TYPE",
+                    "Constraint type (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, EXCLUDE) not found",
+                    new ValidationIssue.ValidationLocation
+                    {
+                        Segment = block.SourcePath ?? "unknown",
+                        Line = block.StartLine,
+                        Column = 0
+                    }
+                ));
+                return ExtractionResult<ConstraintDefinition>.Failure(issues);
             }
             
             // Извлекаем детали в зависимости от типа
-            return constraintType.Value switch
+            var definition = constraintType.Value switch
             {
-                ConstraintType.PrimaryKey => ExtractPrimaryKey(content, constraintName, tableName, schema, block),
-                ConstraintType.ForeignKey => ExtractForeignKey(content, constraintName, tableName, schema, block),
-                ConstraintType.Unique => ExtractUnique(content, constraintName, tableName, schema, block),
-                ConstraintType.Check => ExtractCheck(content, constraintName, tableName, schema, block),
-                ConstraintType.Exclude => ExtractExclude(content, constraintName, tableName, schema, block),
+                ConstraintType.PrimaryKey => ExtractPrimaryKey(content, constraintName, tableName, schema, block, issues),
+                ConstraintType.ForeignKey => ExtractForeignKey(content, constraintName, tableName, schema, block, issues),
+                ConstraintType.Unique => ExtractUnique(content, constraintName, tableName, schema, block, issues),
+                ConstraintType.Check => ExtractCheck(content, constraintName, tableName, schema, block, issues),
+                ConstraintType.Exclude => ExtractExclude(content, constraintName, tableName, schema, block, issues),
                 _ => null
             };
+            
+            if (definition is null)
+            {
+                return ExtractionResult<ConstraintDefinition>.Failure(issues);
+            }
+            
+            return ExtractionResult<ConstraintDefinition>.Success(definition, issues);
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.Constraint,
+                "CONSTRAINT_PARSE_ERROR",
+                $"Failed to parse ALTER TABLE ADD CONSTRAINT statement: {ex.Message}",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.SourcePath ?? "unknown",
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+            return ExtractionResult<ConstraintDefinition>.Failure(issues);
         }
     }
 
@@ -179,10 +245,26 @@ public sealed class ConstraintExtractor : IConstraintExtractor
     /// <summary>
     /// Извлекает PRIMARY KEY ограничение
     /// </summary>
-    private static ConstraintDefinition ExtractPrimaryKey(string content, string constraintName, 
-        string tableName, string? schema, SqlBlock block)
+    private static ConstraintDefinition? ExtractPrimaryKey(string content, string constraintName, 
+        string tableName, string? schema, SqlBlock block, List<ValidationIssue> issues)
     {
         var columns = ExtractColumnsInParentheses(content, "PRIMARY KEY");
+        
+        if (columns.Count == 0)
+        {
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.Constraint,
+                "CONSTRAINT_NO_COLUMNS",
+                "No columns found for PRIMARY KEY constraint",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.SourcePath ?? "unknown",
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+            return null;
+        }
         
         return new ConstraintDefinition
         {
@@ -199,11 +281,44 @@ public sealed class ConstraintExtractor : IConstraintExtractor
     /// <summary>
     /// Извлекает FOREIGN KEY ограничение
     /// </summary>
-    private static ConstraintDefinition ExtractForeignKey(string content, string constraintName,
-        string tableName, string? schema, SqlBlock block)
+    private static ConstraintDefinition? ExtractForeignKey(string content, string constraintName,
+        string tableName, string? schema, SqlBlock block, List<ValidationIssue> issues)
     {
         var columns = ExtractColumnsInParentheses(content, "FOREIGN KEY");
+        
+        if (columns.Count == 0)
+        {
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.Constraint,
+                "CONSTRAINT_NO_COLUMNS",
+                "No columns found for FOREIGN KEY constraint",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.SourcePath ?? "unknown",
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+            return null;
+        }
+        
         var referencedTable = ExtractReferencedTable(content);
+        if (string.IsNullOrWhiteSpace(referencedTable))
+        {
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.Constraint,
+                "CONSTRAINT_NO_REFERENCED_TABLE",
+                "Referenced table not found for FOREIGN KEY constraint",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.SourcePath ?? "unknown",
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+            return null;
+        }
+        
         var referencedColumns = ExtractReferencedColumns(content);
         var onDelete = ExtractReferentialAction(content, "ON DELETE");
         var onUpdate = ExtractReferentialAction(content, "ON UPDATE");
@@ -230,10 +345,26 @@ public sealed class ConstraintExtractor : IConstraintExtractor
     /// <summary>
     /// Извлекает UNIQUE ограничение
     /// </summary>
-    private static ConstraintDefinition ExtractUnique(string content, string constraintName,
-        string tableName, string? schema, SqlBlock block)
+    private static ConstraintDefinition? ExtractUnique(string content, string constraintName,
+        string tableName, string? schema, SqlBlock block, List<ValidationIssue> issues)
     {
         var columns = ExtractColumnsInParentheses(content, "UNIQUE");
+        
+        if (columns.Count == 0)
+        {
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.Constraint,
+                "CONSTRAINT_NO_COLUMNS",
+                "No columns found for UNIQUE constraint",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.SourcePath ?? "unknown",
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+            return null;
+        }
         
         return new ConstraintDefinition
         {
@@ -250,10 +381,27 @@ public sealed class ConstraintExtractor : IConstraintExtractor
     /// <summary>
     /// Извлекает CHECK ограничение
     /// </summary>
-    private static ConstraintDefinition ExtractCheck(string content, string constraintName,
-        string tableName, string? schema, SqlBlock block)
+    private static ConstraintDefinition? ExtractCheck(string content, string constraintName,
+        string tableName, string? schema, SqlBlock block, List<ValidationIssue> issues)
     {
         var checkExpression = ExtractCheckExpression(content);
+        
+        if (string.IsNullOrWhiteSpace(checkExpression))
+        {
+            issues.Add(ValidationIssue.Error(
+                ValidationIssue.ValidationDefinitionType.Constraint,
+                "CONSTRAINT_NO_CHECK_EXPRESSION",
+                "CHECK expression not found for CHECK constraint",
+                new ValidationIssue.ValidationLocation
+                {
+                    Segment = block.SourcePath ?? "unknown",
+                    Line = block.StartLine,
+                    Column = 0
+                }
+            ));
+            return null;
+        }
+        
         var (isDeferrable, isInitiallyDeferred) = ExtractDeferrableInfo(content);
         
         return new ConstraintDefinition
@@ -273,11 +421,14 @@ public sealed class ConstraintExtractor : IConstraintExtractor
     /// <summary>
     /// Извлекает EXCLUDE ограничение
     /// </summary>
-    private static ConstraintDefinition ExtractExclude(string content, string constraintName,
-        string tableName, string? schema, SqlBlock block)
+    private static ConstraintDefinition? ExtractExclude(string content, string constraintName,
+        string tableName, string? schema, SqlBlock block, List<ValidationIssue> issues)
     {
         // EXCLUDE ограничения имеют сложный синтаксис, пока сохраняем базовую информацию
         var columns = ExtractColumnsInParentheses(content, "EXCLUDE");
+        
+        // For EXCLUDE constraints, columns are optional (can have complex expressions)
+        // So we don't add an error if columns are empty
         
         return new ConstraintDefinition
         {

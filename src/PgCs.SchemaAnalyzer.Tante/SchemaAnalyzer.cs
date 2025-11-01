@@ -22,7 +22,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IExtractor<FunctionDefinition> _functionExtractor;
     private readonly IIndexExtractor _indexExtractor;
     private readonly IExtractor<TriggerDefinition> _triggerExtractor;
-    private readonly IConstraintExtractor _constraintExtractor;
+    private readonly IExtractor<ConstraintDefinition> _constraintExtractor;
     private readonly IExtractor<CommentDefinition> _commentExtractor;
 
     /// <summary>
@@ -38,7 +38,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IExtractor<FunctionDefinition> functionExtractor,
         IIndexExtractor indexExtractor,
         IExtractor<TriggerDefinition> triggerExtractor,
-        IConstraintExtractor constraintExtractor,
+        IExtractor<ConstraintDefinition> constraintExtractor,
         IExtractor<CommentDefinition> commentExtractor)
     {
         ArgumentNullException.ThrowIfNull(blockExtractor);
@@ -373,15 +373,15 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
         foreach (var block in blocks)
         {
-            if (!_constraintExtractor.CanExtract(block))
+            if (!_constraintExtractor.CanExtract([block]))
             {
                 continue;
             }
 
-            var constraintDef = _constraintExtractor.Extract(block);
-            if (constraintDef is not null)
+            var result = _constraintExtractor.Extract([block]);
+            if (result.IsSuccess && result.Definition is not null)
             {
-                constraints.Add(constraintDef);
+                constraints.Add(result.Definition);
             }
         }
 
@@ -524,12 +524,12 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
 
                 case SchemaObjectType.Constraints:
                     // Извлекаем ограничение целостности
-                    if (_constraintExtractor.CanExtract(block))
+                    if (_constraintExtractor.CanExtract([block]))
                     {
-                        var constraintDef = _constraintExtractor.Extract(block);
-                        if (constraintDef is not null)
+                        var result = _constraintExtractor.Extract([block]);
+                        if (result.IsSuccess && result.Definition is not null)
                         {
-                            constraints.Add(constraintDef);
+                            constraints.Add(result.Definition);
                         }
                     }
                     break;
