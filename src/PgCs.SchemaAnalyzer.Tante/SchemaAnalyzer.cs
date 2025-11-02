@@ -3,6 +3,7 @@ using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Analyzer;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
 
 namespace PgCs.SchemaAnalyzer.Tante;
@@ -406,6 +407,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var triggers = new List<TriggerDefinition>();
         var constraints = new List<ConstraintDefinition>();
         var comments = new List<CommentDefinition>();
+        var validationIssues = new List<ValidationIssue>();
 
         var blocksList = blocks.ToList();
 
@@ -423,10 +425,11 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     if (_tableExtractor.CanExtract([block]))
                     {
                         var tableResult = _tableExtractor.Extract([block]);
-                        if (tableResult.IsSuccess && tableResult.Definition is not null)
+                        if (tableResult is { IsSuccess: true, Definition: not null })
                         {
                             tables.Add(tableResult.Definition);
                         }
+                        validationIssues.AddRange(tableResult.ValidationIssues);
                     }
                     break;
 
@@ -436,10 +439,11 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     {
                         var blocksToProcess = blocksList.Skip(i).ToList();
                         var result = _viewExtractor.Extract(blocksToProcess);
-                        if (result.IsSuccess && result.Definition is not null)
+                        if (result is { IsSuccess: true, Definition: not null })
                         {
                             views.Add(result.Definition);
                         }
+                        validationIssues.AddRange(result.ValidationIssues);
                     }
                     break;
 
@@ -449,19 +453,21 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     if (_enumExtractor.CanExtract(blockList))
                     {
                         var result = _enumExtractor.Extract(blockList);
-                        if (result.IsSuccess && result.Definition is not null)
+                        if (result is { IsSuccess: true, Definition: not null })
                         {
                             enums.Add(result.Definition);
                         }
+                        validationIssues.AddRange(result.ValidationIssues);
                     }
                     // Пытаемся извлечь Composite
                     else if (_compositeExtractor.CanExtract(blockList))
                     {
                         var compositeResult = _compositeExtractor.Extract(blockList);
-                        if (compositeResult.IsSuccess && compositeResult.Definition is not null)
+                        if (compositeResult is { IsSuccess: true, Definition: not null })
                         {
                             composites.Add(compositeResult.Definition);
                         }
+                        validationIssues.AddRange(compositeResult.ValidationIssues);
                     }
                     // Пытаемся извлечь Domain
                     else
@@ -472,6 +478,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                         {
                             domains.Add(domainResult.Definition);
                         }
+                        validationIssues.AddRange(domainResult.ValidationIssues);
                     }
                     break;
 
@@ -479,10 +486,11 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     // Извлекаем функцию или процедуру
                     var functionBlocks = new[] { block };
                     var functionResult = _functionExtractor.Extract(functionBlocks);
-                    if (functionResult.IsSuccess && functionResult.Definition is not null)
+                    if (functionResult is { IsSuccess: true, Definition: not null })
                     {
                         functions.Add(functionResult.Definition);
                     }
+                    validationIssues.AddRange(functionResult.ValidationIssues);
                     break;
 
                 case SchemaObjectType.Indexes:
@@ -507,6 +515,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                         {
                             comments.Add(commentResult.Definition);
                         }
+                        validationIssues.AddRange(commentResult.ValidationIssues);
                     }
                     break;
 
@@ -515,10 +524,11 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     if (_triggerExtractor.CanExtract([block]))
                     {
                         var result = _triggerExtractor.Extract([block]);
-                        if (result.IsSuccess && result.Definition is not null)
+                        if (result is { IsSuccess: true, Definition: not null })
                         {
                             triggers.Add(result.Definition);
                         }
+                        validationIssues.AddRange(result.ValidationIssues);
                     }
                     break;
 
@@ -527,10 +537,11 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     if (_constraintExtractor.CanExtract([block]))
                     {
                         var result = _constraintExtractor.Extract([block]);
-                        if (result.IsSuccess && result.Definition is not null)
+                        if (result is { IsSuccess: true, Definition: not null })
                         {
                             constraints.Add(result.Definition);
                         }
+                        validationIssues.AddRange(result.ValidationIssues);
                     }
                     break;
 
@@ -554,7 +565,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Constraints = constraints,
             Partitions = [],
             CommentDefinition = comments,
-            ValidationIssues = [],
+            ValidationIssues = validationIssues,
             SourcePaths = sourcePaths,
             AnalyzedAt = DateTime.UtcNow
         };
