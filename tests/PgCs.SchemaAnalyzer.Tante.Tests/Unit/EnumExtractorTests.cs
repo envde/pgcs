@@ -7,505 +7,265 @@ using PgCs.SchemaAnalyzer.Tante.Extractors;
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
-/// Тесты для EnumExtractor
+/// Консолидированные тесты для EnumExtractor
+/// Покрывает базовые enum, schema, multiline format, case sensitivity, специальные символы, валидацию, специальные форматы комментариев
 /// </summary>
 public sealed class EnumExtractorTests
 {
     private readonly IExtractor<EnumTypeDefinition> _extractor = new EnumExtractor();
 
-    #region CanExtract Tests
-
     [Fact]
-    public void CanExtract_WithValidEnumBlock_ReturnsTrue()
+    public void Extract_BasicEnums_HandlesAllVariants()
     {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive');");
+        // Покрывает: simple enum, schema, single value, multiline format, case sensitivity
 
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithTableBlock_ReturnsFalse()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithNullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
-    }
-
-    #endregion
-
-    #region Extract Simple Enum Tests
-
-    [Fact]
-    public void Extract_SimpleEnum_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ('active', 'inactive', 'pending');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("status", result.Definition.Name);
-        Assert.Null(result.Definition.Schema);
-        Assert.Equal(3, result.Definition.Values.Count);
-        Assert.Equal("active", result.Definition.Values[0]);
-        Assert.Equal("inactive", result.Definition.Values[1]);
-        Assert.Equal("pending", result.Definition.Values[2]);
-    }
-
-    [Fact]
-    public void Extract_EnumWithSchema_ReturnsDefinitionWithSchema()
-    {
-        // Arrange
-        var sql = "CREATE TYPE public.order_status AS ENUM ('new', 'processing', 'completed');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("order_status", result.Definition.Name);
-        Assert.Equal("public", result.Definition.Schema);
-        Assert.Equal(3, result.Definition.Values.Count);
-    }
-
-    [Fact]
-    public void Extract_EnumWithMultilineFormat_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = @"CREATE TYPE user_status AS ENUM (
+        // Simple enum with multiple values
+        var simpleBlock = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive', 'pending');");
+        var simpleResult = _extractor.Extract(simpleBlock);
+        
+        Assert.True(simpleResult.IsSuccess);
+        Assert.NotNull(simpleResult.Definition);
+        Assert.Equal("status", simpleResult.Definition.Name);
+        Assert.Null(simpleResult.Definition.Schema);
+        Assert.Equal(3, simpleResult.Definition.Values.Count);
+        Assert.Equal("active", simpleResult.Definition.Values[0]);
+        Assert.Equal("inactive", simpleResult.Definition.Values[1]);
+        Assert.Equal("pending", simpleResult.Definition.Values[2]);
+        
+        // Enum with schema
+        var schemaBlock = CreateBlocks("CREATE TYPE public.order_status AS ENUM ('new', 'processing', 'completed');");
+        var schemaResult = _extractor.Extract(schemaBlock);
+        
+        Assert.True(schemaResult.IsSuccess);
+        Assert.Equal("order_status", schemaResult.Definition!.Name);
+        Assert.Equal("public", schemaResult.Definition.Schema);
+        Assert.Equal(3, schemaResult.Definition.Values.Count);
+        
+        // Single value
+        var singleBlock = CreateBlocks("CREATE TYPE status AS ENUM ('active');");
+        var singleResult = _extractor.Extract(singleBlock);
+        
+        Assert.True(singleResult.IsSuccess);
+        Assert.Single(singleResult.Definition!.Values);
+        Assert.Equal("active", singleResult.Definition.Values[0]);
+        
+        // Multiline format
+        var multilineBlock = CreateBlocks(@"CREATE TYPE user_status AS ENUM (
     'active',
     'inactive',
     'suspended',
     'deleted'
-);";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("user_status", result.Definition.Name);
-        Assert.Equal(4, result.Definition.Values.Count);
-        Assert.Equal("active", result.Definition.Values[0]);
-        Assert.Equal("deleted", result.Definition.Values[3]);
-    }
-
-    #endregion
-
-    #region Extract with Comments Tests
-
-    [Fact]
-    public void Extract_EnumWithHeaderComment_PreservesComment()
-    {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ('active', 'inactive');";
-        var blocks = new List<SqlBlock>
-        {
-            new SqlBlock
-            {
-                Content = sql,
-                RawContent = sql,
-                HeaderComment = "User account status enumeration",
-                StartLine = 1,
-                EndLine = 1
-            }
-        };
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("User account status enumeration", result.Definition.SqlComment);
+);");
+        var multilineResult = _extractor.Extract(multilineBlock);
+        
+        Assert.True(multilineResult.IsSuccess);
+        Assert.Equal("user_status", multilineResult.Definition!.Name);
+        Assert.Equal(4, multilineResult.Definition.Values.Count);
+        Assert.Equal("active", multilineResult.Definition.Values[0]);
+        Assert.Equal("deleted", multilineResult.Definition.Values[3]);
+        
+        // CanExtract validation
+        Assert.True(_extractor.CanExtract(simpleBlock));
+        Assert.False(_extractor.CanExtract(CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);")));
     }
 
     [Fact]
-    public void Extract_EnumBlock_PreservesRawSql()
+    public void Extract_SpecialCasesAndFormatting_HandlesCorrectly()
     {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ('active', 'inactive');";
+        // Покрывает: spaces in values, special characters, uppercase/mixed case, real-world examples
+
+        // Spaces in values
+        var spacesBlock = CreateBlocks("CREATE TYPE status AS ENUM (  'active'  ,  'inactive'  ,  'pending'  );");
+        var spacesResult = _extractor.Extract(spacesBlock);
+        
+        Assert.True(spacesResult.IsSuccess);
+        Assert.Equal(3, spacesResult.Definition!.Values.Count);
+        Assert.Equal("active", spacesResult.Definition.Values[0]);
+        
+        // Special characters in values
+        var specialBlock = CreateBlocks("CREATE TYPE status AS ENUM ('in-progress', 'not_started', 'done!');");
+        var specialResult = _extractor.Extract(specialBlock);
+        
+        Assert.True(specialResult.IsSuccess);
+        Assert.Equal(3, specialResult.Definition!.Values.Count);
+        Assert.Equal("in-progress", specialResult.Definition.Values[0]);
+        Assert.Equal("not_started", specialResult.Definition.Values[1]);
+        Assert.Equal("done!", specialResult.Definition.Values[2]);
+        
+        // Uppercase keywords and values
+        var upperBlock = CreateBlocks("CREATE TYPE STATUS AS ENUM ('ACTIVE', 'INACTIVE');");
+        var upperResult = _extractor.Extract(upperBlock);
+        
+        Assert.True(upperResult.IsSuccess);
+        Assert.Equal("STATUS", upperResult.Definition!.Name);
+        Assert.Equal("ACTIVE", upperResult.Definition.Values[0]);
+        Assert.Equal("INACTIVE", upperResult.Definition.Values[1]);
+        
+        // Mixed case keywords
+        var mixedBlock = CreateBlocks("Create Type status As Enum ('active', 'inactive');");
+        var mixedResult = _extractor.Extract(mixedBlock);
+        
+        Assert.True(mixedResult.IsSuccess);
+        Assert.Equal("status", mixedResult.Definition!.Name);
+        
+        // Real-world: Order status
+        var orderBlock = CreateBlocks("CREATE TYPE order_status AS ENUM ('pending', 'processing', 'shipped', 'delivered', 'cancelled');");
+        var orderResult = _extractor.Extract(orderBlock);
+        
+        Assert.True(orderResult.IsSuccess);
+        Assert.Equal("order_status", orderResult.Definition!.Name);
+        Assert.Equal(5, orderResult.Definition.Values.Count);
+        Assert.Contains("pending", orderResult.Definition.Values);
+        Assert.Contains("delivered", orderResult.Definition.Values);
+        
+        // Real-world: Payment method
+        var paymentBlock = CreateBlocks("CREATE TYPE payment_method AS ENUM ('credit_card', 'debit_card', 'paypal', 'bank_transfer', 'crypto', 'cash');");
+        var paymentResult = _extractor.Extract(paymentBlock);
+        
+        Assert.True(paymentResult.IsSuccess);
+        Assert.Equal("payment_method", paymentResult.Definition!.Name);
+        Assert.Equal(6, paymentResult.Definition.Values.Count);
+    }
+
+    [Fact]
+    public void Extract_SpecialFormatComments_ParsesMetadata()
+    {
+        // Покрывает: comment: формат и comment() формат для enum типов
+        
+        // Format 1: comment: Text; rename: NewName; type: TYPE;
+        var blocks1 = CreateBlocks(
+            "CREATE TYPE status AS ENUM ('active', 'inactive', 'pending');",
+            "comment: Статус пользователя в системе; rename: UserStatus; type: STATUS;");
+        var result1 = _extractor.Extract(blocks1);
+        
+        Assert.True(result1.IsSuccess);
+        Assert.NotNull(result1.Definition);
+        Assert.NotNull(result1.Definition.SqlComment);
+        Assert.Contains("comment:", result1.Definition.SqlComment);
+        Assert.Contains("Статус пользователя", result1.Definition.SqlComment);
+        Assert.Contains("rename:", result1.Definition.SqlComment);
+        
+        // Format 2: comment(Text); rename(NewName); type(TYPE);
+        var blocks2 = CreateBlocks(
+            "CREATE TYPE order_status AS ENUM ('new', 'processing', 'completed', 'cancelled');",
+            "comment(Статус заказа); rename(OrderStatus); type(ORDER_STATUS);");
+        var result2 = _extractor.Extract(blocks2);
+        
+        Assert.True(result2.IsSuccess);
+        Assert.NotNull(result2.Definition);
+        Assert.NotNull(result2.Definition.SqlComment);
+        Assert.Contains("comment(", result2.Definition.SqlComment);
+        Assert.Contains("Статус заказа", result2.Definition.SqlComment);
+        Assert.Contains("rename(", result2.Definition.SqlComment);
+        
+        // Regular header comment
+        var blocks3 = CreateBlocks(
+            "CREATE TYPE status AS ENUM ('active', 'inactive');",
+            "User account status enumeration");
+        var result3 = _extractor.Extract(blocks3);
+        
+        Assert.True(result3.IsSuccess);
+        Assert.Equal("User account status enumeration", result3.Definition!.SqlComment);
+        
+        // Raw SQL preservation
         var rawSql = "-- Status type\nCREATE TYPE status AS ENUM ('active', 'inactive');";
-        var blocks = new List<SqlBlock>
+        var block4 = new SqlBlock
         {
-            new SqlBlock
-            {
-                Content = sql,
-                RawContent = rawSql,
-                StartLine = 1,
-                EndLine = 2
-            }
+            Content = "CREATE TYPE status AS ENUM ('active', 'inactive');",
+            RawContent = rawSql,
+            StartLine = 1,
+            EndLine = 2
         };
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(rawSql, result.Definition.RawSql);
-    }
-
-    #endregion
-
-    #region Extract Special Cases Tests
-
-    [Fact]
-    public void Extract_EnumWithSpacesInValues_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM (  'active'  ,  'inactive'  ,  'pending'  );";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(3, result.Definition.Values.Count);
-        Assert.Equal("active", result.Definition.Values[0]);
+        var blocks4 = new[] { block4 };
+        var result4 = _extractor.Extract(blocks4);
+        
+        Assert.True(result4.IsSuccess);
+        Assert.Equal(rawSql, result4.Definition!.RawSql);
     }
 
     [Fact]
-    public void Extract_EnumWithEmptyValues_ReturnsFailure()
+    public void Extract_ValidationAndEdgeCases_HandlesCorrectly()
     {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ();";
-        var blocks = CreateBlocks(sql);
+        // Покрывает: empty values, duplicate values, too many values, too long value, invalid syntax, errors
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-        Assert.NotEmpty(result.ValidationIssues);
-    }
-
-    [Fact]
-    public void Extract_EnumWithSingleValue_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ('active');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Single(result.Definition.Values);
-        Assert.Equal("active", result.Definition.Values[0]);
-    }
-
-    [Fact]
-    public void Extract_EnumWithSpecialCharactersInValues_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ('in-progress', 'not_started', 'done!');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(3, result.Definition.Values.Count);
-        Assert.Equal("in-progress", result.Definition.Values[0]);
-        Assert.Equal("not_started", result.Definition.Values[1]);
-        Assert.Equal("done!", result.Definition.Values[2]);
-    }
-
-    #endregion
-
-    #region Case Sensitivity Tests
-
-    [Fact]
-    public void Extract_EnumWithUpperCaseKeywords_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = "CREATE TYPE STATUS AS ENUM ('ACTIVE', 'INACTIVE');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("STATUS", result.Definition.Name);
-        Assert.Equal(2, result.Definition.Values.Count);
-    }
-
-    [Fact]
-    public void Extract_EnumWithMixedCaseKeywords_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = "Create Type status As Enum ('active', 'inactive');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("status", result.Definition.Name);
-    }
-
-    #endregion
-
-    #region ValidationIssues Tests
-
-    [Fact]
-    public void Extract_WithDuplicateValues_ReturnsWarning()
-    {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ('active', 'inactive', 'active', 'pending');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess); // Still succeeds, but with warning
-        Assert.NotNull(result.Definition);
-        Assert.NotEmpty(result.ValidationIssues);
-        var warning = result.ValidationIssues.First(i => i.Code == "ENUM_DUPLICATE_VALUES");
-        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, warning.Severity);
-        Assert.Contains("active", warning.Message);
-    }
-
-    [Fact]
-    public void Extract_WithEmptyValues_ReturnsWarning()
-    {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ('active', '', 'inactive');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess); // Still succeeds, but with warning
-        Assert.NotNull(result.Definition);
-        Assert.NotEmpty(result.ValidationIssues);
-        var warning = result.ValidationIssues.First(i => i.Code == "ENUM_EMPTY_VALUE");
-        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, warning.Severity);
-    }
-
-    [Fact]
-    public void Extract_WithTooManyValues_ReturnsWarning()
-    {
-        // Arrange
+        // Empty enum values - failure
+        var emptyBlock = CreateBlocks("CREATE TYPE status AS ENUM ();");
+        var emptyResult = _extractor.Extract(emptyBlock);
+        
+        Assert.False(emptyResult.IsSuccess);
+        Assert.Null(emptyResult.Definition);
+        Assert.NotEmpty(emptyResult.ValidationIssues);
+        
+        // Duplicate values - warning
+        var duplicateBlock = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive', 'active', 'pending');");
+        var duplicateResult = _extractor.Extract(duplicateBlock);
+        
+        Assert.True(duplicateResult.IsSuccess);
+        Assert.NotEmpty(duplicateResult.ValidationIssues);
+        var duplicateWarning = duplicateResult.ValidationIssues.First(i => i.Code == "ENUM_DUPLICATE_VALUES");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, duplicateWarning.Severity);
+        Assert.Contains("active", duplicateWarning.Message);
+        
+        // Empty string value - warning
+        var emptyValueBlock = CreateBlocks("CREATE TYPE status AS ENUM ('active', '', 'inactive');");
+        var emptyValueResult = _extractor.Extract(emptyValueBlock);
+        
+        Assert.True(emptyValueResult.IsSuccess);
+        Assert.NotEmpty(emptyValueResult.ValidationIssues);
+        var emptyValueWarning = emptyValueResult.ValidationIssues.First(i => i.Code == "ENUM_EMPTY_VALUE");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, emptyValueWarning.Severity);
+        
+        // Too many values - warning
         var values = string.Join(", ", Enumerable.Range(1, 150).Select(i => $"'value{i}'"));
-        var sql = $"CREATE TYPE large_enum AS ENUM ({values});";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess); // Still succeeds, but with warning
-        Assert.NotNull(result.Definition);
-        Assert.NotEmpty(result.ValidationIssues);
-        var warning = result.ValidationIssues.First(i => i.Code == "ENUM_TOO_MANY_VALUES");
-        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, warning.Severity);
-        Assert.Contains("150", warning.Message);
-    }
-
-    [Fact]
-    public void Extract_WithVeryLongValue_ReturnsWarning()
-    {
-        // Arrange
+        var tooManyBlock = CreateBlocks($"CREATE TYPE large_enum AS ENUM ({values});");
+        var tooManyResult = _extractor.Extract(tooManyBlock);
+        
+        Assert.True(tooManyResult.IsSuccess);
+        Assert.NotEmpty(tooManyResult.ValidationIssues);
+        var tooManyWarning = tooManyResult.ValidationIssues.First(i => i.Code == "ENUM_TOO_MANY_VALUES");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, tooManyWarning.Severity);
+        Assert.Contains("150", tooManyWarning.Message);
+        
+        // Very long value - warning
         var longValue = new string('x', 300);
-        var sql = $"CREATE TYPE status AS ENUM ('active', '{longValue}', 'inactive');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess); // Still succeeds, but with warning
-        Assert.NotNull(result.Definition);
-        Assert.NotEmpty(result.ValidationIssues);
-        var warning = result.ValidationIssues.First(i => i.Code == "ENUM_VALUE_TOO_LONG");
-        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, warning.Severity);
-    }
-
-    [Fact]
-    public void Extract_WithMultipleIssues_ReturnsAllWarnings()
-    {
-        // Arrange
-        var sql = "CREATE TYPE status AS ENUM ('active', 'active', '', 'inactive');"; // Duplicates + empty
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess); // Still succeeds, but with warnings
-        Assert.NotNull(result.Definition);
-        Assert.NotEmpty(result.ValidationIssues);
-        Assert.Equal(2, result.ValidationIssues.Count);
-        Assert.Contains(result.ValidationIssues, i => i.Code == "ENUM_DUPLICATE_VALUES");
-        Assert.Contains(result.ValidationIssues, i => i.Code == "ENUM_EMPTY_VALUE");
-    }
-
-    #endregion
-
-    #region Invalid Input Tests
-
-    [Fact]
-    public void Extract_WithNullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
+        var longValueBlock = CreateBlocks($"CREATE TYPE status AS ENUM ('active', '{longValue}', 'inactive');");
+        var longValueResult = _extractor.Extract(longValueBlock);
+        
+        Assert.True(longValueResult.IsSuccess);
+        Assert.NotEmpty(longValueResult.ValidationIssues);
+        var longValueWarning = longValueResult.ValidationIssues.First(i => i.Code == "ENUM_VALUE_TOO_LONG");
+        Assert.Equal(ValidationIssue.ValidationSeverity.Warning, longValueWarning.Severity);
+        
+        // Multiple issues combined
+        var multipleBlock = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'active', '', 'inactive');");
+        var multipleResult = _extractor.Extract(multipleBlock);
+        
+        Assert.True(multipleResult.IsSuccess);
+        Assert.NotEmpty(multipleResult.ValidationIssues);
+        Assert.Equal(2, multipleResult.ValidationIssues.Count);
+        Assert.Contains(multipleResult.ValidationIssues, i => i.Code == "ENUM_DUPLICATE_VALUES");
+        Assert.Contains(multipleResult.ValidationIssues, i => i.Code == "ENUM_EMPTY_VALUE");
+        
+        // Invalid syntax (missing AS)
+        var invalidBlock = CreateBlocks("CREATE TYPE status ENUM ('active', 'inactive');");
+        var invalidResult = _extractor.Extract(invalidBlock);
+        
+        Assert.False(invalidResult.IsSuccess);
+        Assert.Null(invalidResult.Definition);
+        
+        // Non-enum block
+        var nonEnumBlock = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
+        var nonEnumResult = _extractor.Extract(nonEnumBlock);
+        
+        Assert.False(nonEnumResult.IsSuccess);
+        Assert.Null(nonEnumResult.Definition);
+        
+        // Null blocks - exception
+        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
         Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
     }
 
-    [Fact]
-    public void Extract_NonEnumBlock_ReturnsNotApplicable()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    [Fact]
-    public void Extract_InvalidEnumSyntax_ReturnsFailure()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TYPE status ENUM ('active', 'inactive');"); // Missing AS
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    #endregion
-
-    #region Real World Examples Tests
-
-    [Fact]
-    public void Extract_PostgreSQL18EnumExample_ExtractsCorrectly()
-    {
-        // Arrange - Пример из реального Schema.sql
-        var sql = "CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended', 'deleted');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("user_status", result.Definition.Name);
-        Assert.Equal(4, result.Definition.Values.Count);
-        Assert.Equal("active", result.Definition.Values[0]);
-        Assert.Equal("inactive", result.Definition.Values[1]);
-        Assert.Equal("suspended", result.Definition.Values[2]);
-        Assert.Equal("deleted", result.Definition.Values[3]);
-    }
-
-    [Fact]
-    public void Extract_OrderStatusEnum_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = "CREATE TYPE order_status AS ENUM ('pending', 'processing', 'shipped', 'delivered', 'cancelled');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("order_status", result.Definition.Name);
-        Assert.Equal(5, result.Definition.Values.Count);
-        Assert.Contains("pending", result.Definition.Values);
-        Assert.Contains("delivered", result.Definition.Values);
-    }
-
-    [Fact]
-    public void Extract_PaymentMethodEnum_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = "CREATE TYPE payment_method AS ENUM ('credit_card', 'debit_card', 'paypal', 'bank_transfer', 'crypto', 'cash');";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("payment_method", result.Definition.Name);
-        Assert.Equal(6, result.Definition.Values.Count);
-    }
-
-    #endregion
-
-    #region Helper Methods
-
-    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql)
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? headerComment = null)
     {
         return
         [
@@ -514,10 +274,9 @@ public sealed class EnumExtractorTests
                 Content = sql,
                 RawContent = sql,
                 StartLine = 1,
-                EndLine = 1
+                EndLine = 1,
+                HeaderComment = headerComment
             }
         ];
     }
-
-    #endregion
 }

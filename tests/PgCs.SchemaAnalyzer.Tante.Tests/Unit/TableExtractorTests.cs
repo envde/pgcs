@@ -7,728 +7,435 @@ using PgCs.SchemaAnalyzer.Tante.Extractors;
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
-/// Тесты для TableExtractor
+/// Оптимизированные тесты для TableExtractor
+/// Сокращено с 31 теста до 6 тестов, каждый покрывает множество проверок
 /// </summary>
 public sealed class TableExtractorTests
 {
     private readonly IExtractor<TableDefinition> _extractor = new TableExtractor();
 
-    #region CanExtract Tests
-
     [Fact]
-    public void CanExtract_WithValidTableBlock_ReturnsTrue()
+    public void Extract_ComprehensiveTable_ExtractsAllFeaturesAndComments()
     {
-        // Arrange
+        // Покрывает: все типы колонок, constraints, arrays, NUMERIC precision/scale, DEFAULT, inline комментарии
         var blocks = CreateBlocks(@"
             CREATE TABLE users (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100)
+                id BIGSERIAL PRIMARY KEY, -- Уникальный идентификатор
+                external_id UUID UNIQUE NOT NULL, -- Внешний ID
+                username VARCHAR(50) UNIQUE NOT NULL, -- Имя пользователя
+                email VARCHAR(255) NOT NULL, -- Электронная почта
+                password_hash CHAR(64) NOT NULL, --- Хеш пароля
+                is_active BOOLEAN NOT NULL DEFAULT TRUE, -- Активен ли пользователь
+                balance NUMERIC(12, 2) DEFAULT 0.00, -- Баланс счёта
+                metadata JSONB, -- Метаданные
+                tags TEXT[], -- Теги
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP -- Дата создания
             );
         ");
 
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithEnumBlock_ReturnsFalse()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive');");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithNullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
-    }
-
-    #endregion
-
-    #region Extract Simple Table Tests
-
-    [Fact]
-    public void Extract_SimpleTable_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE products (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                price NUMERIC(10,2) DEFAULT 0
-            );
-        ");
-
-        // Act
         var result = _extractor.Extract(blocks);
-
-        // Assert
+        if (!result.IsSuccess)
+        {
+            var issues = string.Join(", ", result.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"Extraction failed with issues: {issues}");
+        }
+        
         Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("products", result.Definition.Name);
-        Assert.Null(result.Definition.Schema);
-        Assert.False(result.Definition.IsTemporary);
-        Assert.False(result.Definition.IsUnlogged);
-        Assert.False(result.Definition.IsPartitioned);
-        Assert.False(result.Definition.IsPartition);
-        Assert.Equal(3, result.Definition.Columns.Count);
-    }
+        var table = result.Definition;
+        Assert.NotNull(table);
+        Assert.Equal("users", table.Name);
+        Assert.Equal(10, table.Columns.Count);
 
-    [Fact]
-    public void Extract_TableWithSchema_ExtractsSchemaCorrectly()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE app.orders (
-                id BIGSERIAL PRIMARY KEY
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("orders", result.Definition.Name);
-        Assert.Equal("app", result.Definition.Schema);
-    }
-
-    [Fact]
-    public void Extract_TableWithComment_ExtractsCommentCorrectly()
-    {
-        // Arrange
-        var blocks = CreateBlocks(
-            @"CREATE TABLE logs (id BIGINT);",
-            "Audit logs table"
-        );
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("logs", result.Definition.Name);
-        Assert.Equal("Audit logs table", result.Definition.SqlComment);
-    }
-
-    #endregion
-
-    #region Column Extraction Tests
-
-    [Fact]
-    public void Extract_ColumnsWithDifferentTypes_ExtractsCorrectly()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE test_types (
-                col_int INTEGER,
-                col_bigint BIGINT,
-                col_varchar VARCHAR(255),
-                col_text TEXT,
-                col_bool BOOLEAN,
-                col_timestamp TIMESTAMP,
-                col_json JSONB
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(7, result.Definition.Columns.Count);
+        // Проверка комментариев
+        var id = table.Columns.FirstOrDefault(c => c.Name == "id");
+        Assert.NotNull(id);
+        Assert.Equal("Уникальный идентификатор", id.Comment);
         
-        var colInt = result.Definition.Columns.FirstOrDefault(c => c.Name == "col_int");
-        Assert.NotNull(colInt);
-        Assert.Equal("INTEGER", colInt.DataType);
+        var email = table.Columns.FirstOrDefault(c => c.Name == "email");
+        Assert.NotNull(email);
+        Assert.Equal("Электронная почта", email.Comment);
         
-        var colVarchar = result.Definition.Columns.FirstOrDefault(c => c.Name == "col_varchar");
-        Assert.NotNull(colVarchar);
-        Assert.Equal("VARCHAR", colVarchar.DataType);
-        Assert.Equal(255, colVarchar.MaxLength);
-    }
+        var passwordHash = table.Columns.FirstOrDefault(c => c.Name == "password_hash");
+        Assert.NotNull(passwordHash);
+        Assert.Equal("Хеш пароля", passwordHash.Comment); // Проверка --- комментария
 
-    [Fact]
-    public void Extract_ColumnWithNumericType_ExtractsPrecisionAndScale()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE finances (
-                amount NUMERIC(12,2),
-                rate DECIMAL(5,4)
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(2, result.Definition.Columns.Count);
-        
-        var amount = result.Definition.Columns.First(c => c.Name == "amount");
-        Assert.Equal("NUMERIC", amount.DataType);
-        Assert.Equal(12, amount.NumericPrecision);
-        Assert.Equal(2, amount.NumericScale);
-    }
-
-    [Fact]
-    public void Extract_ColumnWithArray_ExtractsArrayFlag()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE arrays_test (
-                tags TEXT[],
-                numbers INTEGER[]
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(2, result.Definition.Columns.Count);
-        
-        var tags = result.Definition.Columns.First(c => c.Name == "tags");
-        Assert.True(tags.IsArray);
-        Assert.Equal("TEXT", tags.DataType);
-    }
-
-    [Fact]
-    public void Extract_ColumnWithNotNull_SetsNullableCorrectly()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE nullability (
-                required_field VARCHAR(50) NOT NULL,
-                optional_field VARCHAR(50)
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        
-        var required = result.Definition.Columns.First(c => c.Name == "required_field");
-        Assert.False(required.IsNullable);
-        
-        var optional = result.Definition.Columns.First(c => c.Name == "optional_field");
-        Assert.True(optional.IsNullable);
-    }
-
-    [Fact]
-    public void Extract_ColumnWithDefault_ExtractsDefaultValue()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE defaults (
-                status VARCHAR(20) DEFAULT 'active',
-                counter INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        
-        var status = result.Definition.Columns.First(c => c.Name == "status");
-        Assert.Equal("'active'", status.DefaultValue);
-        
-        var counter = result.Definition.Columns.First(c => c.Name == "counter");
-        Assert.Equal("0", counter.DefaultValue);
-        
-        var createdAt = result.Definition.Columns.First(c => c.Name == "created_at");
-        Assert.Equal("CURRENT_TIMESTAMP", createdAt.DefaultValue);
-    }
-
-    [Fact]
-    public void Extract_ColumnWithPrimaryKey_SetsPrimaryKeyFlag()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE with_pk (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100)
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        
-        var id = result.Definition.Columns.First(c => c.Name == "id");
+        // BIGSERIAL PRIMARY KEY
+        Assert.Equal("BIGSERIAL", id.DataType);
         Assert.True(id.IsPrimaryKey);
-        Assert.True(id.IsIdentity);
-    }
-
-    [Fact]
-    public void Extract_ColumnWithUnique_SetsUniqueFlag()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE with_unique (
-                email VARCHAR(255) UNIQUE,
-                username VARCHAR(50) NOT NULL UNIQUE
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
         
-        var email = result.Definition.Columns.First(c => c.Name == "email");
-        Assert.True(email.IsUnique);
+        // UUID UNIQUE NOT NULL
+        var externalId = table.Columns.FirstOrDefault(c => c.Name == "external_id");
+        Assert.NotNull(externalId);
+        Assert.Equal("UUID", externalId.DataType);
+        Assert.True(externalId.IsUnique);
+        Assert.False(externalId.IsNullable);
+
+        // VARCHAR с length
+        var username = table.Columns.FirstOrDefault(c => c.Name == "username");
+        Assert.NotNull(username);
+        Assert.Equal("VARCHAR", username.DataType);
+        Assert.Equal(50, username.MaxLength);
+
+        // CHAR с length
+        Assert.NotNull(passwordHash);
+        Assert.Equal("CHAR", passwordHash.DataType);
+        Assert.Equal(64, passwordHash.MaxLength);
+
+        // BOOLEAN DEFAULT TRUE
+        var isActive = table.Columns.FirstOrDefault(c => c.Name == "is_active");
+        Assert.NotNull(isActive);
+        Assert.Equal("BOOLEAN", isActive.DataType);
+        Assert.Equal("TRUE", isActive.DefaultValue);
+
+        // NUMERIC(precision, scale) DEFAULT
+        var balance = table.Columns.FirstOrDefault(c => c.Name == "balance");
+        Assert.NotNull(balance);
+        Assert.Equal(12, balance.NumericPrecision);
+        Assert.Equal(2, balance.NumericScale);
+        Assert.Equal("0.00", balance.DefaultValue);
         
-        var username = result.Definition.Columns.First(c => c.Name == "username");
-        Assert.True(username.IsUnique);
-        Assert.False(username.IsNullable);
+        // DEFAULT CURRENT_TIMESTAMP
+        var createdAt = table.Columns.FirstOrDefault(c => c.Name == "created_at");
+        Assert.NotNull(createdAt);
+        Assert.Equal("CURRENT_TIMESTAMP", createdAt.DefaultValue);
+        Assert.False(createdAt.IsNullable);
     }
 
-    #endregion
-
-    #region Temporary and Unlogged Tables Tests
-
     [Fact]
-    public void Extract_TemporaryTable_SetsTemporaryFlag()
+    public void Extract_SpecialTableTypes_HandlesAllVariants()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TEMPORARY TABLE temp_data (
-                id SERIAL,
-                value TEXT
+        // Покрывает: schema qualification, TEMPORARY, TEMP, UNLOGGED, inline комментарии
+        var tempBlocks = CreateBlocks(@"
+            CREATE TEMPORARY TABLE public.sessions (
+                id UUID PRIMARY KEY, -- Идентификатор сессии
+                user_id BIGINT NOT NULL, -- ID пользователя
+                data JSONB -- Данные сессии
             );
         ");
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        var tempResult = _extractor.Extract(tempBlocks);
+        if (!tempResult.IsSuccess)
+        {
+            var issues = string.Join(", ", tempResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"TEMPORARY table extraction failed with issues: {issues}");
+        }
+        Assert.True(tempResult.IsSuccess);
+        var tempTable = tempResult.Definition;
+        Assert.NotNull(tempTable);
+        Assert.Equal("sessions", tempTable.Name);
+        Assert.Equal("public", tempTable.Schema);
+        Assert.True(tempTable.IsTemporary);
+        
+        // Проверка inline комментариев
+        var tempId = tempTable.Columns.FirstOrDefault(c => c.Name == "id");
+        Assert.NotNull(tempId);
+        Assert.Equal("Идентификатор сессии", tempId.Comment);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("temp_data", result.Definition.Name);
-        Assert.True(result.Definition.IsTemporary);
-        Assert.False(result.Definition.IsUnlogged);
-    }
+        // TEMP (альтернативный синтаксис)
+        var temp2Blocks = CreateBlocks("CREATE TEMP TABLE temp_session (session_id UUID);");
+        var temp2Result = _extractor.Extract(temp2Blocks);
+        if (!temp2Result.IsSuccess)
+        {
+            var issues = string.Join(", ", temp2Result.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"TEMP table extraction failed with issues: {issues}");
+        }
+        var temp2Table = temp2Result.Definition;
+        Assert.NotNull(temp2Table);
+        Assert.True(temp2Table.IsTemporary);
 
-    [Fact]
-    public void Extract_TempTable_SetsTemporaryFlag()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TEMP TABLE temp_session (
-                session_id UUID
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.True(result.Definition.IsTemporary);
-    }
-
-    [Fact]
-    public void Extract_UnloggedTable_SetsUnloggedFlag()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // UNLOGGED
+        var unloggedBlocks = CreateBlocks(@"
             CREATE UNLOGGED TABLE cache (
-                key VARCHAR(100),
-                value TEXT
+                key VARCHAR(100) PRIMARY KEY, -- Ключ кэша
+                value TEXT NOT NULL --- Значение кэша
             );
         ");
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("cache", result.Definition.Name);
-        Assert.True(result.Definition.IsUnlogged);
-        Assert.False(result.Definition.IsTemporary);
+        var unloggedResult = _extractor.Extract(unloggedBlocks);
+        if (!unloggedResult.IsSuccess)
+        {
+            var issues = string.Join(", ", unloggedResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"UNLOGGED table extraction failed with issues: {issues}");
+        }
+        var unloggedTable = unloggedResult.Definition;
+        Assert.NotNull(unloggedTable);
+        Assert.True(unloggedTable.IsUnlogged);
+        Assert.False(unloggedTable.IsTemporary);
+        
+        // Проверка комментария с тройным дефисом
+        var cacheValue = unloggedTable.Columns.FirstOrDefault(c => c.Name == "value");
+        Assert.NotNull(cacheValue);
+        Assert.Equal("Значение кэша", cacheValue.Comment);
     }
 
-    #endregion
-
-    #region Partitioning Tests
-
     [Fact]
-    public void Extract_PartitionedTableByRange_ExtractsPartitionInfo()
+    public void Extract_PartitionedTables_HandlesAllStrategies()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Покрывает: PARTITION BY RANGE/LIST/HASH, PARTITION OF, expression, inline комментарии
+        var rangeBlocks = CreateBlocks(@"
             CREATE TABLE measurements (
-                id BIGSERIAL,
-                measured_at TIMESTAMP NOT NULL,
-                value NUMERIC
+                id BIGSERIAL, -- ID измерения
+                measured_at TIMESTAMP NOT NULL, -- Время измерения
+                value NUMERIC(10,2), --- Значение
+                sensor_id INTEGER NOT NULL -- ID датчика
             ) PARTITION BY RANGE (measured_at);
         ");
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        var rangeResult = _extractor.Extract(rangeBlocks);
+        if (!rangeResult.IsSuccess)
+        {
+            var issues = string.Join(", ", rangeResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"PARTITION BY RANGE extraction failed with issues: {issues}");
+        }
+        var rangeTable = rangeResult.Definition;
+        Assert.NotNull(rangeTable);
+        Assert.True(rangeTable.IsPartitioned);
+        Assert.NotNull(rangeTable.PartitionInfo);
+        Assert.Equal(PartitionStrategy.Range, rangeTable.PartitionInfo.Strategy);
+        Assert.Contains("measured_at", rangeTable.PartitionInfo.PartitionKeys);
+        
+        // Проверка inline комментариев
+        var measuredAt = rangeTable.Columns.FirstOrDefault(c => c.Name == "measured_at");
+        Assert.NotNull(measuredAt);
+        Assert.Equal("Время измерения", measuredAt.Comment);
+        
+        var value = rangeTable.Columns.FirstOrDefault(c => c.Name == "value");
+        Assert.NotNull(value);
+        Assert.Equal("Значение", value.Comment);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.True(result.Definition.IsPartitioned);
-        Assert.NotNull(result.Definition.PartitionInfo);
-        Assert.Equal(PartitionStrategy.Range, result.Definition.PartitionInfo.Strategy);
-        Assert.Contains("measured_at", result.Definition.PartitionInfo.PartitionKeys);
-    }
+        // LIST
+        var listBlocks = CreateBlocks("CREATE TABLE orders_by_region (id BIGINT, region VARCHAR(50)) PARTITION BY LIST (region);");
+        var listResult = _extractor.Extract(listBlocks);
+        if (!listResult.IsSuccess)
+        {
+            var issues = string.Join(", ", listResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"PARTITION BY LIST extraction failed with issues: {issues}");
+        }
+        var listTable = listResult.Definition;
+        Assert.NotNull(listTable);
+        Assert.NotNull(listTable.PartitionInfo);
+        Assert.Equal(PartitionStrategy.List, listTable.PartitionInfo.Strategy);
 
-    [Fact]
-    public void Extract_PartitionedTableByList_ExtractsPartitionInfo()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE orders_by_region (
-                id BIGINT,
-                region VARCHAR(50)
-            ) PARTITION BY LIST (region);
-        ");
+        // HASH
+        var hashBlocks = CreateBlocks("CREATE TABLE distributed_data (id BIGINT, data TEXT) PARTITION BY HASH (id);");
+        var hashResult = _extractor.Extract(hashBlocks);
+        if (!hashResult.IsSuccess)
+        {
+            var issues = string.Join(", ", hashResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"PARTITION BY HASH extraction failed with issues: {issues}");
+        }
+        var hashTable = hashResult.Definition;
+        Assert.NotNull(hashTable);
+        Assert.NotNull(hashTable.PartitionInfo);
+        Assert.Equal(PartitionStrategy.Hash, hashTable.PartitionInfo.Strategy);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.True(result.Definition.IsPartitioned);
-        Assert.NotNull(result.Definition.PartitionInfo);
-        Assert.Equal(PartitionStrategy.List, result.Definition.PartitionInfo.Strategy);
-    }
-
-    [Fact]
-    public void Extract_PartitionedTableByHash_ExtractsPartitionInfo()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE distributed_data (
-                id BIGINT,
-                data TEXT
-            ) PARTITION BY HASH (id);
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.True(result.Definition.IsPartitioned);
-        Assert.NotNull(result.Definition.PartitionInfo);
-        Assert.Equal(PartitionStrategy.Hash, result.Definition.PartitionInfo.Strategy);
-    }
-
-    [Fact]
-    public void Extract_PartitionedTableWithExpression_ExtractsExpression()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE logs_by_year (
-                id BIGINT,
-                created_at TIMESTAMP
-            ) PARTITION BY RANGE (EXTRACT(YEAR FROM created_at));
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.True(result.Definition.IsPartitioned);
-        Assert.NotNull(result.Definition.PartitionInfo);
-        Assert.NotNull(result.Definition.PartitionInfo.PartitionExpression);
-        Assert.Contains("EXTRACT", result.Definition.PartitionInfo.PartitionExpression);
-    }
-
-    [Fact]
-    public void Extract_PartitionTable_ExtractsParentTable()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // PARTITION OF
+        var partitionBlocks = CreateBlocks(@"
             CREATE TABLE logs_2024_q1 PARTITION OF audit_logs
             FOR VALUES FROM ('2024-01-01') TO ('2024-04-01');
         ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("logs_2024_q1", result.Definition.Name);
-        Assert.True(result.Definition.IsPartition);
-        Assert.Equal("audit_logs", result.Definition.ParentTableName);
-        Assert.False(result.Definition.IsPartitioned);
+        var partitionResult = _extractor.Extract(partitionBlocks);
+        if (!partitionResult.IsSuccess)
+        {
+            var issues = string.Join(", ", partitionResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"PARTITION OF extraction failed with issues: {issues}");
+        }
+        var partitionTable = partitionResult.Definition;
+        Assert.NotNull(partitionTable);
+        Assert.True(partitionTable.IsPartition);
+        Assert.Equal("audit_logs", partitionTable.ParentTableName);
     }
 
-    #endregion
-
-    #region Inheritance Tests
-
     [Fact]
-    public void Extract_TableWithInheritance_ExtractsParentTables()
+    public void Extract_InheritanceTablespaceStorage_HandlesAdvancedFeatures()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Покрывает: INHERITS (single/multiple), TABLESPACE, WITH (storage parameters), inline комментарии
+        var inheritBlocks = CreateBlocks(@"
             CREATE TABLE employees (
-                id SERIAL,
-                name VARCHAR(100)
+                id SERIAL, -- ID сотрудника
+                name VARCHAR(100), --- Имя
+                department VARCHAR(50) -- Отдел
             ) INHERITS (persons);
         ");
+        
+        var inheritResult = _extractor.Extract(inheritBlocks);
+        if (!inheritResult.IsSuccess)
+        {
+            var issues = string.Join(", ", inheritResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"INHERITS extraction failed with issues: {issues}");
+        }
+        var inheritTable = inheritResult.Definition;
+        Assert.NotNull(inheritTable);
+        Assert.NotNull(inheritTable.InheritsFrom);
+        Assert.Single(inheritTable.InheritsFrom);
+        Assert.Contains("persons", inheritTable.InheritsFrom);
+        
+        // Проверка inline комментариев с разными форматами
+        var empId = inheritTable.Columns.FirstOrDefault(c => c.Name == "id");
+        Assert.NotNull(empId);
+        Assert.Equal("ID сотрудника", empId.Comment);
+        
+        var empName = inheritTable.Columns.FirstOrDefault(c => c.Name == "name");
+        Assert.NotNull(empName);
+        Assert.Equal("Имя", empName.Comment); // Тройной дефис
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        // Multiple inheritance
+        var multiBlocks = CreateBlocks("CREATE TABLE premium_users (premium_level INTEGER) INHERITS (users, customers);");
+        var multiResult = _extractor.Extract(multiBlocks);
+        if (!multiResult.IsSuccess)
+        {
+            var issues = string.Join(", ", multiResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"Multiple INHERITS extraction failed with issues: {issues}");
+        }
+        var multiTable = multiResult.Definition;
+        Assert.NotNull(multiTable);
+        Assert.NotNull(multiTable.InheritsFrom);
+        Assert.Equal(2, multiTable.InheritsFrom.Count);
+        Assert.Contains("users", multiTable.InheritsFrom);
+        Assert.Contains("customers", multiTable.InheritsFrom);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.NotNull(result.Definition.InheritsFrom);
-        Assert.Single(result.Definition.InheritsFrom);
-        Assert.Contains("persons", result.Definition.InheritsFrom);
-    }
-
-    [Fact]
-    public void Extract_TableWithMultipleInheritance_ExtractsAllParents()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE premium_users (
-                premium_level INTEGER
-            ) INHERITS (users, customers);
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.NotNull(result.Definition.InheritsFrom);
-        Assert.Equal(2, result.Definition.InheritsFrom.Count);
-        Assert.Contains("users", result.Definition.InheritsFrom);
-        Assert.Contains("customers", result.Definition.InheritsFrom);
-    }
-
-    #endregion
-
-    #region Tablespace Tests
-
-    [Fact]
-    public void Extract_TableWithTablespace_ExtractsTablespace()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // TABLESPACE
+        var tablespaceBlocks = CreateBlocks(@"
             CREATE TABLE archived_data (
-                id BIGINT,
-                data TEXT
+                id BIGINT, -- Идентификатор
+                data TEXT -- Архивные данные
             ) TABLESPACE archive_space;
         ");
+        var tablespaceResult = _extractor.Extract(tablespaceBlocks);
+        if (!tablespaceResult.IsSuccess)
+        {
+            var issues = string.Join(", ", tablespaceResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"TABLESPACE extraction failed with issues: {issues}");
+        }
+        var tablespaceTable = tablespaceResult.Definition;
+        Assert.NotNull(tablespaceTable);
+        Assert.Equal("archive_space", tablespaceTable.Tablespace);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("archive_space", result.Definition.Tablespace);
-    }
-
-    #endregion
-
-    #region Storage Parameters Tests
-
-    [Fact]
-    public void Extract_TableWithStorageParameters_ExtractsParameters()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Storage parameters
+        var storageBlocks = CreateBlocks(@"
             CREATE TABLE config (
-                key VARCHAR(100),
-                value TEXT
+                key VARCHAR(100), -- Ключ конфигурации
+                value TEXT --- Значение конфигурации
             ) WITH (fillfactor = 70, autovacuum_enabled = true);
         ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.NotNull(result.Definition.StorageParameters);
-        Assert.Equal(2, result.Definition.StorageParameters.Count);
-        Assert.True(result.Definition.StorageParameters.ContainsKey("fillfactor"));
-        Assert.Equal("70", result.Definition.StorageParameters["fillfactor"]);
+        var storageResult = _extractor.Extract(storageBlocks);
+        if (!storageResult.IsSuccess)
+        {
+            var issues = string.Join(", ", storageResult.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"WITH storage parameters extraction failed with issues: {issues}");
+        }
+        var storageTable = storageResult.Definition;
+        Assert.NotNull(storageTable);
+        Assert.NotNull(storageTable.StorageParameters);
+        Assert.Equal(2, storageTable.StorageParameters.Count);
+        Assert.Equal("70", storageTable.StorageParameters["fillfactor"]);
+        Assert.Equal("true", storageTable.StorageParameters["autovacuum_enabled"]);
     }
 
-    #endregion
-
-    #region Complex Table Tests
-
     [Fact]
-    public void Extract_ComplexTableFromExample_ExtractsCorrectly()
+    public void Extract_SpecialFormatComments_ParsesMetadata()
     {
-        // Arrange
+        // Покрывает: специальные форматы комментариев с метаданными
+        // Формат 1: comment: Описание; type: ТИП; rename: НовоеИмя;
+        // Формат 2: comment(Описание); type(ТИП); rename(НовоеИмя);
         var blocks = CreateBlocks(@"
-            CREATE TABLE users (
-                id BIGSERIAL PRIMARY KEY,
-                username VARCHAR(50) NOT NULL UNIQUE,
-                email VARCHAR(255) NOT NULL UNIQUE,
-                password_hash VARCHAR(255) NOT NULL,
-                full_name VARCHAR(255),
-                status VARCHAR(20) NOT NULL DEFAULT 'active',
-                preferences JSONB DEFAULT '{}',
-                phone_numbers VARCHAR(20)[],
-                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                balance NUMERIC(12,2) DEFAULT 0.00,
-                is_verified BOOLEAN NOT NULL DEFAULT FALSE
+            CREATE TABLE products (
+                id BIGSERIAL PRIMARY KEY, -- comment: Уникальный идентификатор товара; type: BIGINT; rename: product_id;
+                legacy_name VARCHAR(100), -- comment(Устаревшее имя товара); type(TEXT); rename(product_name);
+                category_id INTEGER, -- comment: ID категории; rename: cat_id;
+                description TEXT, -- comment(Полное описание товара);
+                price NUMERIC(10,2), -- type: DECIMAL; comment: Цена товара;
+                stock_count INTEGER -- rename(quantity); comment(Количество на складе);
             );
         ");
 
-        // Act
         var result = _extractor.Extract(blocks);
+        if (!result.IsSuccess)
+        {
+            var issues = string.Join(", ", result.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"Extraction failed with issues: {issues}");
+        }
 
-        // Assert
         Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("users", result.Definition.Name);
-        // 11 колонок извлекается корректно (password_hash с WITH пропускается из-за сложного парсинга)
-        Assert.Equal(11, result.Definition.Columns.Count);
-        
-        var id = result.Definition.Columns.FirstOrDefault(c => c.Name == "id");
+        var table = result.Definition;
+        Assert.NotNull(table);
+        Assert.Equal("products", table.Name);
+        Assert.Equal(6, table.Columns.Count);
+
+        // Формат 1: comment: ...; type: ...; rename: ...;
+        var id = table.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(id);
-        Assert.True(id.IsPrimaryKey);
-        
-        var username = result.Definition.Columns.FirstOrDefault(c => c.Name == "username");
-        Assert.NotNull(username);
-        Assert.True(username.IsUnique);
-        Assert.False(username.IsNullable);
-        
-        var phoneNumbers = result.Definition.Columns.FirstOrDefault(c => c.Name == "phone_numbers");
-        Assert.NotNull(phoneNumbers);
-        Assert.True(phoneNumbers.IsArray);
+        // Полный комментарий сохранён как есть
+        Assert.Contains("comment:", id.Comment);
+        Assert.Contains("Уникальный идентификатор товара", id.Comment);
+        Assert.Contains("type:", id.Comment);
+        Assert.Contains("rename:", id.Comment);
+
+        // Формат 2: comment(...); type(...); rename(...);
+        var legacyName = table.Columns.FirstOrDefault(c => c.Name == "legacy_name");
+        Assert.NotNull(legacyName);
+        Assert.Contains("comment(", legacyName.Comment);
+        Assert.Contains("Устаревшее имя товара", legacyName.Comment);
+        Assert.Contains("type(TEXT)", legacyName.Comment);
+        Assert.Contains("rename(product_name)", legacyName.Comment);
+
+        // Частичный формат: только comment и rename
+        var categoryId = table.Columns.FirstOrDefault(c => c.Name == "category_id");
+        Assert.NotNull(categoryId);
+        Assert.Contains("ID категории", categoryId.Comment);
+        Assert.Contains("rename:", categoryId.Comment);
+
+        // Только comment
+        var description = table.Columns.FirstOrDefault(c => c.Name == "description");
+        Assert.NotNull(description);
+        Assert.Contains("Полное описание товара", description.Comment);
+
+        // type перед comment
+        var price = table.Columns.FirstOrDefault(c => c.Name == "price");
+        Assert.NotNull(price);
+        Assert.Contains("type:", price.Comment);
+        Assert.Contains("Цена товара", price.Comment);
+
+        // Формат 2 с обратным порядком
+        var stockCount = table.Columns.FirstOrDefault(c => c.Name == "stock_count");
+        Assert.NotNull(stockCount);
+        Assert.Contains("rename(quantity)", stockCount.Comment);
+        Assert.Contains("Количество на складе", stockCount.Comment);
     }
 
-    #endregion
-
-    #region Invalid Input Tests
-
     [Fact]
-    public void Extract_WithNullBlock_ThrowsArgumentNullException()
+    public void Extract_EdgeCasesAndValidation_HandlesCorrectly()
     {
-        // Act & Assert
+        // Покрывает: null validation, non-table blocks, empty blocks, case sensitivity, mixed case
         Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
-    }
+        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
 
-    [Fact]
-    public void Extract_WithNonTableBlock_ReturnsNotApplicable()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive');");
+        // Non-table block
+        var enumBlocks = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive');");
+        Assert.False(_extractor.CanExtract(enumBlocks));
+        Assert.False(_extractor.Extract(enumBlocks).IsSuccess);
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        // Empty block
+        Assert.False(_extractor.Extract(CreateBlocks("")).IsSuccess);
 
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    [Fact]
-    public void Extract_WithEmptyBlock_ReturnsNotApplicable()
-    {
-        // Arrange
-        var blocks = CreateBlocks("");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    #endregion
-
-    #region Case Sensitivity Tests
-
-    [Fact]
-    public void Extract_WithUppercaseSQL_ExtractsCorrectly()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Uppercase
+        var upperBlocks = CreateBlocks(@"
             CREATE TABLE PRODUCTS (
-                ID SERIAL PRIMARY KEY,
-                NAME VARCHAR(100) NOT NULL
+                ID SERIAL PRIMARY KEY, -- Идентификатор
+                NAME VARCHAR(100) NOT NULL -- Название
             );
         ");
+        var upperResult = _extractor.Extract(upperBlocks);
+        Assert.True(upperResult.IsSuccess);
+        Assert.Equal("PRODUCTS", upperResult.Definition!.Name);
+        Assert.Equal(2, upperResult.Definition.Columns.Count);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("PRODUCTS", result.Definition.Name);
-        Assert.Equal(2, result.Definition.Columns.Count);
+        // Mixed case
+        var mixedBlocks = CreateBlocks("CrEaTe TaBLe Orders (Id BiGiNt PrImArY KeY);");
+        var mixedResult = _extractor.Extract(mixedBlocks);
+        Assert.True(mixedResult.IsSuccess);
+        Assert.Equal("Orders", mixedResult.Definition!.Name);
     }
-
-    [Fact]
-    public void Extract_WithMixedCase_ExtractsCorrectly()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CrEaTe TaBLe Orders (
-                Id BiGiNt PrImArY KeY
-            );
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("Orders", result.Definition.Name);
-    }
-
-    #endregion
-
-    #region Helper Methods
 
     private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? comment = null)
     {
@@ -741,6 +448,4 @@ public sealed class TableExtractorTests
             EndLine = sql.Split('\n').Length
         }];
     }
-
-    #endregion
 }

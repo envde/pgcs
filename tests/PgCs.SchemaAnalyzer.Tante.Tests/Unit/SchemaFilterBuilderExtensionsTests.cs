@@ -6,82 +6,68 @@ using PgCs.SchemaAnalyzer.Tante;
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
-/// Тесты для SchemaFilterBuilderExtensions
+/// Consolidated tests for SchemaFilterBuilderExtensions - testing production, tables/views, and clean schema filters
 /// </summary>
 public sealed class SchemaFilterBuilderExtensionsTests
 {
-    #region CreateProductionFilter Tests
-
+    /// <summary>
+    /// Test 1: CreateProductionFilter - excludes system objects, test schemas, includes public schema and comments
+    /// </summary>
     [Fact]
-    public void CreateProductionFilter_ShouldExcludeSystemObjects()
+    public void CreateProductionFilter_AppliesAllRulesCorrectly()
     {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        // Test 1.1: Exclude system objects (pg_catalog, information_schema, pg_* tables)
+        var metadata1 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("pg_stat", "pg_catalog"),
                 CreateTable("tables", "information_schema"),
                 CreateTable("pg_test", "public")
             ]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Equal("users", result.Tables[0].Name);
-        Assert.Equal("public", result.Tables[0].Schema);
-    }
-
-    [Fact]
-    public void CreateProductionFilter_ShouldExcludeTestSchema()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        
+        var filter1 = SchemaFilterBuilderExtensions.CreateProductionFilter();
+        var result1 = filter1.ApplyFilter(metadata1);
+        
+        Assert.Single(result1.Tables);
+        Assert.Equal("users", result1.Tables[0].Name);
+        Assert.Equal("public", result1.Tables[0].Schema);
+        
+        // Test 1.2: Exclude test schemas (test, tests)
+        var metadata2 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("test_data", "test"),
                 CreateTable("test_users", "tests")
             ]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Equal("public", result.Tables[0].Schema);
-    }
-
-    [Fact]
-    public void CreateProductionFilter_ShouldIncludeOnlyPublicSchema()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        
+        var filter2 = SchemaFilterBuilderExtensions.CreateProductionFilter();
+        var result2 = filter2.ApplyFilter(metadata2);
+        
+        Assert.Single(result2.Tables);
+        Assert.Equal("public", result2.Tables[0].Schema);
+        
+        // Test 1.3: Include only public schema
+        var metadata3 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("test_users", "public"),
                 CreateTable("data", "app")
             ]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert - CreateProductionFilter фильтрует только по схеме public и системным объектам
-        Assert.Equal(2, result.Tables.Count);
-        Assert.All(result.Tables, t => Assert.Equal("public", t.Schema));
-    }
-
-    [Fact]
-    public void CreateProductionFilter_ShouldIncludeAllObjectTypes()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
+        
+        var filter3 = SchemaFilterBuilderExtensions.CreateProductionFilter();
+        var result3 = filter3.ApplyFilter(metadata3);
+        
+        Assert.Equal(2, result3.Tables.Count);
+        Assert.All(result3.Tables, t => Assert.Equal("public", t.Schema));
+        
+        // Test 1.4: Include all object types (tables, views, enums, functions, indexes, triggers, constraints)
+        var metadata4 = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
             views: [CreateView("user_view", "public")],
             enums: [CreateEnum("status", "public")],
@@ -90,127 +76,150 @@ public sealed class SchemaFilterBuilderExtensionsTests
             triggers: [CreateTrigger("trg_users", "public")],
             constraints: [CreateConstraint("pk_users", "public")]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Single(result.Views);
-        Assert.Single(result.Enums);
-        Assert.Single(result.Functions);
-        Assert.Single(result.Indexes);
-        Assert.Single(result.Triggers);
-        Assert.Single(result.Constraints);
-    }
-
-    [Fact]
-    public void CreateProductionFilter_ShouldIncludeComments()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
+        
+        var filter4 = SchemaFilterBuilderExtensions.CreateProductionFilter();
+        var result4 = filter4.ApplyFilter(metadata4);
+        
+        Assert.Single(result4.Tables);
+        Assert.Single(result4.Views);
+        Assert.Single(result4.Enums);
+        Assert.Single(result4.Functions);
+        Assert.Single(result4.Indexes);
+        Assert.Single(result4.Triggers);
+        Assert.Single(result4.Constraints);
+        
+        // Test 1.5: Include comments
+        var metadata5 = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
             comments: [CreateTableComment("users", "public", "User table")]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.CommentDefinition);
+        
+        var filter5 = SchemaFilterBuilderExtensions.CreateProductionFilter();
+        var result5 = filter5.ApplyFilter(metadata5);
+        
+        Assert.Single(result5.CommentDefinition);
+        
+        // Test 1.6: Mixed case schemas (case-insensitive for system schemas)
+        var metadata6 = CreateTestMetadata(
+            tables:
+            [
+                CreateTable("users", "Public"),
+                CreateTable("data", "Test"),
+                CreateTable("info", "INFORMATION_SCHEMA")
+            ]
+        );
+        
+        var filter6 = SchemaFilterBuilderExtensions.CreateProductionFilter();
+        var result6 = filter6.ApplyFilter(metadata6);
+        
+        Assert.Single(result6.Tables);
+        Assert.Equal("Public", result6.Tables[0].Schema);
+        
+        // Test 1.7: Should not exclude valid production tables
+        var metadata7 = CreateTestMetadata(
+            tables:
+            [
+                CreateTable("user_profiles", "public"),
+                CreateTable("product_catalog", "public"),
+                CreateTable("order_items", "public"),
+                CreateTable("customer_data", "public")
+            ]
+        );
+        
+        var filter7 = SchemaFilterBuilderExtensions.CreateProductionFilter();
+        var result7 = filter7.ApplyFilter(metadata7);
+        
+        Assert.Equal(4, result7.Tables.Count);
     }
 
-    #endregion
-
-    #region CreateTablesAndViewsFilter Tests
-
+    /// <summary>
+    /// Test 2: CreateTablesAndViewsFilter - includes only tables and views, excludes system objects, no comments
+    /// </summary>
     [Fact]
-    public void CreateTablesAndViewsFilter_ShouldIncludeOnlyTablesAndViews()
+    public void CreateTablesAndViewsFilter_IncludesOnlyTablesAndViewsCorrectly()
     {
-        // Arrange
-        var metadata = CreateTestMetadata(
+        // Test 2.1: Include only tables and views, exclude other object types
+        var metadata1 = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
             views: [CreateView("user_view", "public")],
             functions: [CreateFunction("get_user", "public")],
             enums: [CreateEnum("status", "public")],
             indexes: [CreateIndex("idx_users", "public")]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Single(result.Views);
-        Assert.Empty(result.Functions);
-        Assert.Empty(result.Enums);
-        Assert.Empty(result.Indexes);
-    }
-
-    [Fact]
-    public void CreateTablesAndViewsFilter_ShouldExcludeSystemObjects()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        
+        var filter1 = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
+        var result1 = filter1.ApplyFilter(metadata1);
+        
+        Assert.Single(result1.Tables);
+        Assert.Single(result1.Views);
+        Assert.Empty(result1.Functions);
+        Assert.Empty(result1.Enums);
+        Assert.Empty(result1.Indexes);
+        
+        // Test 2.2: Exclude system objects (pg_catalog, information_schema)
+        var metadata2 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("pg_stat", "pg_catalog")
             ],
-            views: [
+            views:
+            [
                 CreateView("user_view", "public"),
                 CreateView("pg_views", "pg_catalog")
             ]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Equal("users", result.Tables[0].Name);
-        Assert.Single(result.Views);
-        Assert.Equal("user_view", result.Views[0].Name);
-    }
-
-    [Fact]
-    public void CreateTablesAndViewsFilter_ShouldIncludeOnlyTablesAndViewsWithoutComments()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        
+        var filter2 = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
+        var result2 = filter2.ApplyFilter(metadata2);
+        
+        Assert.Single(result2.Tables);
+        Assert.Equal("users", result2.Tables[0].Name);
+        Assert.Single(result2.Views);
+        Assert.Equal("user_view", result2.Views[0].Name);
+        
+        // Test 2.3: Should not include comments (no WithCommentParsing)
+        var metadata3 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("test_users", "public")
             ],
-            views: [
+            views:
+            [
                 CreateView("user_view", "public"),
                 CreateView("temp_view", "public")
             ],
             comments: [CreateTableComment("users", "public", "User table")]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert - TablesAndViewsFilter не включает WithCommentParsing
-        Assert.Equal(2, result.Tables.Count);
-        Assert.Equal(2, result.Views.Count);
-        Assert.Empty(result.CommentDefinition); // Комментарии не включены
+        
+        var filter3 = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
+        var result3 = filter3.ApplyFilter(metadata3);
+        
+        Assert.Equal(2, result3.Tables.Count);
+        Assert.Equal(2, result3.Views.Count);
+        Assert.Empty(result3.CommentDefinition);
+        
+        // Test 2.4: Should not affect table content
+        var originalTable = CreateTable("users", "public");
+        var metadata4 = CreateTestMetadata(tables: [originalTable]);
+        
+        var filter4 = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
+        var result4 = filter4.ApplyFilter(metadata4);
+        
+        Assert.Single(result4.Tables);
+        Assert.Equal(originalTable.Name, result4.Tables[0].Name);
+        Assert.Equal(originalTable.Schema, result4.Tables[0].Schema);
     }
 
-    #endregion
-
-    #region CreateCleanSchemaFilter Tests
-
+    /// <summary>
+    /// Test 3: CreateCleanSchemaFilter - includes all object types, excludes system/test/temp objects, includes comments
+    /// </summary>
     [Fact]
-    public void CreateCleanSchemaFilter_ShouldIncludeAllObjectTypes()
+    public void CreateCleanSchemaFilter_AppliesCleaningRulesCorrectly()
     {
-        // Arrange
-        var metadata = CreateTestMetadata(
+        // Test 3.1: Include all object types (tables, views, enums, composites, domains, functions, indexes, triggers, constraints, partitions)
+        var metadata1 = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
             views: [CreateView("user_view", "public")],
             enums: [CreateEnum("status", "public")],
@@ -222,278 +231,160 @@ public sealed class SchemaFilterBuilderExtensionsTests
             constraints: [CreateConstraint("pk_users", "public")],
             partitions: [CreatePartition("users_2024", "public")]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Single(result.Views);
-        Assert.Single(result.Enums);
-        Assert.Single(result.Composites);
-        Assert.Single(result.Domains);
-        Assert.Single(result.Functions);
-        Assert.Single(result.Indexes);
-        Assert.Single(result.Triggers);
-        Assert.Single(result.Constraints);
-        Assert.Single(result.Partitions);
-    }
-
-    [Fact]
-    public void CreateCleanSchemaFilter_ShouldExcludeSystemObjects()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        
+        var filter1 = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
+        var result1 = filter1.ApplyFilter(metadata1);
+        
+        Assert.Single(result1.Tables);
+        Assert.Single(result1.Views);
+        Assert.Single(result1.Enums);
+        Assert.Single(result1.Composites);
+        Assert.Single(result1.Domains);
+        Assert.Single(result1.Functions);
+        Assert.Single(result1.Indexes);
+        Assert.Single(result1.Triggers);
+        Assert.Single(result1.Constraints);
+        Assert.Single(result1.Partitions);
+        
+        // Test 3.2: Exclude system objects (pg_catalog, information_schema)
+        var metadata2 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("pg_stat", "pg_catalog"),
                 CreateTable("tables", "information_schema")
             ]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Equal("public", result.Tables[0].Schema);
-    }
-
-    [Fact]
-    public void CreateCleanSchemaFilter_ShouldExcludeTestAndTempTables()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        
+        var filter2 = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
+        var result2 = filter2.ApplyFilter(metadata2);
+        
+        Assert.Single(result2.Tables);
+        Assert.Equal("public", result2.Tables[0].Schema);
+        
+        // Test 3.3: Exclude test and temp tables (test_*, temp_*)
+        var metadata3 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("test_users", "public"),
                 CreateTable("temp_data", "public")
             ]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert - CleanSchemaFilter исключает тестовые и временные таблицы
-        Assert.Single(result.Tables);
-        Assert.Equal("users", result.Tables[0].Name);
-    }
-
-    [Fact]
-    public void CreateCleanSchemaFilter_ShouldIncludeComments()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
+        
+        var filter3 = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
+        var result3 = filter3.ApplyFilter(metadata3);
+        
+        Assert.Single(result3.Tables);
+        Assert.Equal("users", result3.Tables[0].Name);
+        
+        // Test 3.4: Include comments
+        var metadata4 = CreateTestMetadata(
             tables: [CreateTable("users", "public")],
             comments: [CreateTableComment("users", "public", "User table")]
         );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.CommentDefinition);
+        
+        var filter4 = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
+        var result4 = filter4.ApplyFilter(metadata4);
+        
+        Assert.Single(result4.CommentDefinition);
+        
+        // Test 3.5: Preserve object relationships (tables, indexes, constraints)
+        var metadata5 = CreateTestMetadata(
+            tables: [CreateTable("users", "public")],
+            indexes: [CreateIndex("idx_users", "public")],
+            constraints: [CreateConstraint("pk_users", "public")]
+        );
+        
+        var filter5 = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
+        var result5 = filter5.ApplyFilter(metadata5);
+        
+        Assert.Single(result5.Tables);
+        Assert.Single(result5.Indexes);
+        Assert.Single(result5.Constraints);
     }
 
-    #endregion
-
-    #region Filter Composition Tests
-
+    /// <summary>
+    /// Test 4: Filter composition and edge cases - combining filters, empty metadata
+    /// </summary>
     [Fact]
-    public void CreateProductionFilter_WithAdditionalFilters_ShouldCombine()
+    public void FilterCompositionAndEdgeCases_WorkCorrectly()
     {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        // Test 4.1: Combine production filter with additional filters
+        var metadata1 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("orders", "public"),
                 CreateTable("products", "app")
             ]
         );
-
-        // Act
-        var baseFilter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var builder = new SchemaFilterBuilder()
+        
+        var builder1 = new SchemaFilterBuilder()
             .ExcludeSystemObjects()
             .IncludeOnlySchemas("public")
             .ExcludeTables("^orders$");
-        var filter = builder.Build();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Equal("users", result.Tables[0].Name);
-    }
-
-    [Fact]
-    public void CreateTablesAndViewsFilter_WithSchemaFilter_ShouldCombine()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
+        var filter1 = builder1.Build();
+        var result1 = filter1.ApplyFilter(metadata1);
+        
+        Assert.Single(result1.Tables);
+        Assert.Equal("users", result1.Tables[0].Name);
+        
+        // Test 4.2: Combine tables/views filter with schema filter
+        var metadata2 = CreateTestMetadata(
+            tables:
+            [
                 CreateTable("users", "public"),
                 CreateTable("orders", "app")
             ],
-            views: [
+            views:
+            [
                 CreateView("user_view", "public"),
                 CreateView("order_view", "app")
             ]
         );
-
-        // Act
-        var builder = new SchemaFilterBuilder()
+        
+        var builder2 = new SchemaFilterBuilder()
             .OnlyTablesAndViews()
             .ExcludeSystemObjects()
             .IncludeOnlySchemas("public");
-        var filter = builder.Build();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Single(result.Views);
-        Assert.Equal("public", result.Tables[0].Schema);
-        Assert.Equal("public", result.Views[0].Schema);
+        var filter2 = builder2.Build();
+        var result2 = filter2.ApplyFilter(metadata2);
+        
+        Assert.Single(result2.Tables);
+        Assert.Single(result2.Views);
+        Assert.Equal("public", result2.Tables[0].Schema);
+        Assert.Equal("public", result2.Views[0].Schema);
+        
+        // Test 4.3: Production filter with empty metadata
+        var emptyMetadata1 = CreateTestMetadata();
+        
+        var filter3 = SchemaFilterBuilderExtensions.CreateProductionFilter();
+        var result3 = filter3.ApplyFilter(emptyMetadata1);
+        
+        Assert.Empty(result3.Tables);
+        Assert.Empty(result3.Views);
+        Assert.Empty(result3.Functions);
+        
+        // Test 4.4: Tables/Views filter with empty metadata
+        var emptyMetadata2 = CreateTestMetadata();
+        
+        var filter4 = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
+        var result4 = filter4.ApplyFilter(emptyMetadata2);
+        
+        Assert.Empty(result4.Tables);
+        Assert.Empty(result4.Views);
+        
+        // Test 4.5: Clean schema filter with empty metadata
+        var emptyMetadata3 = CreateTestMetadata();
+        
+        var filter5 = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
+        var result5 = filter5.ApplyFilter(emptyMetadata3);
+        
+        Assert.Empty(result5.Tables);
+        Assert.Empty(result5.Views);
+        Assert.Empty(result5.Functions);
     }
-
-    #endregion
-
-    #region Edge Cases Tests
-
-    [Fact]
-    public void CreateProductionFilter_WithEmptyMetadata_ShouldReturnEmptyResult()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata();
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Empty(result.Tables);
-        Assert.Empty(result.Views);
-        Assert.Empty(result.Functions);
-    }
-
-    [Fact]
-    public void CreateTablesAndViewsFilter_WithEmptyMetadata_ShouldReturnEmptyResult()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata();
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Empty(result.Tables);
-        Assert.Empty(result.Views);
-    }
-
-    [Fact]
-    public void CreateCleanSchemaFilter_WithEmptyMetadata_ShouldReturnEmptyResult()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata();
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Empty(result.Tables);
-        Assert.Empty(result.Views);
-        Assert.Empty(result.Functions);
-    }
-
-    [Fact]
-    public void CreateProductionFilter_WithMixedCaseSchemas_ShouldFilter()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [
-                CreateTable("users", "Public"),
-                CreateTable("data", "Test"),
-                CreateTable("info", "INFORMATION_SCHEMA")
-            ]
-        );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert - System schemas are case-insensitive
-        Assert.Single(result.Tables);
-        Assert.Equal("Public", result.Tables[0].Schema);
-    }
-
-    #endregion
-
-    #region Regression Tests
-
-    [Fact]
-    public void CreateProductionFilter_ShouldNotExcludeValidProductionTables()
-    {
-        // Arrange - Таблицы, которые НЕ должны быть исключены
-        var metadata = CreateTestMetadata(
-            tables: [
-                CreateTable("user_profiles", "public"),
-                CreateTable("product_catalog", "public"),
-                CreateTable("order_items", "public"),
-                CreateTable("customer_data", "public")
-            ]
-        );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateProductionFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Equal(4, result.Tables.Count);
-    }
-
-    [Fact]
-    public void CreateTablesAndViewsFilter_ShouldNotAffectTableContent()
-    {
-        // Arrange
-        var originalTable = CreateTable("users", "public");
-        var metadata = CreateTestMetadata(tables: [originalTable]);
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateTablesAndViewsFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert
-        Assert.Single(result.Tables);
-        Assert.Equal(originalTable.Name, result.Tables[0].Name);
-        Assert.Equal(originalTable.Schema, result.Tables[0].Schema);
-    }
-
-    [Fact]
-    public void CreateCleanSchemaFilter_ShouldPreserveObjectRelationships()
-    {
-        // Arrange
-        var metadata = CreateTestMetadata(
-            tables: [CreateTable("users", "public")],
-            indexes: [CreateIndex("idx_users", "public")],
-            constraints: [CreateConstraint("pk_users", "public")]
-        );
-
-        // Act
-        var filter = SchemaFilterBuilderExtensions.CreateCleanSchemaFilter();
-        var result = filter.ApplyFilter(metadata);
-
-        // Assert - Все связанные объекты должны быть включены
-        Assert.Single(result.Tables);
-        Assert.Single(result.Indexes);
-        Assert.Single(result.Constraints);
-    }
-
-    #endregion
 
     #region Helper Methods
 

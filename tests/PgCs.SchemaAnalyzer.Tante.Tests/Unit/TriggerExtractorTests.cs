@@ -7,643 +7,409 @@ using PgCs.SchemaAnalyzer.Tante.Extractors;
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
-/// Тесты для TriggerExtractor
+/// Консолидированные тесты для TriggerExtractor
+/// Покрывает все типы триггеров, события, условия WHEN, UPDATE OF, и специальные форматы комментариев
 /// </summary>
 public sealed class TriggerExtractorTests
 {
     private readonly IExtractor<TriggerDefinition> _extractor = new TriggerExtractor();
 
-    #region CanExtract Tests
-
     [Fact]
-    public void CanExtract_WithValidTriggerBlock_ReturnsTrue()
+    public void Extract_BasicTriggers_HandlesAllTimingsAndEvents()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_update_user
-                BEFORE UPDATE ON users
-                FOR EACH ROW
-                EXECUTE FUNCTION update_updated_at_column();
-        ");
+        // Покрывает: BEFORE/AFTER/INSTEAD OF, INSERT/UPDATE/DELETE/TRUNCATE, single/multiple events, ROW/STATEMENT level
 
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithTableBlock_ReturnsFalse()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE test_table (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100)
-            );
-        ");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithNullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
-    }
-
-    #endregion
-
-    #region Extract Simple Trigger Tests
-
-    [Fact]
-    public void Extract_SimpleTriggerBeforeInsert_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // BEFORE INSERT
+        var beforeInsertBlocks = CreateBlocks(@"
             CREATE TRIGGER trigger_validate_user
                 BEFORE INSERT ON users
                 FOR EACH ROW
                 EXECUTE FUNCTION validate_user_data();
         ");
+        var beforeInsertResult = _extractor.Extract(beforeInsertBlocks);
+        Assert.True(beforeInsertResult.IsSuccess);
+        var beforeInsert = beforeInsertResult.Definition;
+        Assert.NotNull(beforeInsert);
+        Assert.Equal("trigger_validate_user", beforeInsert.Name);
+        Assert.Equal("users", beforeInsert.TableName);
+        Assert.Equal(TriggerTiming.Before, beforeInsert.Timing);
+        Assert.Single(beforeInsert.Events);
+        Assert.Contains(TriggerEvent.Insert, beforeInsert.Events);
+        Assert.Equal("validate_user_data", beforeInsert.FunctionName);
+        Assert.Equal(TriggerLevel.Row, beforeInsert.Level);
+        Assert.Null(beforeInsert.WhenCondition);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_validate_user", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal(TriggerTiming.Before, result.Definition.Timing);
-        Assert.Single(result.Definition.Events);
-        Assert.Contains(TriggerEvent.Insert, result.Definition.Events);
-        Assert.Equal("validate_user_data", result.Definition.FunctionName);
-        Assert.Equal(TriggerLevel.Row, result.Definition.Level);
-        Assert.Null(result.Definition.WhenCondition);
-        Assert.Null(result.Definition.UpdateColumns);
-    }
-
-    [Fact]
-    public void Extract_TriggerAfterUpdate_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // AFTER UPDATE
+        var afterUpdateBlocks = CreateBlocks(@"
             CREATE TRIGGER trigger_log_changes
                 AFTER UPDATE ON orders
                 FOR EACH ROW
                 EXECUTE FUNCTION log_order_changes();
         ");
+        var afterUpdateResult = _extractor.Extract(afterUpdateBlocks);
+        Assert.True(afterUpdateResult.IsSuccess);
+        Assert.Equal(TriggerTiming.After, afterUpdateResult.Definition!.Timing);
+        Assert.Contains(TriggerEvent.Update, afterUpdateResult.Definition.Events);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_log_changes", result.Definition.Name);
-        Assert.Equal("orders", result.Definition.TableName);
-        Assert.Equal(TriggerTiming.After, result.Definition.Timing);
-        Assert.Single(result.Definition.Events);
-        Assert.Contains(TriggerEvent.Update, result.Definition.Events);
-        Assert.Equal("log_order_changes", result.Definition.FunctionName);
-        Assert.Equal(TriggerLevel.Row, result.Definition.Level);
-    }
-
-    [Fact]
-    public void Extract_TriggerInsteadOf_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_view_insert
-                INSTEAD OF INSERT ON user_view
+        // BEFORE DELETE
+        var beforeDeleteBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_archive_data
+                BEFORE DELETE ON products
                 FOR EACH ROW
-                EXECUTE FUNCTION insert_into_users();
+                EXECUTE FUNCTION archive_product();
         ");
+        var beforeDeleteResult = _extractor.Extract(beforeDeleteBlocks);
+        Assert.True(beforeDeleteResult.IsSuccess);
+        Assert.Contains(TriggerEvent.Delete, beforeDeleteResult.Definition!.Events);
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        // AFTER TRUNCATE (STATEMENT level)
+        var truncateBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_log_truncate
+                AFTER TRUNCATE ON audit_table
+                FOR EACH STATEMENT
+                EXECUTE FUNCTION log_truncate();
+        ");
+        var truncateResult = _extractor.Extract(truncateBlocks);
+        Assert.True(truncateResult.IsSuccess);
+        Assert.Contains(TriggerEvent.Truncate, truncateResult.Definition!.Events);
+        Assert.Equal(TriggerLevel.Statement, truncateResult.Definition.Level);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_view_insert", result.Definition.Name);
-        Assert.Equal("user_view", result.Definition.TableName);
-        Assert.Equal(TriggerTiming.InsteadOf, result.Definition.Timing);
-        Assert.Single(result.Definition.Events);
-        Assert.Contains(TriggerEvent.Insert, result.Definition.Events);
-        Assert.Equal("insert_into_users", result.Definition.FunctionName);
-    }
-
-    [Fact]
-    public void Extract_TriggerWithSchema_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER public.trigger_update_audit
-                AFTER UPDATE ON public.users
+        // Multiple events: INSERT OR UPDATE OR DELETE
+        var multiEventBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_audit_changes
+                AFTER INSERT OR UPDATE OR DELETE ON audit_log
                 FOR EACH ROW
-                EXECUTE FUNCTION audit_log();
+                EXECUTE FUNCTION audit_changes();
         ");
+        var multiEventResult = _extractor.Extract(multiEventBlocks);
+        Assert.True(multiEventResult.IsSuccess);
+        var multiEvent = multiEventResult.Definition;
+        Assert.NotNull(multiEvent);
+        Assert.Equal(3, multiEvent.Events.Count);
+        Assert.Contains(TriggerEvent.Insert, multiEvent.Events);
+        Assert.Contains(TriggerEvent.Update, multiEvent.Events);
+        Assert.Contains(TriggerEvent.Delete, multiEvent.Events);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_update_audit", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal("public", result.Definition.Schema);
-    }
-
-    #endregion
-
-    #region Extract Multiple Events Tests
-
-    [Fact]
-    public void Extract_TriggerWithMultipleEvents_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_update_category_search
-                BEFORE INSERT OR UPDATE OF name, description ON categories
-                FOR EACH ROW
-                EXECUTE FUNCTION update_category_search_vector();
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_update_category_search", result.Definition.Name);
-        Assert.Equal("categories", result.Definition.TableName);
-        Assert.Equal(TriggerTiming.Before, result.Definition.Timing);
-        Assert.Equal(2, result.Definition.Events.Count);
-        Assert.Contains(TriggerEvent.Insert, result.Definition.Events);
-        Assert.Contains(TriggerEvent.Update, result.Definition.Events);
-        Assert.Equal("update_category_search_vector", result.Definition.FunctionName);
-        Assert.NotNull(result.Definition.UpdateColumns);
-        Assert.Equal(2, result.Definition.UpdateColumns.Count);
-        Assert.Contains("name", result.Definition.UpdateColumns);
-        Assert.Contains("description", result.Definition.UpdateColumns);
-    }
-
-    [Fact]
-    public void Extract_TriggerWithAllEvents_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // All events: INSERT OR UPDATE OR DELETE OR TRUNCATE
+        var allEventsBlocks = CreateBlocks(@"
             CREATE TRIGGER trigger_audit_all
                 AFTER INSERT OR UPDATE OR DELETE OR TRUNCATE ON audit_table
                 FOR EACH STATEMENT
                 EXECUTE FUNCTION log_all_changes();
         ");
+        var allEventsResult = _extractor.Extract(allEventsBlocks);
+        Assert.True(allEventsResult.IsSuccess);
+        Assert.Equal(4, allEventsResult.Definition!.Events.Count);
+        Assert.Contains(TriggerEvent.Truncate, allEventsResult.Definition.Events);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_audit_all", result.Definition.Name);
-        Assert.Equal("audit_table", result.Definition.TableName);
-        Assert.Equal(4, result.Definition.Events.Count);
-        Assert.Contains(TriggerEvent.Insert, result.Definition.Events);
-        Assert.Contains(TriggerEvent.Update, result.Definition.Events);
-        Assert.Contains(TriggerEvent.Delete, result.Definition.Events);
-        Assert.Contains(TriggerEvent.Truncate, result.Definition.Events);
-        Assert.Equal(TriggerLevel.Statement, result.Definition.Level);
-    }
-
-    #endregion
-
-    #region Extract Trigger Level Tests
-
-    [Fact]
-    public void Extract_TriggerForEachRow_ReturnsRowLevel()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_row_level
-                AFTER UPDATE ON test_table
+        // INSTEAD OF (for views)
+        var insteadOfBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_view_insert
+                INSTEAD OF INSERT ON user_view
                 FOR EACH ROW
-                EXECUTE FUNCTION test_function();
+                EXECUTE FUNCTION handle_view_insert();
         ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(TriggerLevel.Row, result.Definition.Level);
+        var insteadOfResult = _extractor.Extract(insteadOfBlocks);
+        Assert.True(insteadOfResult.IsSuccess);
+        Assert.Equal(TriggerTiming.InsteadOf, insteadOfResult.Definition!.Timing);
     }
 
     [Fact]
-    public void Extract_TriggerForEachStatement_ReturnsStatementLevel()
+    public void Extract_UpdateOfColumns_HandlesColumnSpecifications()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_statement_level
-                AFTER TRUNCATE ON test_table
-                FOR EACH STATEMENT
-                EXECUTE FUNCTION test_function();
-        ");
+        // Покрывает: UPDATE OF single/multiple columns
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(TriggerLevel.Statement, result.Definition.Level);
-    }
-
-    #endregion
-
-    #region Extract WHEN Condition Tests
-
-    [Fact]
-    public void Extract_TriggerWithWhenCondition_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_order_status_history
-                BEFORE UPDATE OF status ON orders
-                FOR EACH ROW
-                WHEN (OLD.status IS DISTINCT FROM NEW.status)
-                EXECUTE FUNCTION add_order_status_history();
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_order_status_history", result.Definition.Name);
-        Assert.Equal("orders", result.Definition.TableName);
-        Assert.NotNull(result.Definition.WhenCondition);
-        Assert.Equal("OLD.status IS DISTINCT FROM NEW.status", result.Definition.WhenCondition);
-        Assert.NotNull(result.Definition.UpdateColumns);
-        Assert.Single(result.Definition.UpdateColumns);
-        Assert.Contains("status", result.Definition.UpdateColumns);
-    }
-
-    [Fact]
-    public void Extract_TriggerWithComplexWhenCondition_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_check_balance
-                BEFORE UPDATE ON users
-                FOR EACH ROW
-                WHEN (NEW.balance < 0 AND OLD.balance >= 0)
-                EXECUTE FUNCTION notify_negative_balance();
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.NotNull(result.Definition.WhenCondition);
-        Assert.Equal("NEW.balance < 0 AND OLD.balance >= 0", result.Definition.WhenCondition);
-    }
-
-    #endregion
-
-    #region Extract UPDATE OF Columns Tests
-
-    [Fact]
-    public void Extract_TriggerUpdateOfSingleColumn_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Single column
+        var singleColumnBlocks = CreateBlocks(@"
             CREATE TRIGGER trigger_update_status
                 AFTER UPDATE OF status ON orders
                 FOR EACH ROW
                 EXECUTE FUNCTION handle_status_change();
         ");
+        var singleColumnResult = _extractor.Extract(singleColumnBlocks);
+        Assert.True(singleColumnResult.IsSuccess);
+        var singleColumn = singleColumnResult.Definition;
+        Assert.NotNull(singleColumn);
+        Assert.NotNull(singleColumn.UpdateColumns);
+        Assert.Single(singleColumn.UpdateColumns);
+        Assert.Contains("status", singleColumn.UpdateColumns);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.NotNull(result.Definition.UpdateColumns);
-        Assert.Single(result.Definition.UpdateColumns);
-        Assert.Contains("status", result.Definition.UpdateColumns);
-    }
-
-    [Fact]
-    public void Extract_TriggerUpdateOfMultipleColumns_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Multiple columns
+        var multiColumnBlocks = CreateBlocks(@"
             CREATE TRIGGER trigger_update_name_email
                 BEFORE UPDATE OF username, email, full_name ON users
                 FOR EACH ROW
                 EXECUTE FUNCTION validate_user_info();
         ");
+        var multiColumnResult = _extractor.Extract(multiColumnBlocks);
+        Assert.True(multiColumnResult.IsSuccess);
+        var multiColumn = multiColumnResult.Definition;
+        Assert.NotNull(multiColumn);
+        Assert.NotNull(multiColumn.UpdateColumns);
+        Assert.Equal(3, multiColumn.UpdateColumns.Count);
+        Assert.Contains("username", multiColumn.UpdateColumns);
+        Assert.Contains("email", multiColumn.UpdateColumns);
+        Assert.Contains("full_name", multiColumn.UpdateColumns);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.NotNull(result.Definition.UpdateColumns);
-        Assert.Equal(3, result.Definition.UpdateColumns.Count);
-        Assert.Contains("username", result.Definition.UpdateColumns);
-        Assert.Contains("email", result.Definition.UpdateColumns);
-        Assert.Contains("full_name", result.Definition.UpdateColumns);
-    }
-
-    #endregion
-
-    #region Old Syntax Tests
-
-    [Fact]
-    public void Extract_TriggerWithExecuteProcedure_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_old_syntax
-                BEFORE INSERT ON legacy_table
-                FOR EACH ROW
-                EXECUTE PROCEDURE legacy_function();
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_old_syntax", result.Definition.Name);
-        Assert.Equal("legacy_table", result.Definition.TableName);
-        Assert.Equal("legacy_function", result.Definition.FunctionName);
-    }
-
-    #endregion
-
-    #region Case Sensitivity Tests
-
-    [Fact]
-    public void Extract_TriggerUpperCase_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER TRIGGER_UPPERCASE
-                BEFORE INSERT ON USERS
-                FOR EACH ROW
-                EXECUTE FUNCTION VALIDATE_DATA();
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("TRIGGER_UPPERCASE", result.Definition.Name);
-        Assert.Equal("USERS", result.Definition.TableName);
-        Assert.Equal("VALIDATE_DATA", result.Definition.FunctionName);
-    }
-
-    [Fact]
-    public void Extract_TriggerMixedCase_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            create TrIgGeR MixedCaseTrigger
-                BeFoRe UpDaTe on TestTable
-                fOr EaCh RoW
-                ExEcUtE fUnCtIoN testFunc();
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("MixedCaseTrigger", result.Definition.Name);
-        Assert.Equal("TestTable", result.Definition.TableName);
-        Assert.Equal("testFunc", result.Definition.FunctionName);
-    }
-
-    #endregion
-
-    #region Invalid Input Tests
-
-    [Fact]
-    public void Extract_InvalidSql_ReturnsNotApplicable()
-    {
-        // Arrange
-        var blocks = CreateBlocks("INVALID SQL STATEMENT");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    [Fact]
-    public void Extract_NullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
-    }
-
-    [Fact]
-    public void Extract_EmptyBlock_ReturnsNotApplicable()
-    {
-        // Arrange
-        var blocks = CreateBlocks("");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    [Fact]
-    public void Extract_TriggerWithoutFunction_ReturnsFailure()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER incomplete_trigger
-                BEFORE INSERT ON users
-                FOR EACH ROW;
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-        Assert.NotEmpty(result.ValidationIssues);
-    }
-
-    #endregion
-
-    #region Real World Examples Tests
-
-    [Fact]
-    public void Extract_RealWorldUpdatedAtTrigger_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_users_updated_at
-                BEFORE UPDATE ON users
-                FOR EACH ROW
-                EXECUTE FUNCTION update_updated_at_column();
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_users_updated_at", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal(TriggerTiming.Before, result.Definition.Timing);
-        Assert.Single(result.Definition.Events);
-        Assert.Contains(TriggerEvent.Update, result.Definition.Events);
-        Assert.Equal("update_updated_at_column", result.Definition.FunctionName);
-        Assert.Equal(TriggerLevel.Row, result.Definition.Level);
-    }
-
-    [Fact]
-    public void Extract_RealWorldSearchVectorTrigger_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // UPDATE OF with multiple events
+        var updateOfMultiEventBlocks = CreateBlocks(@"
             CREATE TRIGGER trigger_update_category_search
                 BEFORE INSERT OR UPDATE OF name, description
                 ON categories
                 FOR EACH ROW
                 EXECUTE FUNCTION update_category_search_vector();
         ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_update_category_search", result.Definition.Name);
-        Assert.Equal("categories", result.Definition.TableName);
-        Assert.Equal(TriggerTiming.Before, result.Definition.Timing);
-        Assert.Equal(2, result.Definition.Events.Count);
-        Assert.Contains(TriggerEvent.Insert, result.Definition.Events);
-        Assert.Contains(TriggerEvent.Update, result.Definition.Events);
-        Assert.Equal("update_category_search_vector", result.Definition.FunctionName);
-        Assert.NotNull(result.Definition.UpdateColumns);
-        Assert.Equal(2, result.Definition.UpdateColumns.Count);
+        var updateOfMultiResult = _extractor.Extract(updateOfMultiEventBlocks);
+        Assert.True(updateOfMultiResult.IsSuccess);
+        var updateOfMulti = updateOfMultiResult.Definition;
+        Assert.NotNull(updateOfMulti);
+        Assert.Equal(2, updateOfMulti.Events.Count);
+        Assert.Contains(TriggerEvent.Insert, updateOfMulti.Events);
+        Assert.Contains(TriggerEvent.Update, updateOfMulti.Events);
+        Assert.NotNull(updateOfMulti.UpdateColumns);
+        Assert.Equal(2, updateOfMulti.UpdateColumns.Count);
+        Assert.Contains("name", updateOfMulti.UpdateColumns);
+        Assert.Contains("description", updateOfMulti.UpdateColumns);
     }
 
     [Fact]
-    public void Extract_RealWorldAuditTrigger_ReturnsValidDefinition()
+    public void Extract_WhenConditions_HandlesAllConditionTypes()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Покрывает: WHEN с различными условиями (OLD/NEW, IS DISTINCT FROM, сравнения, AND/OR)
+
+        // Simple WHEN with IS DISTINCT FROM
+        var distinctBlocks = CreateBlocks(@"
             CREATE TRIGGER trigger_order_status_history
                 BEFORE UPDATE OF status ON orders
                 FOR EACH ROW
                 WHEN (OLD.status IS DISTINCT FROM NEW.status)
                 EXECUTE FUNCTION add_order_status_history();
         ");
+        var distinctResult = _extractor.Extract(distinctBlocks);
+        Assert.True(distinctResult.IsSuccess);
+        var distinct = distinctResult.Definition;
+        Assert.NotNull(distinct);
+        Assert.Equal("trigger_order_status_history", distinct.Name);
+        Assert.NotNull(distinct.WhenCondition);
+        Assert.Equal("OLD.status IS DISTINCT FROM NEW.status", distinct.WhenCondition);
+        Assert.NotNull(distinct.UpdateColumns);
+        Assert.Contains("status", distinct.UpdateColumns);
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        // WHEN with comparison and AND
+        var complexConditionBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_check_balance
+                BEFORE UPDATE ON users
+                FOR EACH ROW
+                WHEN (NEW.balance < 0 AND OLD.balance >= 0)
+                EXECUTE FUNCTION notify_negative_balance();
+        ");
+        var complexResult = _extractor.Extract(complexConditionBlocks);
+        Assert.True(complexResult.IsSuccess);
+        Assert.NotNull(complexResult.Definition);
+        Assert.NotNull(complexResult.Definition.WhenCondition);
+        Assert.Equal("NEW.balance < 0 AND OLD.balance >= 0", complexResult.Definition.WhenCondition);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_order_status_history", result.Definition.Name);
-        Assert.Equal("orders", result.Definition.TableName);
-        Assert.Equal(TriggerTiming.Before, result.Definition.Timing);
-        Assert.Single(result.Definition.Events);
-        Assert.Contains(TriggerEvent.Update, result.Definition.Events);
-        Assert.Equal("add_order_status_history", result.Definition.FunctionName);
-        Assert.Equal(TriggerLevel.Row, result.Definition.Level);
-        Assert.NotNull(result.Definition.WhenCondition);
-        Assert.Equal("OLD.status IS DISTINCT FROM NEW.status", result.Definition.WhenCondition);
-        Assert.NotNull(result.Definition.UpdateColumns);
-        Assert.Single(result.Definition.UpdateColumns);
-        Assert.Contains("status", result.Definition.UpdateColumns);
+        // WHEN with NULL checks
+        var nullCheckBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_set_defaults
+                BEFORE INSERT ON users
+                FOR EACH ROW
+                WHEN (NEW.created_at IS NULL)
+                EXECUTE FUNCTION set_created_at();
+        ");
+        var nullCheckResult = _extractor.Extract(nullCheckBlocks);
+        Assert.True(nullCheckResult.IsSuccess);
+        Assert.NotNull(nullCheckResult.Definition);
+        Assert.NotNull(nullCheckResult.Definition.WhenCondition);
+        Assert.Contains("IS NULL", nullCheckResult.Definition.WhenCondition);
+
+        // WHEN with OR condition
+        var orConditionBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_validate_email
+                BEFORE INSERT OR UPDATE ON users
+                FOR EACH ROW
+                WHEN (NEW.email IS NULL OR NEW.email = '')
+                EXECUTE FUNCTION validate_email();
+        ");
+        var orResult = _extractor.Extract(orConditionBlocks);
+        Assert.True(orResult.IsSuccess);
+        Assert.NotNull(orResult.Definition);
+        Assert.NotNull(orResult.Definition.WhenCondition);
+        Assert.Contains("OR", orResult.Definition.WhenCondition);
     }
 
     [Fact]
-    public void Extract_RealWorldCategoryPathTrigger_ReturnsValidDefinition()
+    public void Extract_SpecialFormatComments_ParsesMetadata()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TRIGGER trigger_update_category_path
-                BEFORE INSERT OR UPDATE OF parent_id
-                ON categories
+        // Покрывает: специальные форматы комментариев с метаданными
+        // Формат 1: comment: Описание; type: ТИП; rename: НовоеИмя;
+        // Формат 2: comment(...); type(...); rename(...);
+
+        // Формат 1: comment: ...; rename: ...;
+        var blocks1 = CreateBlocks(@"
+            CREATE TRIGGER trigger_users_updated_at
+                BEFORE UPDATE ON users
                 FOR EACH ROW
-                EXECUTE FUNCTION update_category_path();
-        ");
+                EXECUTE FUNCTION update_updated_at_column();
+        ", "comment: Автоматическое обновление даты изменения; rename: UsersUpdatedAtTrigger;");
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        var result1 = _extractor.Extract(blocks1);
+        Assert.True(result1.IsSuccess);
+        Assert.NotNull(result1.Definition);
+        Assert.NotNull(result1.Definition.SqlComment);
+        Assert.Contains("comment:", result1.Definition.SqlComment);
+        Assert.Contains("Автоматическое обновление даты изменения", result1.Definition.SqlComment);
+        Assert.Contains("rename:", result1.Definition.SqlComment);
+        Assert.Contains("UsersUpdatedAtTrigger", result1.Definition.SqlComment);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("trigger_update_category_path", result.Definition.Name);
-        Assert.Equal("categories", result.Definition.TableName);
-        Assert.Equal(TriggerTiming.Before, result.Definition.Timing);
-        Assert.Equal(2, result.Definition.Events.Count);
-        Assert.Contains(TriggerEvent.Insert, result.Definition.Events);
-        Assert.Contains(TriggerEvent.Update, result.Definition.Events);
-        Assert.Equal("update_category_path", result.Definition.FunctionName);
-        Assert.NotNull(result.Definition.UpdateColumns);
-        Assert.Single(result.Definition.UpdateColumns);
-        Assert.Contains("parent_id", result.Definition.UpdateColumns);
+        // Формат 2: comment(...); rename(...); type(...);
+        var blocks2 = CreateBlocks(@"
+            CREATE TRIGGER trigger_audit_changes
+                AFTER INSERT OR UPDATE OR DELETE ON audit_log
+                FOR EACH ROW
+                EXECUTE FUNCTION audit_changes();
+        ", "comment(Триггер для аудита изменений); rename(AuditChangesTrigger); type(AuditTrigger);");
+
+        var result2 = _extractor.Extract(blocks2);
+        Assert.True(result2.IsSuccess);
+        Assert.NotNull(result2.Definition);
+        Assert.NotNull(result2.Definition.SqlComment);
+        Assert.Contains("comment(", result2.Definition.SqlComment);
+        Assert.Contains("Триггер для аудита изменений", result2.Definition.SqlComment);
+        Assert.Contains("rename(AuditChangesTrigger)", result2.Definition.SqlComment);
+        Assert.Contains("type(AuditTrigger)", result2.Definition.SqlComment);
+
+        // Смешанный формат
+        var blocks3 = CreateBlocks(@"
+            CREATE TRIGGER trigger_validate_data
+                BEFORE INSERT ON products
+                FOR EACH ROW
+                EXECUTE FUNCTION validate_product_data();
+        ", "comment: Валидация данных перед вставкой; type(ValidationTrigger);");
+
+        var result3 = _extractor.Extract(blocks3);
+        Assert.True(result3.IsSuccess);
+        Assert.NotNull(result3.Definition);
+        Assert.NotNull(result3.Definition.SqlComment);
+        Assert.Contains("comment:", result3.Definition.SqlComment);
+        Assert.Contains("Валидация данных перед вставкой", result3.Definition.SqlComment);
+        Assert.Contains("type(ValidationTrigger)", result3.Definition.SqlComment);
+
+        // Формат 1 с WHEN условием
+        var blocks4 = CreateBlocks(@"
+            CREATE TRIGGER trigger_order_status_change
+                BEFORE UPDATE OF status ON orders
+                FOR EACH ROW
+                WHEN (OLD.status IS DISTINCT FROM NEW.status)
+                EXECUTE FUNCTION log_status_change();
+        ", "comment: Логирование изменений статуса заказа; rename: OrderStatusChangeTrigger; type: HistoryTrigger;");
+
+        var result4 = _extractor.Extract(blocks4);
+        Assert.True(result4.IsSuccess);
+        Assert.NotNull(result4.Definition);
+        Assert.NotNull(result4.Definition.SqlComment);
+        Assert.Contains("Логирование изменений статуса заказа", result4.Definition.SqlComment);
+        Assert.Contains("rename:", result4.Definition.SqlComment);
+        Assert.Contains("type:", result4.Definition.SqlComment);
     }
 
-    #endregion
-
-    #region Helper Methods
-
-    /// <summary>
-    /// Создает SQL блок для тестирования
-    /// </summary>
-    private static IReadOnlyList<SqlBlock> CreateBlocks(string content)
+    [Fact]
+    public void Extract_EdgeCasesAndValidation_HandlesCorrectly()
     {
+        // Покрывает: null validation, non-trigger blocks, old EXECUTE PROCEDURE syntax, schema qualification, case sensitivity
+
+        // Null checks
+        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
+        Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
+
+        // Non-trigger block
+        var tableBlocks = CreateBlocks(@"
+            CREATE TABLE test_table (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100)
+            );
+        ");
+        Assert.False(_extractor.CanExtract(tableBlocks));
+
+        // Empty block
+        var emptyResult = _extractor.Extract(CreateBlocks(""));
+        Assert.False(emptyResult.IsSuccess);
+
+        // Invalid SQL
+        var invalidResult = _extractor.Extract(CreateBlocks("INVALID SQL STATEMENT"));
+        Assert.False(invalidResult.IsSuccess);
+
+        // Incomplete trigger (without EXECUTE)
+        var incompleteBlocks = CreateBlocks(@"
+            CREATE TRIGGER incomplete_trigger
+                BEFORE INSERT ON users
+                FOR EACH ROW;
+        ");
+        var incompleteResult = _extractor.Extract(incompleteBlocks);
+        Assert.False(incompleteResult.IsSuccess);
+        Assert.NotEmpty(incompleteResult.ValidationIssues);
+
+        // Old EXECUTE PROCEDURE syntax (instead of EXECUTE FUNCTION)
+        var oldSyntaxBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_old_syntax
+                BEFORE INSERT ON legacy_table
+                FOR EACH ROW
+                EXECUTE PROCEDURE legacy_function();
+        ");
+        var oldSyntaxResult = _extractor.Extract(oldSyntaxBlocks);
+        Assert.True(oldSyntaxResult.IsSuccess);
+        Assert.Equal("trigger_old_syntax", oldSyntaxResult.Definition!.Name);
+        Assert.Equal("legacy_function", oldSyntaxResult.Definition.FunctionName);
+
+        // Schema qualification
+        var schemaBlocks = CreateBlocks(@"
+            CREATE TRIGGER trigger_with_schema
+                AFTER INSERT ON myschema.users
+                FOR EACH ROW
+                EXECUTE FUNCTION myschema.audit_insert();
+        ");
+        var schemaResult = _extractor.Extract(schemaBlocks);
+        Assert.True(schemaResult.IsSuccess);
+        Assert.Equal("users", schemaResult.Definition!.TableName);
+        Assert.Equal("myschema", schemaResult.Definition.Schema);
+
+        // Case sensitivity
+        var upperBlocks = CreateBlocks(@"
+            CREATE TRIGGER TRIGGER_UPPERCASE
+                BEFORE INSERT ON USERS
+                FOR EACH ROW
+                EXECUTE FUNCTION VALIDATE_DATA();
+        ");
+        var upperResult = _extractor.Extract(upperBlocks);
+        Assert.True(upperResult.IsSuccess);
+        Assert.Equal("TRIGGER_UPPERCASE", upperResult.Definition!.Name);
+        Assert.Equal("USERS", upperResult.Definition.TableName);
+
+        // Mixed case
+        var mixedBlocks = CreateBlocks(@"
+            CrEaTe TrIgGeR MixedCase
+                BeFoRe InSeRt On TestTable
+                FoR EaCh RoW
+                ExEcUtE FuNcTiOn test_func();
+        ");
+        var mixedResult = _extractor.Extract(mixedBlocks);
+        Assert.True(mixedResult.IsSuccess);
+        Assert.Equal("MixedCase", mixedResult.Definition!.Name);
+    }
+
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? headerComment = null)
+    {
+        var content = sql.Trim();
+
         return [new SqlBlock
         {
             Content = content,
             RawContent = content,
-            HeaderComment = null,
+            HeaderComment = headerComment,
             InlineComments = null,
             StartLine = 1,
             EndLine = content.Split('\n').Length,
             SourcePath = "test.sql"
         }];
     }
-
-    #endregion
 }

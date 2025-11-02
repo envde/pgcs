@@ -3,99 +3,40 @@ using PgCs.Core.Schema.Common;
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
-/// Тесты для SchemaDefinitionDetector - детектора типов объектов схемы
+/// Consolidated tests for SchemaObjectDetector - detecting schema object types from SQL statements
 /// </summary>
 public sealed class SchemaObjectDetectorTests
 {
+    /// <summary>
+    /// Test 1: DetectObjectType - detects correct SchemaObjectType for various SQL statements
+    /// </summary>
     [Theory]
+    // Types (ENUM, Composite, Domain)
     [InlineData("CREATE TYPE user_status AS ENUM ('active', 'inactive');", SchemaObjectType.Types)]
     [InlineData("CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));", SchemaObjectType.Types)]
     [InlineData("CREATE DOMAIN email AS VARCHAR(255) CHECK (VALUE ~* '^[A-Za-z0-9._%+-]+@');", SchemaObjectType.Types)]
-    public void DetectObjectType_CreateType_ReturnsTypes(string sql, SchemaObjectType expected)
-    {
-        // Act
-        var result = SchemaObjectDetector.DetectObjectType(sql);
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
+    // Tables
     [InlineData("CREATE TABLE users (id SERIAL PRIMARY KEY);", SchemaObjectType.Tables)]
     [InlineData("CREATE TABLE orders (id BIGSERIAL, user_id INTEGER);", SchemaObjectType.Tables)]
-    public void DetectObjectType_CreateTable_ReturnsTables(string sql, SchemaObjectType expected)
-    {
-        // Act
-        var result = SchemaObjectDetector.DetectObjectType(sql);
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
+    // Indexes
     [InlineData("CREATE INDEX idx_users_email ON users (email);", SchemaObjectType.Indexes)]
     [InlineData("CREATE UNIQUE INDEX idx_users_username ON users (username);", SchemaObjectType.Indexes)]
     [InlineData("CREATE INDEX idx_users_preferences ON users USING GIN (preferences);", SchemaObjectType.Indexes)]
-    public void DetectObjectType_CreateIndex_ReturnsIndexes(string sql, SchemaObjectType expected)
-    {
-        // Act
-        var result = SchemaObjectDetector.DetectObjectType(sql);
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
+    // Views
     [InlineData("CREATE VIEW active_users AS SELECT * FROM users WHERE status = 'active';", SchemaObjectType.Views)]
     [InlineData("CREATE OR REPLACE VIEW user_stats AS SELECT COUNT(*) FROM users;", SchemaObjectType.Views)]
     [InlineData("CREATE MATERIALIZED VIEW category_stats AS SELECT * FROM categories;", SchemaObjectType.Views)]
-    public void DetectObjectType_CreateView_ReturnsViews(string sql, SchemaObjectType expected)
-    {
-        // Act
-        var result = SchemaObjectDetector.DetectObjectType(sql);
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
+    // Functions and Procedures
     [InlineData("CREATE FUNCTION update_timestamp() RETURNS TRIGGER AS $$ BEGIN RETURN NEW; END; $$ LANGUAGE plpgsql;", SchemaObjectType.Functions)]
     [InlineData("CREATE OR REPLACE FUNCTION get_user(user_id INT) RETURNS TEXT AS $$ BEGIN RETURN 'test'; END; $$ LANGUAGE plpgsql;", SchemaObjectType.Functions)]
     [InlineData("CREATE PROCEDURE update_stats() AS $$ BEGIN UPDATE stats SET count = count + 1; END; $$ LANGUAGE plpgsql;", SchemaObjectType.Functions)]
-    public void DetectObjectType_CreateFunction_ReturnsFunctions(string sql, SchemaObjectType expected)
-    {
-        // Act
-        var result = SchemaObjectDetector.DetectObjectType(sql);
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
+    // Triggers
     [InlineData("CREATE TRIGGER update_timestamp BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_timestamp();", SchemaObjectType.Triggers)]
     [InlineData("CREATE TRIGGER validate_email BEFORE INSERT ON users FOR EACH ROW EXECUTE FUNCTION validate_email();", SchemaObjectType.Triggers)]
-    public void DetectObjectType_CreateTrigger_ReturnsTriggers(string sql, SchemaObjectType expected)
-    {
-        // Act
-        var result = SchemaObjectDetector.DetectObjectType(sql);
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
+    // Constraints
     [InlineData("ALTER TABLE orders ADD CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id);", SchemaObjectType.Constraints)]
     [InlineData("ALTER TABLE products ADD CONSTRAINT check_price CHECK (price >= 0);", SchemaObjectType.Constraints)]
-    public void DetectObjectType_AlterTableAddConstraint_ReturnsConstraints(string sql, SchemaObjectType expected)
-    {
-        // Act
-        var result = SchemaObjectDetector.DetectObjectType(sql);
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
+    // Comments (all types)
     [InlineData("COMMENT ON TYPE user_status IS 'Possible user statuses';", SchemaObjectType.Comments)]
     [InlineData("COMMENT ON TABLE users IS 'Main users table';", SchemaObjectType.Comments)]
     [InlineData("COMMENT ON COLUMN users.email IS 'User email address';", SchemaObjectType.Comments)]
@@ -103,21 +44,12 @@ public sealed class SchemaObjectDetectorTests
     [InlineData("COMMENT ON VIEW active_users IS 'Active users view';", SchemaObjectType.Comments)]
     [InlineData("COMMENT ON FUNCTION update_timestamp() IS 'Updates timestamp';", SchemaObjectType.Comments)]
     [InlineData("COMMENT ON TRIGGER update_timestamp ON users IS 'Auto-update trigger';", SchemaObjectType.Comments)]
-    public void DetectObjectType_CommentOn_ReturnsComments(string sql, SchemaObjectType expected)
-    {
-        // Act
-        var result = SchemaObjectDetector.DetectObjectType(sql);
-
-        // Assert
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
+    // DML statements (should return None)
     [InlineData("SELECT * FROM users;", SchemaObjectType.None)]
     [InlineData("INSERT INTO users (username) VALUES ('test');", SchemaObjectType.None)]
     [InlineData("UPDATE users SET status = 'active';", SchemaObjectType.None)]
     [InlineData("DELETE FROM users WHERE id = 1;", SchemaObjectType.None)]
-    public void DetectObjectType_DmlStatements_ReturnsNone(string sql, SchemaObjectType expected)
+    public void DetectObjectType_VariousStatements_ReturnsCorrectType(string sql, SchemaObjectType expected)
     {
         // Act
         var result = SchemaObjectDetector.DetectObjectType(sql);
@@ -126,20 +58,9 @@ public sealed class SchemaObjectDetectorTests
         Assert.Equal(expected, result);
     }
 
-    [Fact]
-    public void DetectObjectType_EmptyString_ThrowsArgumentException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => SchemaObjectDetector.DetectObjectType(""));
-    }
-
-    [Fact]
-    public void DetectObjectType_WhitespaceOnly_ThrowsArgumentException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => SchemaObjectDetector.DetectObjectType("   \n\t  "));
-    }
-
+    /// <summary>
+    /// Test 2: ExtractCommentOnObjectType and edge cases - extracts object type from COMMENT ON statements, handles invalid input
+    /// </summary>
     [Theory]
     [InlineData("COMMENT ON TYPE user_status IS 'test';", "TYPE")]
     [InlineData("COMMENT ON DOMAIN email IS 'test';", "DOMAIN")]
@@ -150,7 +71,7 @@ public sealed class SchemaObjectDetectorTests
     [InlineData("COMMENT ON FUNCTION update_timestamp() IS 'test';", "FUNCTION")]
     [InlineData("COMMENT ON TRIGGER update_timestamp ON users IS 'test';", "TRIGGER")]
     [InlineData("COMMENT ON CONSTRAINT fk_user ON orders IS 'test';", "CONSTRAINT")]
-    public void ExtractCommentOnObjectType_ReturnsCorrectType(string sql, string expectedType)
+    public void ExtractCommentOnObjectType_CommentStatements_ReturnsCorrectType(string sql, string expectedType)
     {
         // Act
         var result = SchemaObjectDetector.ExtractCommentOnObjectType(sql);
@@ -170,5 +91,19 @@ public sealed class SchemaObjectDetectorTests
 
         // Assert
         Assert.Null(result);
+    }
+
+    [Fact]
+    public void DetectObjectType_EmptyString_ThrowsArgumentException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => SchemaObjectDetector.DetectObjectType(""));
+    }
+
+    [Fact]
+    public void DetectObjectType_WhitespaceOnly_ThrowsArgumentException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => SchemaObjectDetector.DetectObjectType("   \n\t  "));
     }
 }

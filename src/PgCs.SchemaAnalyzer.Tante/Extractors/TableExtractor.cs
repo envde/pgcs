@@ -447,10 +447,19 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                 continue;
             }
 
+            // Удаляем inline комментарии перед парсингом
+            // Сохраняем комментарий для будущего использования
+            var lineWithoutComment = RemoveInlineComment(trimmedLine, out var comment);
+            
             // Попытка извлечь колонку
-            var column = TryExtractColumn(trimmedLine);
+            var column = TryExtractColumn(lineWithoutComment);
             if (column != null)
             {
+                // Если был inline комментарий, сохраняем его
+                if (!string.IsNullOrWhiteSpace(comment))
+                {
+                    column = column with { Comment = comment };
+                }
                 columns.Add(column);
             }
             else
@@ -459,7 +468,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                 issues.Add(ValidationIssue.Warning(
                     ValidationIssue.ValidationDefinitionType.Table,
                     "TABLE_INVALID_COLUMN",
-                    $"Failed to parse column definition in TABLE '{tableName}': '{trimmedLine.TrimEnd(',').Trim()}'",
+                    $"Failed to parse column definition in TABLE '{tableName}': '{lineWithoutComment.TrimEnd(',').Trim()}'",
                     new ValidationIssue.ValidationLocation
                     {
                         Segment = trimmedLine,
@@ -565,6 +574,33 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
     {
         var keywords = new[] { "PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT", "REFERENCES" };
         return keywords.Any(k => word.Equals(k, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Удаляет inline комментарий из строки и возвращает текст комментария
+    /// Поддерживает: -- комментарий, --- комментарий, и специальный формат comment: ...
+    /// </summary>
+    private static string RemoveInlineComment(string line, out string comment)
+    {
+        comment = string.Empty;
+        
+        // Ищем начало inline комментария (--)
+        var commentIndex = line.IndexOf("--", StringComparison.Ordinal);
+        if (commentIndex == -1)
+        {
+            return line;
+        }
+        
+        // Извлекаем текст комментария (всё после --)
+        var commentText = line.Substring(commentIndex + 2).Trim();
+        
+        // Удаляем дополнительные дефисы в начале (--- комментарий)
+        commentText = commentText.TrimStart('-').Trim();
+        
+        comment = commentText;
+        
+        // Возвращаем строку без комментария
+        return line.Substring(0, commentIndex).Trim();
     }
 
     /// <summary>

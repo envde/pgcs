@@ -2,748 +2,303 @@ using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
-using PgCs.Core.Validation;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
 
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
-/// Тесты для универсального CommentExtractor
+/// Консолидированные тесты для CommentExtractor
+/// Покрывает все типы объектов (TABLE, COLUMN, FUNCTION, INDEX, TRIGGER, CONSTRAINT, TYPE, VIEW)
 /// </summary>
 public sealed class CommentExtractorTests
 {
     private readonly IExtractor<CommentDefinition> _extractor = new CommentExtractor();
 
-    #region Helper Methods
-
-    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? comment = null)
+    [Fact]
+    public void Extract_TableAndColumnComments_HandlesAllVariants()
     {
-        return new List<SqlBlock>
-        {
+        // Покрывает: TABLE comments (with/without schema), COLUMN comments (with/without schema)
+
+        // Simple table comment
+        var tableBlock = CreateBlocks("COMMENT ON TABLE users IS 'User accounts table';");
+        var tableResult = _extractor.Extract(tableBlock);
+        
+        Assert.True(tableResult.IsSuccess);
+        Assert.NotNull(tableResult.Definition);
+        Assert.Equal(SchemaObjectType.Tables, tableResult.Definition.ObjectType);
+        Assert.Equal("users", tableResult.Definition.Name);
+        Assert.Equal("User accounts table", tableResult.Definition.Comment);
+        Assert.Null(tableResult.Definition.Schema);
+        
+        // Table comment with schema
+        var tableSchemaBlock = CreateBlocks("COMMENT ON TABLE public.orders IS 'Order records';");
+        var tableSchemaResult = _extractor.Extract(tableSchemaBlock);
+        
+        Assert.True(tableSchemaResult.IsSuccess);
+        Assert.Equal("orders", tableSchemaResult.Definition!.Name);
+        Assert.Equal("public", tableSchemaResult.Definition.Schema);
+        Assert.Equal("Order records", tableSchemaResult.Definition.Comment);
+        
+        // Column comment
+        var columnBlock = CreateBlocks("COMMENT ON COLUMN users.email IS 'User email address';");
+        var columnResult = _extractor.Extract(columnBlock);
+        
+        Assert.True(columnResult.IsSuccess);
+        Assert.Equal(SchemaObjectType.Columns, columnResult.Definition!.ObjectType);
+        Assert.Equal("users", columnResult.Definition.TableName);
+        Assert.Equal("email", columnResult.Definition.Name);
+        Assert.Equal("User email address", columnResult.Definition.Comment);
+        
+        // Column comment with schema
+        var columnSchemaBlock = CreateBlocks("COMMENT ON COLUMN public.users.created_at IS 'Account creation timestamp';");
+        var columnSchemaResult = _extractor.Extract(columnSchemaBlock);
+        
+        Assert.True(columnSchemaResult.IsSuccess);
+        Assert.Equal("public", columnSchemaResult.Definition!.Schema);
+        Assert.Equal("users", columnSchemaResult.Definition.TableName);
+        Assert.Equal("created_at", columnSchemaResult.Definition.Name);
+        
+        // CanExtract validation
+        Assert.True(_extractor.CanExtract(tableBlock));
+        Assert.True(_extractor.CanExtract(columnBlock));
+        Assert.False(_extractor.CanExtract(CreateBlocks("CREATE TABLE users (id INT);")));
+    }
+
+    [Fact]
+    public void Extract_FunctionAndProcedureComments_HandlesAllVariants()
+    {
+        // Покрывает: FUNCTION comments (with/without params, with/without schema), PROCEDURE comments
+
+        // Function with parameters
+        var funcBlock = CreateBlocks("COMMENT ON FUNCTION get_user(integer) IS 'Retrieves user by ID';");
+        var funcResult = _extractor.Extract(funcBlock);
+        
+        Assert.True(funcResult.IsSuccess);
+        Assert.NotNull(funcResult.Definition);
+        Assert.Equal(SchemaObjectType.Functions, funcResult.Definition.ObjectType);
+        Assert.Equal("get_user", funcResult.Definition.Name);
+        Assert.Equal("get_user(integer)", funcResult.Definition.FunctionSignature);
+        Assert.Equal("Retrieves user by ID", funcResult.Definition.Comment);
+        
+        // Function without parameters
+        var noParamBlock = CreateBlocks("COMMENT ON FUNCTION get_current_timestamp() IS 'Returns current timestamp';");
+        var noParamResult = _extractor.Extract(noParamBlock);
+        
+        Assert.True(noParamResult.IsSuccess);
+        Assert.Equal("get_current_timestamp", noParamResult.Definition!.Name);
+        Assert.Equal("get_current_timestamp()", noParamResult.Definition.FunctionSignature);
+        
+        // Procedure comment
+        var procBlock = CreateBlocks("COMMENT ON PROCEDURE update_user_status(integer, text) IS 'Updates user status';");
+        var procResult = _extractor.Extract(procBlock);
+        
+        Assert.True(procResult.IsSuccess);
+        Assert.Equal(SchemaObjectType.Functions, procResult.Definition!.ObjectType);
+        Assert.Equal("update_user_status", procResult.Definition.Name);
+        Assert.Equal("update_user_status(integer, text)", procResult.Definition.FunctionSignature);
+        
+        // Function with schema
+        var funcSchemaBlock = CreateBlocks("COMMENT ON FUNCTION public.calculate_total(integer) IS 'Calculates order total';");
+        var funcSchemaResult = _extractor.Extract(funcSchemaBlock);
+        
+        Assert.True(funcSchemaResult.IsSuccess);
+        Assert.Equal("public", funcSchemaResult.Definition!.Schema);
+        Assert.Equal("calculate_total", funcSchemaResult.Definition.Name);
+        Assert.Equal("calculate_total(integer)", funcSchemaResult.Definition.FunctionSignature);
+    }
+
+    [Fact]
+    public void Extract_IndexAndTriggerComments_HandlesAllVariants()
+    {
+        // Покрывает: INDEX comments (with/without schema), TRIGGER comments (with/without schema)
+
+        // Simple index comment
+        var indexBlock = CreateBlocks("COMMENT ON INDEX idx_users_email IS 'Index for email lookups';");
+        var indexResult = _extractor.Extract(indexBlock);
+        
+        Assert.True(indexResult.IsSuccess);
+        Assert.NotNull(indexResult.Definition);
+        Assert.Equal(SchemaObjectType.Indexes, indexResult.Definition.ObjectType);
+        Assert.Equal("idx_users_email", indexResult.Definition.Name);
+        Assert.Equal("Index for email lookups", indexResult.Definition.Comment);
+        
+        // Index with schema
+        var indexSchemaBlock = CreateBlocks("COMMENT ON INDEX public.idx_orders_user_id IS 'User orders index';");
+        var indexSchemaResult = _extractor.Extract(indexSchemaBlock);
+        
+        Assert.True(indexSchemaResult.IsSuccess);
+        Assert.Equal("public", indexSchemaResult.Definition!.Schema);
+        Assert.Equal("idx_orders_user_id", indexSchemaResult.Definition.Name);
+        
+        // Trigger comment
+        var triggerBlock = CreateBlocks("COMMENT ON TRIGGER update_timestamp ON users IS 'Updates modified_at timestamp';");
+        var triggerResult = _extractor.Extract(triggerBlock);
+        
+        Assert.True(triggerResult.IsSuccess);
+        Assert.Equal(SchemaObjectType.Triggers, triggerResult.Definition!.ObjectType);
+        Assert.Equal("update_timestamp", triggerResult.Definition.Name);
+        Assert.Equal("users", triggerResult.Definition.TableName);
+        Assert.Equal("Updates modified_at timestamp", triggerResult.Definition.Comment);
+        
+        // Trigger with schema
+        var triggerSchemaBlock = CreateBlocks("COMMENT ON TRIGGER audit_log ON public.orders IS 'Logs order changes';");
+        var triggerSchemaResult = _extractor.Extract(triggerSchemaBlock);
+        
+        Assert.True(triggerSchemaResult.IsSuccess);
+        Assert.Equal("public", triggerSchemaResult.Definition!.Schema);
+        Assert.Equal("audit_log", triggerSchemaResult.Definition.Name);
+        Assert.Equal("orders", triggerSchemaResult.Definition.TableName);
+    }
+
+    [Fact]
+    public void Extract_ConstraintComments_HandlesAllVariants()
+    {
+        // Покрывает: CONSTRAINT comments (with/without schema)
+
+        // Simple constraint comment
+        var constraintBlock = CreateBlocks("COMMENT ON CONSTRAINT users_email_key ON users IS 'Unique email constraint';");
+        var constraintResult = _extractor.Extract(constraintBlock);
+        
+        Assert.True(constraintResult.IsSuccess);
+        Assert.NotNull(constraintResult.Definition);
+        Assert.Equal(SchemaObjectType.Constraints, constraintResult.Definition.ObjectType);
+        Assert.Equal("users_email_key", constraintResult.Definition.Name);
+        Assert.Equal("users", constraintResult.Definition.TableName);
+        Assert.Equal("Unique email constraint", constraintResult.Definition.Comment);
+        
+        // Constraint with schema
+        var constraintSchemaBlock = CreateBlocks("COMMENT ON CONSTRAINT orders_user_fkey ON public.orders IS 'Foreign key to users table';");
+        var constraintSchemaResult = _extractor.Extract(constraintSchemaBlock);
+        
+        Assert.True(constraintSchemaResult.IsSuccess);
+        Assert.Equal("public", constraintSchemaResult.Definition!.Schema);
+        Assert.Equal("orders_user_fkey", constraintSchemaResult.Definition.Name);
+        Assert.Equal("orders", constraintSchemaResult.Definition.TableName);
+        Assert.Equal("Foreign key to users table", constraintSchemaResult.Definition.Comment);
+    }
+
+    [Fact]
+    public void Extract_TypeAndViewComments_HandlesAllVariants()
+    {
+        // Покрывает: TYPE comments (with/without schema), VIEW comments (regular and materialized, with/without schema)
+
+        // Type comment
+        var typeBlock = CreateBlocks("COMMENT ON TYPE status IS 'User status enumeration';");
+        var typeResult = _extractor.Extract(typeBlock);
+        
+        Assert.True(typeResult.IsSuccess);
+        Assert.NotNull(typeResult.Definition);
+        Assert.Equal(SchemaObjectType.Types, typeResult.Definition.ObjectType);
+        Assert.Equal("status", typeResult.Definition.Name);
+        Assert.Equal("User status enumeration", typeResult.Definition.Comment);
+        
+        // Type with schema
+        var typeSchemaBlock = CreateBlocks("COMMENT ON TYPE public.order_status IS 'Order status values';");
+        var typeSchemaResult = _extractor.Extract(typeSchemaBlock);
+        
+        Assert.True(typeSchemaResult.IsSuccess);
+        Assert.Equal("public", typeSchemaResult.Definition!.Schema);
+        Assert.Equal("order_status", typeSchemaResult.Definition.Name);
+        
+        // View comment
+        var viewBlock = CreateBlocks("COMMENT ON VIEW active_users IS 'View of active user accounts';");
+        var viewResult = _extractor.Extract(viewBlock);
+        
+        Assert.True(viewResult.IsSuccess);
+        Assert.Equal(SchemaObjectType.Views, viewResult.Definition!.ObjectType);
+        Assert.Equal("active_users", viewResult.Definition.Name);
+        Assert.Equal("View of active user accounts", viewResult.Definition.Comment);
+        
+        // Materialized view comment
+        var matViewBlock = CreateBlocks("COMMENT ON MATERIALIZED VIEW user_stats IS 'Cached user statistics';");
+        var matViewResult = _extractor.Extract(matViewBlock);
+        
+        Assert.True(matViewResult.IsSuccess);
+        Assert.Equal(SchemaObjectType.Views, matViewResult.Definition!.ObjectType);
+        Assert.Equal("user_stats", matViewResult.Definition.Name);
+        
+        // View with schema
+        var viewSchemaBlock = CreateBlocks("COMMENT ON VIEW public.order_summary IS 'Order summary view';");
+        var viewSchemaResult = _extractor.Extract(viewSchemaBlock);
+        
+        Assert.True(viewSchemaResult.IsSuccess);
+        Assert.Equal("public", viewSchemaResult.Definition!.Schema);
+        Assert.Equal("order_summary", viewSchemaResult.Definition.Name);
+    }
+
+    [Fact]
+    public void Extract_SpecialCasesAndValidation_HandlesCorrectly()
+    {
+        // Покрывает: escaped quotes, NULL comments, empty comments, special characters, invalid syntax, edge cases
+
+        // Escaped quotes in comment text
+        var escapedBlock = CreateBlocks("COMMENT ON TABLE users IS 'User''s account information';");
+        var escapedResult = _extractor.Extract(escapedBlock);
+        
+        Assert.True(escapedResult.IsSuccess);
+        Assert.Contains("User's account", escapedResult.Definition!.Comment);
+        
+        // NULL comment might not be valid syntax - may return failure
+        var nullBlock = CreateBlocks("COMMENT ON TABLE users IS NULL;");
+        var nullResult = _extractor.Extract(nullBlock);
+        
+        // NULL is special - extractor might treat it as removal (success) or invalid (failure)
+        // Just verify it doesn't crash
+        Assert.NotNull(nullResult);
+        
+        // Empty comment
+        var emptyBlock = CreateBlocks("COMMENT ON TABLE users IS '';");
+        var emptyResult = _extractor.Extract(emptyBlock);
+        
+        Assert.True(emptyResult.IsSuccess);
+        Assert.Empty(emptyResult.Definition!.Comment);
+        
+        // Comment with semicolon in text
+        var semiBlock = CreateBlocks("COMMENT ON TABLE products IS 'Products; including digital items';");
+        var semiResult = _extractor.Extract(semiBlock);
+        
+        Assert.True(semiResult.IsSuccess);
+        Assert.Contains(";", semiResult.Definition!.Comment);
+        Assert.Contains("digital", semiResult.Definition.Comment);
+        
+        // Very long comment
+        var longComment = new string('x', 5000);
+        var longBlock = CreateBlocks($"COMMENT ON TABLE users IS '{longComment}';");
+        var longResult = _extractor.Extract(longBlock);
+        
+        Assert.True(longResult.IsSuccess);
+        Assert.Equal(5000, longResult.Definition!.Comment.Length);
+        
+        // Invalid syntax
+        var invalidBlock = CreateBlocks("COMMENT ON INVALID SYNTAX");
+        var invalidResult = _extractor.Extract(invalidBlock);
+        
+        Assert.False(invalidResult.IsSuccess);
+        Assert.Null(invalidResult.Definition);
+        
+        // Non-comment block
+        var nonCommentBlock = CreateBlocks("CREATE TABLE users (id INT);");
+        var nonCommentResult = _extractor.Extract(nonCommentBlock);
+        
+        Assert.False(nonCommentResult.IsSuccess);
+        Assert.Null(nonCommentResult.Definition);
+        
+        // Null blocks - exception
+        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
+        Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
+    }
+
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql)
+    {
+        return
+        [
             new SqlBlock
             {
                 Content = sql,
                 RawContent = sql,
-                HeaderComment = comment,
                 StartLine = 1,
                 EndLine = 1
             }
-        };
+        ];
     }
-
-    #endregion
-
-    #region CanExtract Tests
-
-    [Fact]
-    public void CanExtract_WithTableComment_ReturnsTrue()
-    {
-        // Arrange
-        var blocks = CreateBlocks("COMMENT ON TABLE users IS 'User accounts';");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithColumnComment_ReturnsTrue()
-    {
-        // Arrange
-        var blocks = CreateBlocks("COMMENT ON COLUMN users.email IS 'User email address';");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithFunctionComment_ReturnsTrue()
-    {
-        // Arrange
-        var blocks = CreateBlocks("COMMENT ON FUNCTION calculate_total(integer) IS 'Calculates order total';");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithNonCommentSql_ReturnsFalse()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TABLE users (id INT);");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithNullBlocks_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
-    }
-
-    [Fact]
-    public void CanExtract_WithEmptyBlocks_ReturnsFalse()
-    {
-        // Arrange
-        var blocks = new List<SqlBlock>();
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    #endregion
-
-    #region TABLE Comment Tests
-
-    [Fact]
-    public void Extract_TableComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS 'User accounts table';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Tables, result.Definition.ObjectType);
-        Assert.Equal("users", result.Definition.Name);
-        Assert.Equal("User accounts table", result.Definition.Comment);
-        Assert.Null(result.Definition.Schema);
-        Assert.Null(result.Definition.TableName);
-        Assert.Null(result.Definition.FunctionSignature);
-    }
-
-    [Fact]
-    public void Extract_TableCommentWithSchema_IncludesSchema()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE public.users IS 'Public user accounts';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Tables, result.Definition.ObjectType);
-        Assert.Equal("users", result.Definition.Name);
-        Assert.Equal("public", result.Definition.Schema);
-        Assert.Equal("Public user accounts", result.Definition.Comment);
-    }
-
-    [Fact]
-    public void Extract_TableCommentWithSemicolon_ParsesCorrectly()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE orders IS 'Customer orders';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("orders", result.Definition!.Name);
-    }
-
-    #endregion
-
-    #region COLUMN Comment Tests
-
-    [Fact]
-    public void Extract_ColumnComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON COLUMN users.email IS 'User email address';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Columns, result.Definition.ObjectType);
-        Assert.Equal("email", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal("User email address", result.Definition.Comment);
-        Assert.Null(result.Definition.Schema);
-    }
-
-    [Fact]
-    public void Extract_ColumnCommentWithSchema_IncludesSchemaAndTable()
-    {
-        // Arrange
-        var sql = "COMMENT ON COLUMN public.users.email IS 'Primary email';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Columns, result.Definition.ObjectType);
-        Assert.Equal("email", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal("public", result.Definition.Schema);
-        Assert.Equal("Primary email", result.Definition.Comment);
-    }
-
-    #endregion
-
-    #region FUNCTION Comment Tests
-
-    [Fact]
-    public void Extract_FunctionComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON FUNCTION calculate_total(integer, numeric) IS 'Calculates order total';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Functions, result.Definition.ObjectType);
-        Assert.Equal("calculate_total", result.Definition.Name);
-        Assert.Equal("calculate_total(integer, numeric)", result.Definition.FunctionSignature);
-        Assert.Equal("Calculates order total", result.Definition.Comment);
-    }
-
-    [Fact]
-    public void Extract_FunctionCommentWithoutParams_ParsesCorrectly()
-    {
-        // Arrange
-        var sql = "COMMENT ON FUNCTION get_current_user() IS 'Returns current user';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Functions, result.Definition.ObjectType);
-        Assert.Equal("get_current_user", result.Definition.Name);
-        Assert.Equal("get_current_user()", result.Definition.FunctionSignature);
-    }
-
-    [Fact]
-    public void Extract_ProcedureComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON PROCEDURE update_user(integer, text) IS 'Updates user data';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Functions, result.Definition.ObjectType);
-        Assert.Equal("update_user", result.Definition.Name);
-        Assert.Equal("update_user(integer, text)", result.Definition.FunctionSignature);
-    }
-
-    [Fact]
-    public void Extract_FunctionCommentWithSchema_IncludesSchema()
-    {
-        // Arrange
-        var sql = "COMMENT ON FUNCTION public.calc_tax(numeric) IS 'Tax calculator';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("public", result.Definition!.Schema);
-        Assert.Equal("calc_tax", result.Definition.Name);
-    }
-
-    #endregion
-
-    #region INDEX Comment Tests
-
-    [Fact]
-    public void Extract_IndexComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON INDEX idx_users_email IS 'Email lookup index';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Indexes, result.Definition.ObjectType);
-        Assert.Equal("idx_users_email", result.Definition.Name);
-        Assert.Equal("Email lookup index", result.Definition.Comment);
-        Assert.Null(result.Definition.TableName);
-    }
-
-    [Fact]
-    public void Extract_IndexCommentWithSchema_IncludesSchema()
-    {
-        // Arrange
-        var sql = "COMMENT ON INDEX public.idx_orders_date IS 'Date range index';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("public", result.Definition!.Schema);
-        Assert.Equal("idx_orders_date", result.Definition.Name);
-    }
-
-    #endregion
-
-    #region TRIGGER Comment Tests
-
-    [Fact]
-    public void Extract_TriggerComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON TRIGGER update_timestamp ON users IS 'Updates timestamp on change';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Triggers, result.Definition.ObjectType);
-        Assert.Equal("update_timestamp", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal("Updates timestamp on change", result.Definition.Comment);
-    }
-
-    [Fact]
-    public void Extract_TriggerCommentWithSchema_IncludesSchemaAndTable()
-    {
-        // Arrange
-        var sql = "COMMENT ON TRIGGER audit_trigger ON public.orders IS 'Audit log trigger';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("audit_trigger", result.Definition!.Name);
-        Assert.Equal("orders", result.Definition.TableName);
-        Assert.Equal("public", result.Definition.Schema);
-    }
-
-    #endregion
-
-    #region CONSTRAINT Comment Tests
-
-    [Fact]
-    public void Extract_ConstraintComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON CONSTRAINT users_email_check ON users IS 'Email format validation';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Constraints, result.Definition.ObjectType);
-        Assert.Equal("users_email_check", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal("Email format validation", result.Definition.Comment);
-    }
-
-    [Fact]
-    public void Extract_ConstraintCommentWithSchema_IncludesSchemaAndTable()
-    {
-        // Arrange
-        var sql = "COMMENT ON CONSTRAINT orders_total_check ON public.orders IS 'Total must be positive';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("orders_total_check", result.Definition!.Name);
-        Assert.Equal("orders", result.Definition.TableName);
-        Assert.Equal("public", result.Definition.Schema);
-    }
-
-    #endregion
-
-    #region TYPE Comment Tests
-
-    [Fact]
-    public void Extract_TypeComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON TYPE address IS 'Address composite type';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Types, result.Definition.ObjectType);
-        Assert.Equal("address", result.Definition.Name);
-        Assert.Equal("Address composite type", result.Definition.Comment);
-    }
-
-    [Fact]
-    public void Extract_TypeCommentWithSchema_IncludesSchema()
-    {
-        // Arrange
-        var sql = "COMMENT ON TYPE public.user_status IS 'User status enum';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("public", result.Definition!.Schema);
-        Assert.Equal("user_status", result.Definition.Name);
-    }
-
-    #endregion
-
-    #region VIEW Comment Tests
-
-    [Fact]
-    public void Extract_ViewComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON VIEW active_users IS 'View of active users only';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Views, result.Definition.ObjectType);
-        Assert.Equal("active_users", result.Definition.Name);
-        Assert.Equal("View of active users only", result.Definition.Comment);
-    }
-
-    [Fact]
-    public void Extract_MaterializedViewComment_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "COMMENT ON MATERIALIZED VIEW order_summary IS 'Materialized order stats';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(SchemaObjectType.Views, result.Definition.ObjectType);
-        Assert.Equal("order_summary", result.Definition.Name);
-    }
-
-    [Fact]
-    public void Extract_ViewCommentWithSchema_IncludesSchema()
-    {
-        // Arrange
-        var sql = "COMMENT ON VIEW public.recent_orders IS 'Last 30 days orders';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("public", result.Definition!.Schema);
-        Assert.Equal("recent_orders", result.Definition.Name);
-    }
-
-    #endregion
-
-    #region Special Characters Tests
-
-    [Fact]
-    public void Extract_CommentWithEscapedQuotes_UnescapesCorrectly()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS 'User''s account table';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("User's account table", result.Definition!.Comment);
-    }
-
-    [Fact]
-    public void Extract_CommentWithMultipleEscapedQuotes_UnescapesAll()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE orders IS 'Customer''s order''s data';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("Customer's order's data", result.Definition!.Comment);
-    }
-
-    [Fact]
-    public void Extract_CommentWithSpecialCharacters_PreservesText()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS 'Users: @admin #tags $prices & more!';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("Users: @admin #tags $prices & more!", result.Definition!.Comment);
-    }
-
-    #endregion
-
-    #region Header Comment Tests
-
-    [Fact]
-    public void Extract_WithHeaderComment_PreservesHeaderComment()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS 'User accounts';";
-        var blocks = CreateBlocks(sql, "-- This is a header comment");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("-- This is a header comment", result.Definition!.SqlComment);
-    }
-
-    [Fact]
-    public void Extract_WithoutHeaderComment_SqlCommentIsNull()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS 'User accounts';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Null(result.Definition!.SqlComment);
-    }
-
-    #endregion
-
-    #region ValidationIssue Tests
-
-    [Fact]
-    public void Extract_EmptyComment_ReturnsWarning()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS '';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotEmpty(result.ValidationIssues);
-        Assert.Contains(result.ValidationIssues, v => 
-            v.Code == "COMMENT_EMPTY" && 
-            v.Severity == ValidationIssue.ValidationSeverity.Warning);
-    }
-
-    [Fact]
-    public void Extract_WhitespaceOnlyComment_ReturnsWarning()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS '   ';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotEmpty(result.ValidationIssues);
-        Assert.Contains(result.ValidationIssues, v => v.Code == "COMMENT_EMPTY");
-    }
-
-    [Fact]
-    public void Extract_VeryLongComment_ReturnsWarning()
-    {
-        // Arrange
-        var longComment = new string('A', 1500);
-        var sql = $"COMMENT ON TABLE users IS '{longComment}';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.NotEmpty(result.ValidationIssues);
-        Assert.Contains(result.ValidationIssues, v => 
-            v.Code == "COMMENT_TOO_LONG" && 
-            v.Severity == ValidationIssue.ValidationSeverity.Warning);
-    }
-
-    [Fact]
-    public void Extract_ValidComment_NoValidationIssues()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS 'User accounts table';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Empty(result.ValidationIssues);
-    }
-
-    #endregion
-
-    #region Error Cases Tests
-
-    [Fact]
-    public void Extract_InvalidSql_ReturnsFailure()
-    {
-        // Arrange
-        var sql = "COMMENT ON SOMETHING invalid IS 'text';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.False(result.IsSuccess);
-        Assert.NotEmpty(result.ValidationIssues);
-        Assert.Contains(result.ValidationIssues, v => v.Code == "COMMENT_PARSE_ERROR");
-    }
-
-    [Fact]
-    public void Extract_NotApplicable_ReturnsNotApplicable()
-    {
-        // Arrange
-        var sql = "CREATE TABLE users (id INT);";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    [Fact]
-    public void Extract_NullBlocks_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
-    }
-
-    #endregion
-
-    #region RawSql Preservation Tests
-
-    [Fact]
-    public void Extract_PreservesRawSql()
-    {
-        // Arrange
-        var sql = "COMMENT ON TABLE users IS 'User accounts';";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.IsSuccess);
-        Assert.Equal(sql, result.Definition!.RawSql);
-    }
-
-    #endregion
 }

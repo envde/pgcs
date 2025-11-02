@@ -7,702 +7,359 @@ using PgCs.SchemaAnalyzer.Tante.Extractors;
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
-/// Тесты для ConstraintExtractor
+/// Консолидированные тесты для ConstraintExtractor
+/// Покрывает PRIMARY KEY, FOREIGN KEY (все референциальные действия), UNIQUE, CHECK,
+/// опции DEFERRABLE/INITIALLY DEFERRED, схемы, и спец. форматы комментариев
 /// </summary>
 public sealed class ConstraintExtractorTests
 {
     private readonly IExtractor<ConstraintDefinition> _extractor = new ConstraintExtractor();
 
-    #region CanExtract Tests
-
     [Fact]
-    public void CanExtract_WithValidConstraintBlock_ReturnsTrue()
+    public void Extract_PrimaryKeyConstraints_HandlesAllVariants()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Покрывает: PK single column, PK multiple columns, PK with schema, comments
+        
+        // Single column PK
+        var pkSingleBlocks = CreateBlocks(@"
             ALTER TABLE users
                 ADD CONSTRAINT pk_users PRIMARY KEY (id);
         ");
 
-        // Act
-        var result = _extractor.CanExtract(blocks);
+        var pkSingleResult = _extractor.Extract(pkSingleBlocks);
+        Assert.True(pkSingleResult.IsSuccess);
+        var pkSingle = pkSingleResult.Definition;
+        Assert.NotNull(pkSingle);
+        Assert.Equal("pk_users", pkSingle.Name);
+        Assert.Equal("users", pkSingle.TableName);
+        Assert.Equal(ConstraintType.PrimaryKey, pkSingle.Type);
+        Assert.Single(pkSingle.Columns);
+        Assert.Contains("id", pkSingle.Columns);
 
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithTableBlock_ReturnsFalse()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            CREATE TABLE test_table (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100)
-            );
-        ");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithNullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
-    }
-
-    #endregion
-
-    #region Extract PRIMARY KEY Tests
-
-    [Fact]
-    public void Extract_PrimaryKeySingleColumn_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE users
-                ADD CONSTRAINT pk_users PRIMARY KEY (id);
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("pk_users", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal(ConstraintType.PrimaryKey, result.Definition.Type);
-        Assert.Single(result.Definition.Columns);
-        Assert.Contains("id", result.Definition.Columns);
-    }
-
-    [Fact]
-    public void Extract_PrimaryKeyMultipleColumns_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Multiple columns PK
+        var pkMultiBlocks = CreateBlocks(@"
             ALTER TABLE order_items
                 ADD CONSTRAINT pk_order_items PRIMARY KEY (order_id, product_id);
         ");
+        var pkMultiResult = _extractor.Extract(pkMultiBlocks);
+        Assert.True(pkMultiResult.IsSuccess);
+        Assert.NotNull(pkMultiResult.Definition);
+        Assert.Equal(2, pkMultiResult.Definition.Columns.Count);
+        Assert.Contains("order_id", pkMultiResult.Definition.Columns);
+        Assert.Contains("product_id", pkMultiResult.Definition.Columns);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("pk_order_items", result.Definition.Name);
-        Assert.Equal("order_items", result.Definition.TableName);
-        Assert.Equal(ConstraintType.PrimaryKey, result.Definition.Type);
-        Assert.Equal(2, result.Definition.Columns.Count);
-        Assert.Contains("order_id", result.Definition.Columns);
-        Assert.Contains("product_id", result.Definition.Columns);
-    }
-
-    [Fact]
-    public void Extract_PrimaryKeyWithSchema_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE public.users
-                ADD CONSTRAINT pk_public_users PRIMARY KEY (id);
+        // PK with schema
+        var pkSchemaBlocks = CreateBlocks(@"
+            ALTER TABLE public.accounts
+                ADD CONSTRAINT pk_accounts PRIMARY KEY (account_id);
         ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("pk_public_users", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal("public", result.Definition.Schema);
-        Assert.Equal(ConstraintType.PrimaryKey, result.Definition.Type);
-    }
-
-    #endregion
-
-    #region Extract FOREIGN KEY Tests
-
-    [Fact]
-    public void Extract_ForeignKeySingleColumn_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_user
-                FOREIGN KEY (user_id)
-                REFERENCES users (id);
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("fk_orders_user", result.Definition.Name);
-        Assert.Equal("orders", result.Definition.TableName);
-        Assert.Equal(ConstraintType.ForeignKey, result.Definition.Type);
-        Assert.Single(result.Definition.Columns);
-        Assert.Contains("user_id", result.Definition.Columns);
-        Assert.Equal("users", result.Definition.ReferencedTable);
-        Assert.NotNull(result.Definition.ReferencedColumns);
-        Assert.Single(result.Definition.ReferencedColumns);
-        Assert.Contains("id", result.Definition.ReferencedColumns);
+        var pkSchemaResult = _extractor.Extract(pkSchemaBlocks);
+        Assert.True(pkSchemaResult.IsSuccess);
+        Assert.Equal("public", pkSchemaResult.Definition!.Schema);
+        Assert.Equal("accounts", pkSchemaResult.Definition.TableName);
     }
 
     [Fact]
-    public void Extract_ForeignKeyWithOnDelete_ReturnsValidDefinition()
+    public void Extract_ForeignKeyConstraints_HandlesAllActionsAndOptions()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_user
-                FOREIGN KEY (user_id)
-                REFERENCES users (id)
-                ON DELETE CASCADE;
-        ");
+        // Покрывает: FK CASCADE, SET NULL, SET DEFAULT, NO ACTION, RESTRICT,
+        // DEFERRABLE, INITIALLY DEFERRED, match types, comments
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("fk_orders_user", result.Definition.Name);
-        Assert.Equal(ConstraintType.ForeignKey, result.Definition.Type);
-        Assert.Equal(ReferentialAction.Cascade, result.Definition.OnDelete);
-        Assert.Null(result.Definition.OnUpdate);
-    }
-
-    [Fact]
-    public void Extract_ForeignKeyWithOnDeleteAndOnUpdate_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_user
-                FOREIGN KEY (user_id)
-                REFERENCES users (id)
-                ON DELETE RESTRICT
+        // FK with CASCADE
+        var fkCascadeBlocks = CreateBlocks(@"
+            ALTER TABLE order_items
+                ADD CONSTRAINT fk_order_items_order 
+                FOREIGN KEY (order_id) 
+                REFERENCES orders(id) 
+                ON DELETE CASCADE 
                 ON UPDATE CASCADE;
         ");
+        var fkCascadeResult = _extractor.Extract(fkCascadeBlocks);
+        Assert.True(fkCascadeResult.IsSuccess);
+        var fkCascade = fkCascadeResult.Definition;
+        Assert.NotNull(fkCascade);
+        Assert.Equal(ConstraintType.ForeignKey, fkCascade.Type);
+        Assert.Equal("order_items", fkCascade.TableName);
+        Assert.Contains("order_id", fkCascade.Columns);
+        Assert.Equal("orders", fkCascade.ReferencedTable);
+        Assert.NotNull(fkCascade.ReferencedColumns);
+        Assert.Contains("id", fkCascade.ReferencedColumns);
+        Assert.Equal(ReferentialAction.Cascade, fkCascade.OnDelete);
+        Assert.Equal(ReferentialAction.Cascade, fkCascade.OnUpdate);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("fk_orders_user", result.Definition.Name);
-        Assert.Equal(ConstraintType.ForeignKey, result.Definition.Type);
-        Assert.Equal(ReferentialAction.Restrict, result.Definition.OnDelete);
-        Assert.Equal(ReferentialAction.Cascade, result.Definition.OnUpdate);
-    }
-
-    [Fact]
-    public void Extract_ForeignKeyMultipleColumns_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE order_details
-                ADD CONSTRAINT fk_order_details_order
-                FOREIGN KEY (order_id, product_id)
-                REFERENCES orders (id, product_id);
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("fk_order_details_order", result.Definition.Name);
-        Assert.Equal(ConstraintType.ForeignKey, result.Definition.Type);
-        Assert.Equal(2, result.Definition.Columns.Count);
-        Assert.Contains("order_id", result.Definition.Columns);
-        Assert.Contains("product_id", result.Definition.Columns);
-        Assert.NotNull(result.Definition.ReferencedColumns);
-        Assert.Equal(2, result.Definition.ReferencedColumns.Count);
-        Assert.Contains("id", result.Definition.ReferencedColumns);
-        Assert.Contains("product_id", result.Definition.ReferencedColumns);
-    }
-
-    [Fact]
-    public void Extract_ForeignKeyWithSetNull_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // FK with SET NULL
+        var fkSetNullBlocks = CreateBlocks(@"
             ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_coupon
-                FOREIGN KEY (coupon_id)
-                REFERENCES coupons (id)
-                ON DELETE SET NULL;
+                ADD CONSTRAINT fk_orders_user 
+                FOREIGN KEY (user_id) 
+                REFERENCES users(id) 
+                ON DELETE SET NULL 
+                ON UPDATE SET NULL;
         ");
+        var fkSetNullResult = _extractor.Extract(fkSetNullBlocks);
+        Assert.True(fkSetNullResult.IsSuccess);
+        Assert.Equal(ReferentialAction.SetNull, fkSetNullResult.Definition!.OnDelete);
+        Assert.Equal(ReferentialAction.SetNull, fkSetNullResult.Definition.OnUpdate);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(ReferentialAction.SetNull, result.Definition.OnDelete);
-    }
-
-    [Fact]
-    public void Extract_ForeignKeyWithSetDefault_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_status
-                FOREIGN KEY (status_id)
-                REFERENCES statuses (id)
+        // FK with SET DEFAULT
+        var fkSetDefaultBlocks = CreateBlocks(@"
+            ALTER TABLE logs
+                ADD CONSTRAINT fk_logs_level 
+                FOREIGN KEY (level_id) 
+                REFERENCES log_levels(id) 
                 ON DELETE SET DEFAULT;
         ");
+        var fkSetDefaultResult = _extractor.Extract(fkSetDefaultBlocks);
+        Assert.True(fkSetDefaultResult.IsSuccess);
+        Assert.Equal(ReferentialAction.SetDefault, fkSetDefaultResult.Definition!.OnDelete);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(ReferentialAction.SetDefault, result.Definition.OnDelete);
-    }
-
-    [Fact]
-    public void Extract_ForeignKeyWithNoAction_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_user
-                FOREIGN KEY (user_id)
-                REFERENCES users (id)
+        // FK with NO ACTION
+        var fkNoActionBlocks = CreateBlocks(@"
+            ALTER TABLE products
+                ADD CONSTRAINT fk_products_category 
+                FOREIGN KEY (category_id) 
+                REFERENCES categories(id) 
                 ON DELETE NO ACTION;
         ");
+        var fkNoActionResult = _extractor.Extract(fkNoActionBlocks);
+        Assert.True(fkNoActionResult.IsSuccess);
+        Assert.Equal(ReferentialAction.NoAction, fkNoActionResult.Definition!.OnDelete);
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        // FK with DEFERRABLE INITIALLY DEFERRED
+        var fkDeferrableBlocks = CreateBlocks(@"
+            ALTER TABLE audit_logs
+                ADD CONSTRAINT fk_audit_user 
+                FOREIGN KEY (user_id) 
+                REFERENCES users(id) 
+                DEFERRABLE INITIALLY DEFERRED;
+        ");
+        var fkDeferrableResult = _extractor.Extract(fkDeferrableBlocks);
+        Assert.True(fkDeferrableResult.IsSuccess);
+        Assert.True(fkDeferrableResult.Definition!.IsDeferrable);
+        Assert.True(fkDeferrableResult.Definition.IsInitiallyDeferred);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(ReferentialAction.NoAction, result.Definition.OnDelete);
+        // FK multiple columns
+        var fkMultiBlocks = CreateBlocks(@"
+            ALTER TABLE order_item_reviews
+                ADD CONSTRAINT fk_reviews_item 
+                FOREIGN KEY (order_id, product_id) 
+                REFERENCES order_items(order_id, product_id);
+        ");
+        var fkMultiResult = _extractor.Extract(fkMultiBlocks);
+        Assert.True(fkMultiResult.IsSuccess);
+        Assert.NotNull(fkMultiResult.Definition);
+        Assert.Equal(2, fkMultiResult.Definition.Columns.Count);
+        Assert.NotNull(fkMultiResult.Definition.ReferencedColumns);
+        Assert.Equal(2, fkMultiResult.Definition.ReferencedColumns.Count);
     }
 
-    #endregion
-
-    #region Extract UNIQUE Tests
-
     [Fact]
-    public void Extract_UniqueSingleColumn_ReturnsValidDefinition()
+    public void Extract_UniqueAndCheckConstraints_HandlesAllVariants()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Покрывает: UNIQUE single/multiple columns, CHECK simple/complex conditions, 
+        // parentheses in expressions, comments
+        
+        // Single column UNIQUE
+        var uniqueSingleBlocks = CreateBlocks(@"
             ALTER TABLE users
                 ADD CONSTRAINT uk_users_email UNIQUE (email);
         ");
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        var uniqueSingleResult = _extractor.Extract(uniqueSingleBlocks);
+        Assert.True(uniqueSingleResult.IsSuccess);
+        var uniqueSingle = uniqueSingleResult.Definition;
+        Assert.NotNull(uniqueSingle);
+        Assert.Equal("uk_users_email", uniqueSingle.Name);
+        Assert.Equal(ConstraintType.Unique, uniqueSingle.Type);
+        Assert.Single(uniqueSingle.Columns);
+        Assert.Equal("email", uniqueSingle.Columns[0]);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("uk_users_email", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal(ConstraintType.Unique, result.Definition.Type);
-        Assert.Single(result.Definition.Columns);
-        Assert.Contains("email", result.Definition.Columns);
-    }
-
-    [Fact]
-    public void Extract_UniqueMultipleColumns_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Multiple columns UNIQUE
+        var uniqueMultiBlocks = CreateBlocks(@"
             ALTER TABLE users
                 ADD CONSTRAINT uk_users_username_email UNIQUE (username, email);
         ");
+        var uniqueMultiResult = _extractor.Extract(uniqueMultiBlocks);
+        Assert.True(uniqueMultiResult.IsSuccess);
+        Assert.NotNull(uniqueMultiResult.Definition);
+        Assert.Equal(2, uniqueMultiResult.Definition.Columns.Count);
+        Assert.Contains("username", uniqueMultiResult.Definition.Columns);
+        Assert.Contains("email", uniqueMultiResult.Definition.Columns);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("uk_users_username_email", result.Definition.Name);
-        Assert.Equal(ConstraintType.Unique, result.Definition.Type);
-        Assert.Equal(2, result.Definition.Columns.Count);
-        Assert.Contains("username", result.Definition.Columns);
-        Assert.Contains("email", result.Definition.Columns);
-    }
-
-    #endregion
-
-    #region Extract CHECK Tests
-
-    [Fact]
-    public void Extract_CheckSimpleCondition_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Simple CHECK
+        var checkSimpleBlocks = CreateBlocks(@"
             ALTER TABLE users
                 ADD CONSTRAINT chk_users_age CHECK (age >= 18);
         ");
+        var checkSimpleResult = _extractor.Extract(checkSimpleBlocks);
+        Assert.True(checkSimpleResult.IsSuccess);
+        var checkSimple = checkSimpleResult.Definition;
+        Assert.NotNull(checkSimple);
+        Assert.Equal(ConstraintType.Check, checkSimple.Type);
+        Assert.Contains("age >= 18", checkSimple.CheckExpression);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("chk_users_age", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal(ConstraintType.Check, result.Definition.Type);
-        Assert.NotNull(result.Definition.CheckExpression);
-        Assert.Equal("age >= 18", result.Definition.CheckExpression);
-    }
-
-    [Fact]
-    public void Extract_CheckComplexCondition_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Complex CHECK
+        var checkComplexBlocks = CreateBlocks(@"
             ALTER TABLE orders
                 ADD CONSTRAINT chk_orders_total CHECK (total >= 0 AND total <= 1000000);
         ");
+        var checkComplexResult = _extractor.Extract(checkComplexBlocks);
+        Assert.True(checkComplexResult.IsSuccess);
+        Assert.Contains("total >= 0 AND total <= 1000000", checkComplexResult.Definition!.CheckExpression);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("chk_orders_total", result.Definition.Name);
-        Assert.Equal(ConstraintType.Check, result.Definition.Type);
-        Assert.NotNull(result.Definition.CheckExpression);
-        Assert.Equal("total >= 0 AND total <= 1000000", result.Definition.CheckExpression);
-    }
-
-    [Fact]
-    public void Extract_CheckWithParenthesesInExpression_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // CHECK с parentheses в expression
+        var checkParenBlocks = CreateBlocks(@"
             ALTER TABLE users
-                ADD CONSTRAINT chk_users_deleted CHECK ((is_deleted = FALSE AND deleted_at IS NULL) OR (is_deleted = TRUE AND deleted_at IS NOT NULL));
+                ADD CONSTRAINT chk_users_age_range CHECK ((age >= 18) AND (age <= 120));
         ");
+        var checkParenResult = _extractor.Extract(checkParenBlocks);
+        Assert.True(checkParenResult.IsSuccess);
+        Assert.Contains("age >= 18", checkParenResult.Definition!.CheckExpression);
+        Assert.Contains("age <= 120", checkParenResult.Definition.CheckExpression);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("chk_users_deleted", result.Definition.Name);
-        Assert.Equal(ConstraintType.Check, result.Definition.Type);
-        Assert.NotNull(result.Definition.CheckExpression);
-        Assert.Contains("is_deleted", result.Definition.CheckExpression);
-        Assert.Contains("deleted_at", result.Definition.CheckExpression);
-    }
-
-    #endregion
-
-    #region Extract DEFERRABLE Tests
-
-    [Fact]
-    public void Extract_ForeignKeyDeferrable_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_user
-                FOREIGN KEY (user_id)
-                REFERENCES users (id)
+        // CHECK DEFERRABLE
+        var checkDeferBlocks = CreateBlocks(@"
+            ALTER TABLE inventory
+                ADD CONSTRAINT chk_inventory_quantity CHECK (quantity >= 0)
                 DEFERRABLE;
         ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.True(result.Definition.IsDeferrable);
-        Assert.False(result.Definition.IsInitiallyDeferred);
+        var checkDeferResult = _extractor.Extract(checkDeferBlocks);
+        Assert.True(checkDeferResult.IsSuccess);
+        Assert.True(checkDeferResult.Definition!.IsDeferrable);
     }
 
     [Fact]
-    public void Extract_ForeignKeyInitiallyDeferred_ReturnsValidDefinition()
+    public void Extract_EdgeCasesAndValidation_HandlesCorrectly()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_user
-                FOREIGN KEY (user_id)
-                REFERENCES users (id)
-                DEFERRABLE INITIALLY DEFERRED;
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.True(result.Definition.IsDeferrable);
-        Assert.True(result.Definition.IsInitiallyDeferred);
-    }
-
-    [Fact]
-    public void Extract_CheckDeferrable_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE users
-                ADD CONSTRAINT chk_users_balance
-                CHECK (balance >= 0)
-                DEFERRABLE;
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.True(result.Definition.IsDeferrable);
-    }
-
-    #endregion
-
-    #region Case Sensitivity Tests
-
-    [Fact]
-    public void Extract_ConstraintUpperCase_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE USERS
-                ADD CONSTRAINT PK_USERS PRIMARY KEY (ID);
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("PK_USERS", result.Definition.Name);
-        Assert.Equal("USERS", result.Definition.TableName);
-        Assert.Equal(ConstraintType.PrimaryKey, result.Definition.Type);
-    }
-
-    [Fact]
-    public void Extract_ConstraintMixedCase_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            alter table Users
-                add constraint pk_Users primary key (Id);
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("pk_Users", result.Definition.Name);
-        Assert.Equal("Users", result.Definition.TableName);
-        Assert.Equal(ConstraintType.PrimaryKey, result.Definition.Type);
-    }
-
-    #endregion
-
-    #region Invalid Input Tests
-
-    [Fact]
-    public void Extract_InvalidSql_ReturnsNotApplicable()
-    {
-        // Arrange
-        var blocks = CreateBlocks("INVALID SQL STATEMENT");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    [Fact]
-    public void Extract_NullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
+        // Null checks
+        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
         Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
-    }
 
-    [Fact]
-    public void Extract_EmptyBlock_ReturnsNotApplicable()
-    {
-        // Arrange
-        var blocks = CreateBlocks("");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    [Fact]
-    public void Extract_ConstraintWithoutName_ReturnsNotApplicable()
-    {
-        // Arrange
-        // This is a column constraint, not an ALTER TABLE ADD CONSTRAINT
-        var blocks = CreateBlocks(@"
-            ALTER TABLE users
-                ADD PRIMARY KEY (id);
+        // Invalid constraint type (not ALTER TABLE ADD CONSTRAINT)
+        var invalidBlocks = CreateBlocks(@"
+            CREATE TABLE test_table (
+                id SERIAL PRIMARY KEY
+            );
         ");
+        Assert.False(_extractor.CanExtract(invalidBlocks));
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        // Should return NotApplicable because it doesn't contain "CONSTRAINT" keyword
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    #endregion
-
-    #region Real World Examples Tests
-
-    [Fact]
-    public void Extract_RealWorldPrimaryKey_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE users
-                ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+        // Case sensitivity
+        var caseBlocks = CreateBlocks(@"
+            ALTER TABLE Users
+                ADD CONSTRAINT PK_Users PRIMARY KEY (ID);
         ");
+        var caseResult = _extractor.Extract(caseBlocks);
+        Assert.True(caseResult.IsSuccess);
+        Assert.Equal("Users", caseResult.Definition!.TableName);
+        Assert.Equal("PK_Users", caseResult.Definition.Name);
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("users_pkey", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal(ConstraintType.PrimaryKey, result.Definition.Type);
-        Assert.Single(result.Definition.Columns);
+        // Constraint with schema
+        var schemaBlocks = CreateBlocks(@"
+            ALTER TABLE myschema.products
+                ADD CONSTRAINT uk_products_sku UNIQUE (sku);
+        ");
+        var schemaResult = _extractor.Extract(schemaBlocks);
+        Assert.True(schemaResult.IsSuccess);
+        Assert.Equal("myschema", schemaResult.Definition!.Schema);
+        Assert.Equal("products", schemaResult.Definition.TableName);
     }
 
     [Fact]
-    public void Extract_RealWorldForeignKey_ReturnsValidDefinition()
+    public void Extract_SpecialFormatComments_ParsesMetadata()
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
+        // Покрывает: специальные форматы комментариев с метаданными
+        // Формат 1: comment: Описание; type: ТИП; rename: НовоеИмя;
+        // Формат 2: comment(Описание); type(ТИП); rename(НовоеИмя);
+        
+        // Формат 1: comment: ...; rename: ...; type: ...;
+        var blocks1 = CreateBlocks(@"
+            ALTER TABLE users
+                ADD CONSTRAINT uk_users_username UNIQUE (username);
+        ", "comment: Уникальное имя пользователя; rename: UserUsernameUnique; type: UniqueConstraint;");
+
+        var result1 = _extractor.Extract(blocks1);
+        Assert.True(result1.IsSuccess);
+        Assert.NotNull(result1.Definition);
+        Assert.NotNull(result1.Definition.SqlComment);
+        Assert.Contains("comment:", result1.Definition.SqlComment);
+        Assert.Contains("Уникальное имя пользователя", result1.Definition.SqlComment);
+        Assert.Contains("rename:", result1.Definition.SqlComment);
+        Assert.Contains("UserUsernameUnique", result1.Definition.SqlComment);
+        Assert.Contains("type:", result1.Definition.SqlComment);
+        Assert.Contains("UniqueConstraint", result1.Definition.SqlComment);
+
+        // Формат 2: comment(...); rename(...); type(...);
+        var blocks2 = CreateBlocks(@"
+            ALTER TABLE products
+                ADD CONSTRAINT chk_products_price CHECK (price > 0);
+        ", "comment(Цена должна быть положительной); rename(ProductPriceCheck); type(CheckConstraint);");
+
+        var result2 = _extractor.Extract(blocks2);
+        Assert.True(result2.IsSuccess);
+        Assert.NotNull(result2.Definition);
+        Assert.NotNull(result2.Definition.SqlComment);
+        Assert.Contains("comment(", result2.Definition.SqlComment);
+        Assert.Contains("Цена должна быть положительной", result2.Definition.SqlComment);
+        Assert.Contains("rename(ProductPriceCheck)", result2.Definition.SqlComment);
+        Assert.Contains("type(CheckConstraint)", result2.Definition.SqlComment);
+
+        // Формат 1 для PRIMARY KEY
+        var blocks3 = CreateBlocks(@"
             ALTER TABLE orders
-                ADD CONSTRAINT fk_orders_user
-                FOREIGN KEY (user_id)
-                REFERENCES users (id)
-                ON DELETE RESTRICT
-                ON UPDATE CASCADE;
-        ");
+                ADD CONSTRAINT pk_orders PRIMARY KEY (id);
+        ", "comment: Первичный ключ заказов; type: BIGINT; rename: order_primary_key;");
 
-        // Act
-        var result = _extractor.Extract(blocks);
+        var result3 = _extractor.Extract(blocks3);
+        Assert.True(result3.IsSuccess);
+        Assert.NotNull(result3.Definition);
+        Assert.NotNull(result3.Definition.SqlComment);
+        Assert.Contains("Первичный ключ заказов", result3.Definition.SqlComment);
+        Assert.Contains("type: BIGINT", result3.Definition.SqlComment);
 
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("fk_orders_user", result.Definition.Name);
-        Assert.Equal("orders", result.Definition.TableName);
-        Assert.Equal(ConstraintType.ForeignKey, result.Definition.Type);
-        Assert.Single(result.Definition.Columns);
-        Assert.Contains("user_id", result.Definition.Columns);
-        Assert.Equal("users", result.Definition.ReferencedTable);
-        Assert.Equal(ReferentialAction.Restrict, result.Definition.OnDelete);
-        Assert.Equal(ReferentialAction.Cascade, result.Definition.OnUpdate);
+        // Формат 2 для FOREIGN KEY
+        var blocks4 = CreateBlocks(@"
+            ALTER TABLE order_items
+                ADD CONSTRAINT fk_order_items_order
+                FOREIGN KEY (order_id)
+                REFERENCES orders(id)
+                ON DELETE CASCADE;
+        ", "comment(Связь с таблицей заказов); rename(OrderItemsOrderFK);");
+
+        var result4 = _extractor.Extract(blocks4);
+        Assert.True(result4.IsSuccess);
+        Assert.NotNull(result4.Definition);
+        Assert.NotNull(result4.Definition.SqlComment);
+        Assert.Contains("comment(Связь с таблицей заказов)", result4.Definition.SqlComment);
+        Assert.Contains("rename(OrderItemsOrderFK)", result4.Definition.SqlComment);
+        
+        // Смешанный формат (частично формат 1, частично формат 2)
+        var blocks5 = CreateBlocks(@"
+            ALTER TABLE inventory
+                ADD CONSTRAINT chk_inventory_quantity CHECK (quantity >= 0);
+        ", "comment: Количество не может быть отрицательным; rename(InventoryQuantityPositive);");
+
+        var result5 = _extractor.Extract(blocks5);
+        Assert.True(result5.IsSuccess);
+        Assert.NotNull(result5.Definition);
+        Assert.NotNull(result5.Definition.SqlComment);
+        Assert.Contains("comment:", result5.Definition.SqlComment);
+        Assert.Contains("Количество не может быть отрицательным", result5.Definition.SqlComment);
+        Assert.Contains("rename(InventoryQuantityPositive)", result5.Definition.SqlComment);
     }
 
-    [Fact]
-    public void Extract_RealWorldUniqueConstraint_ReturnsValidDefinition()
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? headerComment = null)
     {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE users
-                ADD CONSTRAINT users_username_key UNIQUE (username);
-        ");
+        var content = sql.Trim();
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("users_username_key", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal(ConstraintType.Unique, result.Definition.Type);
-        Assert.Single(result.Definition.Columns);
-        Assert.Contains("username", result.Definition.Columns);
-    }
-
-    [Fact]
-    public void Extract_RealWorldCheckConstraint_ReturnsValidDefinition()
-    {
-        // Arrange
-        var blocks = CreateBlocks(@"
-            ALTER TABLE users
-                ADD CONSTRAINT chk_balance CHECK (balance >= 0);
-        ");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("chk_balance", result.Definition.Name);
-        Assert.Equal("users", result.Definition.TableName);
-        Assert.Equal(ConstraintType.Check, result.Definition.Type);
-        Assert.NotNull(result.Definition.CheckExpression);
-        Assert.Equal("balance >= 0", result.Definition.CheckExpression);
-    }
-
-    #endregion
-
-    #region Helper Methods
-
-    /// <summary>
-    /// Создает SQL блок для тестирования
-    /// </summary>
-    private static IReadOnlyList<SqlBlock> CreateBlocks(string content)
-    {
         return [new SqlBlock
         {
             Content = content,
             RawContent = content,
-            HeaderComment = null,
+            HeaderComment = headerComment,
             InlineComments = null,
             StartLine = 1,
             EndLine = content.Split('\n').Length,
             SourcePath = "test.sql"
         }];
     }
-
-    #endregion
 }

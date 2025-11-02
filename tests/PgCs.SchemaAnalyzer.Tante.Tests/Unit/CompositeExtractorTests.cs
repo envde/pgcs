@@ -6,384 +6,243 @@ using PgCs.SchemaAnalyzer.Tante.Extractors;
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
-/// Тесты для CompositeExtractor
+/// Консолидированные тесты для CompositeExtractor
+/// Покрывает composite типы с различными атрибутами, типы данных (VARCHAR, NUMERIC, TIMESTAMP, массивы), специальные форматы комментариев
 /// </summary>
 public sealed class CompositeExtractorTests
 {
     private readonly IExtractor<CompositeTypeDefinition> _extractor = new CompositeExtractor();
 
-    #region CanExtract Tests
-
     [Fact]
-    public void CanExtract_WithValidCompositeBlock_ReturnsTrue()
+    public void Extract_BasicComposites_HandlesAllVariants()
     {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));");
+        // Покрывает: simple composite, schema, multiline format, single attribute, mixed data types
 
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithEnumBlock_ReturnsFalse()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive');");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithTableBlock_ReturnsFalse()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
-
-        // Act
-        var result = _extractor.CanExtract(blocks);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void CanExtract_WithNullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
-    }
-
-    #endregion
-
-    #region Extract Simple Composite Tests
-
-    [Fact]
-    public void Extract_SimpleComposite_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100), zip_code VARCHAR(20));";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("address", result.Definition.Name);
-        Assert.Null(result.Definition.Schema);
-        Assert.Equal(3, result.Definition.Attributes.Count);
-        Assert.Equal("street", result.Definition.Attributes[0].Name);
-        Assert.Equal("VARCHAR", result.Definition.Attributes[0].DataType);
-        Assert.Equal(255, result.Definition.Attributes[0].MaxLength);
-    }
-
-    [Fact]
-    public void Extract_CompositeWithSchema_ReturnsDefinitionWithSchema()
-    {
-        // Arrange
-        var sql = "CREATE TYPE public.contact_info AS (phone VARCHAR(20), email VARCHAR(255));";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("contact_info", result.Definition.Name);
-        Assert.Equal("public", result.Definition.Schema);
-        Assert.Equal(2, result.Definition.Attributes.Count);
-    }
-
-    [Fact]
-    public void Extract_CompositeWithMultilineFormat_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = @"CREATE TYPE address AS (
+        // Simple composite with multiple attributes
+        var simpleBlock = CreateBlocks("CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100), zip_code VARCHAR(20));");
+        var simpleResult = _extractor.Extract(simpleBlock);
+        
+        Assert.True(simpleResult.IsSuccess);
+        Assert.NotNull(simpleResult.Definition);
+        Assert.Equal("address", simpleResult.Definition.Name);
+        Assert.Null(simpleResult.Definition.Schema);
+        Assert.Equal(3, simpleResult.Definition.Attributes.Count);
+        Assert.Equal("street", simpleResult.Definition.Attributes[0].Name);
+        Assert.Equal("VARCHAR", simpleResult.Definition.Attributes[0].DataType);
+        Assert.Equal(255, simpleResult.Definition.Attributes[0].MaxLength);
+        Assert.Equal("city", simpleResult.Definition.Attributes[1].Name);
+        Assert.Equal(100, simpleResult.Definition.Attributes[1].MaxLength);
+        
+        // Composite with schema
+        var schemaBlock = CreateBlocks("CREATE TYPE public.contact_info AS (phone VARCHAR(20), email VARCHAR(255));");
+        var schemaResult = _extractor.Extract(schemaBlock);
+        
+        Assert.True(schemaResult.IsSuccess);
+        Assert.Equal("contact_info", schemaResult.Definition!.Name);
+        Assert.Equal("public", schemaResult.Definition.Schema);
+        Assert.Equal(2, schemaResult.Definition.Attributes.Count);
+        
+        // Multiline format
+        var multilineBlock = CreateBlocks(@"CREATE TYPE address AS (
     street VARCHAR(255),
     city VARCHAR(100),
     state VARCHAR(50),
     zip_code VARCHAR(20),
     country VARCHAR(50)
-);";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("address", result.Definition.Name);
-        Assert.Equal(5, result.Definition.Attributes.Count);
-        Assert.Equal("street", result.Definition.Attributes[0].Name);
-        Assert.Equal("country", result.Definition.Attributes[4].Name);
+);");
+        var multilineResult = _extractor.Extract(multilineBlock);
+        
+        Assert.True(multilineResult.IsSuccess);
+        Assert.Equal("address", multilineResult.Definition!.Name);
+        Assert.Equal(5, multilineResult.Definition.Attributes.Count);
+        Assert.Equal("street", multilineResult.Definition.Attributes[0].Name);
+        Assert.Equal("country", multilineResult.Definition.Attributes[4].Name);
+        
+        // Single attribute
+        var singleBlock = CreateBlocks("CREATE TYPE simple_type AS (value INTEGER);");
+        var singleResult = _extractor.Extract(singleBlock);
+        
+        Assert.True(singleResult.IsSuccess);
+        Assert.Single(singleResult.Definition!.Attributes);
+        Assert.Equal("value", singleResult.Definition.Attributes[0].Name);
+        Assert.Equal("INTEGER", singleResult.Definition.Attributes[0].DataType);
+        
+        // Mixed data types
+        var mixedBlock = CreateBlocks("CREATE TYPE user_data AS (id INTEGER, name TEXT, created_at TIMESTAMP, is_active BOOLEAN);");
+        var mixedResult = _extractor.Extract(mixedBlock);
+        
+        Assert.True(mixedResult.IsSuccess);
+        Assert.Equal(4, mixedResult.Definition!.Attributes.Count);
+        Assert.Equal("INTEGER", mixedResult.Definition.Attributes[0].DataType);
+        Assert.Equal("TEXT", mixedResult.Definition.Attributes[1].DataType);
+        Assert.Equal("TIMESTAMP", mixedResult.Definition.Attributes[2].DataType);
+        Assert.Equal("BOOLEAN", mixedResult.Definition.Attributes[3].DataType);
+        
+        // CanExtract validation
+        Assert.True(_extractor.CanExtract(simpleBlock));
+        Assert.False(_extractor.CanExtract(CreateBlocks("CREATE TYPE status AS ENUM ('active', 'inactive');")));
+        Assert.False(_extractor.CanExtract(CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);")));
     }
 
-    #endregion
-
-    #region Extract with Different Data Types Tests
-
     [Fact]
-    public void Extract_CompositeWithNumericTypes_ExtractsCorrectly()
+    public void Extract_ComplexDataTypes_HandlesCorrectly()
     {
-        // Arrange
-        var sql = "CREATE TYPE product_price AS (amount NUMERIC(12, 2), currency VARCHAR(3));";
-        var blocks = CreateBlocks(sql);
+        // Покрывает: NUMERIC with precision/scale, array types, real-world examples
 
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(2, result.Definition.Attributes.Count);
+        // Numeric with precision and scale
+        var numericBlock = CreateBlocks("CREATE TYPE product_price AS (amount NUMERIC(12, 2), currency VARCHAR(3));");
+        var numericResult = _extractor.Extract(numericBlock);
         
-        var amountAttr = result.Definition.Attributes[0];
+        Assert.True(numericResult.IsSuccess);
+        Assert.Equal(2, numericResult.Definition!.Attributes.Count);
+        
+        var amountAttr = numericResult.Definition.Attributes[0];
         Assert.Equal("amount", amountAttr.Name);
         Assert.Equal("NUMERIC", amountAttr.DataType);
         Assert.Equal(12, amountAttr.NumericPrecision);
         Assert.Equal(2, amountAttr.NumericScale);
-    }
-
-    [Fact]
-    public void Extract_CompositeWithArrayTypes_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = "CREATE TYPE tags_info AS (tag_names VARCHAR(50)[], tag_counts INTEGER[]);";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(2, result.Definition.Attributes.Count);
         
-        var tagNamesAttr = result.Definition.Attributes[0];
+        var currencyAttr = numericResult.Definition.Attributes[1];
+        Assert.Equal("currency", currencyAttr.Name);
+        Assert.Equal("VARCHAR", currencyAttr.DataType);
+        Assert.Equal(3, currencyAttr.MaxLength);
+        
+        // Array types
+        var arrayBlock = CreateBlocks("CREATE TYPE tags_info AS (tag_names VARCHAR(50)[], tag_counts INTEGER[]);");
+        var arrayResult = _extractor.Extract(arrayBlock);
+        
+        Assert.True(arrayResult.IsSuccess);
+        Assert.Equal(2, arrayResult.Definition!.Attributes.Count);
+        
+        var tagNamesAttr = arrayResult.Definition.Attributes[0];
         Assert.Equal("tag_names", tagNamesAttr.Name);
         Assert.Equal("VARCHAR", tagNamesAttr.DataType);
+        Assert.Equal(50, tagNamesAttr.MaxLength);
         Assert.True(tagNamesAttr.IsArray);
         
-        var tagCountsAttr = result.Definition.Attributes[1];
+        var tagCountsAttr = arrayResult.Definition.Attributes[1];
         Assert.Equal("tag_counts", tagCountsAttr.Name);
         Assert.Equal("INTEGER", tagCountsAttr.DataType);
         Assert.True(tagCountsAttr.IsArray);
-    }
-
-    [Fact]
-    public void Extract_CompositeWithMixedTypes_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = "CREATE TYPE user_data AS (id INTEGER, name TEXT, created_at TIMESTAMP, is_active BOOLEAN);";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(4, result.Definition.Attributes.Count);
-        Assert.Equal("INTEGER", result.Definition.Attributes[0].DataType);
-        Assert.Equal("TEXT", result.Definition.Attributes[1].DataType);
-        Assert.Equal("TIMESTAMP", result.Definition.Attributes[2].DataType);
-        Assert.Equal("BOOLEAN", result.Definition.Attributes[3].DataType);
-    }
-
-    #endregion
-
-    #region Extract with Comments Tests
-
-    [Fact]
-    public void Extract_CompositeWithHeaderComment_PreservesComment()
-    {
-        // Arrange
-        var sql = "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));";
-        var blocks = (IReadOnlyList<SqlBlock>)[new SqlBlock
-        {
-            Content = sql,
-            RawContent = sql,
-            HeaderComment = "Address type for user locations",
-            StartLine = 1,
-            EndLine = 1
-        }];
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("Address type for user locations", result.Definition.SqlComment);
-    }
-
-    [Fact]
-    public void Extract_CompositeBlock_PreservesRawSql()
-    {
-        // Arrange
-        var sql = "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));";
-        var rawSql = "-- Address type\nCREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));";
-        var blocks = (IReadOnlyList<SqlBlock>)[new SqlBlock
-        {
-            Content = sql,
-            RawContent = rawSql,
-            StartLine = 1,
-            EndLine = 2
-        }];
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal(rawSql, result.Definition.RawSql);
-    }
-
-    #endregion
-
-    #region Edge Cases Tests
-
-    [Fact]
-    public void Extract_CompositeWithEmptyAttributes_ReturnsFailure()
-    {
-        // Arrange
-        var sql = "CREATE TYPE empty_type AS ();";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-        Assert.NotEmpty(result.ValidationIssues);
-        Assert.Contains(result.ValidationIssues, i => i.Code == "COMPOSITE_EMPTY_ATTRIBUTES");
-    }
-
-    [Fact]
-    public void Extract_CompositeWithSingleAttribute_ReturnsValidDefinition()
-    {
-        // Arrange
-        var sql = "CREATE TYPE simple_type AS (value INTEGER);";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Single(result.Definition.Attributes);
-        Assert.Equal("value", result.Definition.Attributes[0].Name);
-    }
-
-    #endregion
-
-    #region Invalid Input Tests
-
-    [Fact]
-    public void Extract_WithNullBlock_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
-    }
-
-    [Fact]
-    public void Extract_NonCompositeBlock_ReturnsNotApplicable()
-    {
-        // Arrange
-        var blocks = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.False(result.IsSuccess);
-        Assert.Null(result.Definition);
-    }
-
-    #endregion
-
-    #region Real World Examples Tests
-
-    [Fact]
-    public void Extract_AddressTypeFromSchema_ExtractsCorrectly()
-    {
-        // Arrange - Пример из реального Schema.sql
-        var sql = @"CREATE TYPE address AS (
+        
+        // Real-world: Address type
+        var addressBlock = CreateBlocks(@"CREATE TYPE address AS (
     street VARCHAR(255),
     city VARCHAR(100),
     state VARCHAR(50),
     zip_code VARCHAR(20),
     country VARCHAR(50)
-);";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("address", result.Definition.Name);
-        Assert.Equal(5, result.Definition.Attributes.Count);
+);");
+        var addressResult = _extractor.Extract(addressBlock);
         
-        Assert.Equal("street", result.Definition.Attributes[0].Name);
-        Assert.Equal("VARCHAR", result.Definition.Attributes[0].DataType);
-        Assert.Equal(255, result.Definition.Attributes[0].MaxLength);
+        Assert.True(addressResult.IsSuccess);
+        Assert.Equal("address", addressResult.Definition!.Name);
+        Assert.Equal(5, addressResult.Definition.Attributes.Count);
+        Assert.Equal("street", addressResult.Definition.Attributes[0].Name);
+        Assert.Equal(255, addressResult.Definition.Attributes[0].MaxLength);
+        Assert.Equal("zip_code", addressResult.Definition.Attributes[3].Name);
         
-        Assert.Equal("zip_code", result.Definition.Attributes[3].Name);
-    }
-
-    [Fact]
-    public void Extract_ContactInfoTypeFromSchema_ExtractsCorrectly()
-    {
-        // Arrange
-        var sql = @"CREATE TYPE contact_info AS (
+        // Real-world: Contact info
+        var contactBlock = CreateBlocks(@"CREATE TYPE contact_info AS (
     phone VARCHAR(20),
     email VARCHAR(255),
     telegram VARCHAR(50),
     preferred_method VARCHAR(20)
-);";
-        var blocks = CreateBlocks(sql);
-
-        // Act
-        var result = _extractor.Extract(blocks);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Definition);
-        Assert.Equal("contact_info", result.Definition.Name);
-        Assert.Equal(4, result.Definition.Attributes.Count);
-        Assert.Contains(result.Definition.Attributes, a => a.Name == "phone");
-        Assert.Contains(result.Definition.Attributes, a => a.Name == "telegram");
+);");
+        var contactResult = _extractor.Extract(contactBlock);
+        
+        Assert.True(contactResult.IsSuccess);
+        Assert.Equal("contact_info", contactResult.Definition!.Name);
+        Assert.Equal(4, contactResult.Definition.Attributes.Count);
+        Assert.Contains(contactResult.Definition.Attributes, a => a.Name == "phone");
+        Assert.Contains(contactResult.Definition.Attributes, a => a.Name == "telegram");
     }
 
-    #endregion
+    [Fact]
+    public void Extract_SpecialFormatCommentsAndEdgeCases_HandlesCorrectly()
+    {
+        // Покрывает: comment: формат, comment() формат, regular comments, empty attributes, invalid syntax
+        
+        // Format 1: comment: Text; rename: NewName; type: TYPE;
+        var blocks1 = CreateBlocks(
+            "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100), zip_code VARCHAR(20));",
+            "comment: Адрес пользователя; rename: UserAddress; type: ADDRESS;");
+        var result1 = _extractor.Extract(blocks1);
+        
+        Assert.True(result1.IsSuccess);
+        Assert.NotNull(result1.Definition);
+        Assert.NotNull(result1.Definition.SqlComment);
+        Assert.Contains("comment:", result1.Definition.SqlComment);
+        Assert.Contains("Адрес пользователя", result1.Definition.SqlComment);
+        Assert.Contains("rename:", result1.Definition.SqlComment);
+        
+        // Format 2: comment(Text); rename(NewName); type(TYPE);
+        var blocks2 = CreateBlocks(
+            "CREATE TYPE product_price AS (amount NUMERIC(12, 2), currency VARCHAR(3));",
+            "comment(Цена продукта с валютой); rename(ProductPrice); type(PRICE);");
+        var result2 = _extractor.Extract(blocks2);
+        
+        Assert.True(result2.IsSuccess);
+        Assert.NotNull(result2.Definition);
+        Assert.NotNull(result2.Definition.SqlComment);
+        Assert.Contains("comment(", result2.Definition.SqlComment);
+        Assert.Contains("Цена продукта", result2.Definition.SqlComment);
+        Assert.Contains("rename(", result2.Definition.SqlComment);
+        
+        // Regular header comment
+        var blocks3 = CreateBlocks(
+            "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));",
+            "Address type for user locations");
+        var result3 = _extractor.Extract(blocks3);
+        
+        Assert.True(result3.IsSuccess);
+        Assert.Equal("Address type for user locations", result3.Definition!.SqlComment);
+        
+        // Raw SQL preservation
+        var rawSql = "-- Address type\nCREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));";
+        var block4 = new SqlBlock
+        {
+            Content = "CREATE TYPE address AS (street VARCHAR(255), city VARCHAR(100));",
+            RawContent = rawSql,
+            StartLine = 1,
+            EndLine = 2
+        };
+        var blocks4 = new[] { block4 };
+        var result4 = _extractor.Extract(blocks4);
+        
+        Assert.True(result4.IsSuccess);
+        Assert.Equal(rawSql, result4.Definition!.RawSql);
+        
+        // Empty attributes - failure
+        var emptyBlock = CreateBlocks("CREATE TYPE empty_type AS ();");
+        var emptyResult = _extractor.Extract(emptyBlock);
+        
+        Assert.False(emptyResult.IsSuccess);
+        Assert.Null(emptyResult.Definition);
+        Assert.NotEmpty(emptyResult.ValidationIssues);
+        Assert.Contains(emptyResult.ValidationIssues, i => i.Code == "COMPOSITE_EMPTY_ATTRIBUTES");
+        
+        // Non-composite block
+        var nonCompositeBlock = CreateBlocks("CREATE TABLE users (id INT PRIMARY KEY);");
+        var nonCompositeResult = _extractor.Extract(nonCompositeBlock);
+        
+        Assert.False(nonCompositeResult.IsSuccess);
+        Assert.Null(nonCompositeResult.Definition);
+        
+        // Null blocks - exception
+        Assert.Throws<ArgumentNullException>(() => _extractor.CanExtract(null!));
+        Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
+    }
 
-    #region Helper Methods
-
-    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql)
+    private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? headerComment = null)
     {
         return [new SqlBlock
         {
             Content = sql,
             RawContent = sql,
             StartLine = 1,
-            EndLine = 1
+            EndLine = 1,
+            HeaderComment = headerComment
         }];
     }
-
-    #endregion
 }
