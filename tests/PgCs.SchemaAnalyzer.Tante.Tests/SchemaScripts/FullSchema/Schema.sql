@@ -1,6 +1,3 @@
--- Пример схемы PostgreSQL 18 для демонстрации возможностей PgCs
--- Этот файл содержит примеры всех основных типов объектов PostgreSQL
-
 -- Создание ENUM типов
 -- ENUM для статуса пользователя
 CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended', 'deleted');
