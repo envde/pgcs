@@ -1,0 +1,1 @@
+COMMENT ON TYPE user_status IS 'Возможные статусы пользователя в системе';

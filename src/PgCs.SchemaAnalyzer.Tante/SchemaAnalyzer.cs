@@ -24,6 +24,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     private readonly IIndexExtractor _indexExtractor;
     private readonly IExtractor<TriggerDefinition> _triggerExtractor;
     private readonly IExtractor<ConstraintDefinition> _constraintExtractor;
+    private readonly IExtractor<PartitionDefinition> _partitionExtractor;
     private readonly IExtractor<CommentDefinition> _commentExtractor;
 
     /// <summary>
@@ -40,6 +41,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IIndexExtractor indexExtractor,
         IExtractor<TriggerDefinition> triggerExtractor,
         IExtractor<ConstraintDefinition> constraintExtractor,
+        IExtractor<PartitionDefinition> partitionExtractor,
         IExtractor<CommentDefinition> commentExtractor)
     {
         ArgumentNullException.ThrowIfNull(blockExtractor);
@@ -52,6 +54,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         ArgumentNullException.ThrowIfNull(indexExtractor);
         ArgumentNullException.ThrowIfNull(triggerExtractor);
         ArgumentNullException.ThrowIfNull(constraintExtractor);
+        ArgumentNullException.ThrowIfNull(partitionExtractor);
         ArgumentNullException.ThrowIfNull(commentExtractor);
         
         _blockExtractor = blockExtractor;
@@ -64,6 +67,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         _indexExtractor = indexExtractor;
         _triggerExtractor = triggerExtractor;
         _constraintExtractor = constraintExtractor;
+        _partitionExtractor = partitionExtractor;
         _commentExtractor = commentExtractor;
     }
 
@@ -81,6 +85,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         new IndexExtractor(),
         new TriggerExtractor(),
         new ConstraintExtractor(),
+        new PartitionExtractor(),
         new CommentExtractor())
     {
     }
@@ -406,6 +411,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         var indexes = new List<IndexDefinition>();
         var triggers = new List<TriggerDefinition>();
         var constraints = new List<ConstraintDefinition>();
+        var partitions = new List<PartitionDefinition>();
         var comments = new List<CommentDefinition>();
         var validationIssues = new List<ValidationIssue>();
 
@@ -545,6 +551,19 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
                     }
                     break;
 
+                case SchemaObjectType.Partitions:
+                    // Извлекаем партицию
+                    if (_partitionExtractor.CanExtract([block]))
+                    {
+                        var result = _partitionExtractor.Extract([block]);
+                        if (result is { IsSuccess: true, Definition: not null })
+                        {
+                            partitions.Add(result.Definition);
+                        }
+                        validationIssues.AddRange(result.ValidationIssues);
+                    }
+                    break;
+
                 case SchemaObjectType.None:
                 default:
                     // Пока не реализовано
@@ -563,7 +582,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             Indexes = indexes,
             Triggers = triggers,
             Constraints = constraints,
-            Partitions = [],
+            Partitions = partitions,
             CommentDefinition = comments,
             ValidationIssues = validationIssues,
             SourcePaths = sourcePaths,

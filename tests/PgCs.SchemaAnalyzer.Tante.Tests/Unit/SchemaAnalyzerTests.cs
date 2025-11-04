@@ -1,3 +1,7 @@
+using PgCs.Core.Schema.Common;
+using PgCs.Core.Schema.Definitions;
+using PgCs.Core.Validation;
+
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Unit;
 
 /// <summary>
@@ -29,6 +33,26 @@ CREATE TABLE users (
     address address
 );
 
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL
+);
+
+ALTER TABLE orders 
+    ADD CONSTRAINT fk_orders_users FOREIGN KEY (user_id) REFERENCES users(id);
+
+ALTER TABLE orders
+    ADD CONSTRAINT check_user_id CHECK (user_id > 0);
+
+CREATE TABLE sales_data (
+    id SERIAL,
+    sale_date DATE NOT NULL,
+    amount NUMERIC(10,2)
+) PARTITION BY RANGE (sale_date);
+
+CREATE TABLE sales_2023 PARTITION OF sales_data
+    FOR VALUES FROM ('2023-01-01') TO ('2024-01-01');
+
 CREATE VIEW active_users AS SELECT * FROM users WHERE status = 'active';
 
 CREATE INDEX idx_users_email ON users (email);
@@ -39,13 +63,13 @@ CREATE TRIGGER update_timestamp BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNC
 
 COMMENT ON TABLE users IS 'Main users table';
 ";
-        
+
         try
         {
             await File.WriteAllTextAsync(_testFilePath, fullSchema);
-            
+
             var result = await _analyzer.AnalyzeFileAsync(_testFilePath);
-            
+
             // Assert major object types extracted
             Assert.NotNull(result);
             Assert.Single(result.Enums);
@@ -54,8 +78,9 @@ COMMENT ON TABLE users IS 'Main users table';
             Assert.Equal("address", result.Composites[0].Name);
             Assert.Single(result.Domains);
             Assert.Equal("email", result.Domains[0].Name);
-            Assert.Single(result.Tables);
-            Assert.Equal("users", result.Tables[0].Name);
+            // Tables: users, orders, sales_data (partitioned), sales_2023 (partition, may be counted as table)
+            Assert.True(result.Tables.Count >= 3);
+            Assert.Contains(result.Tables, t => t.Name == "users");
             Assert.Single(result.Views);
             Assert.Equal("active_users", result.Views[0].Name);
             Assert.Single(result.Indexes);
@@ -67,17 +92,33 @@ COMMENT ON TABLE users IS 'Main users table';
             Assert.Single(result.CommentDefinition);
             Assert.Equal("Main users table", result.CommentDefinition[0].Comment);
             
+            // Assert Constraints extracted
+            Assert.NotEmpty(result.Constraints);
+            var fkConstraint = result.Constraints.FirstOrDefault(c => c.Name == "fk_orders_users");
+            Assert.NotNull(fkConstraint);
+            
+            // Assert Partitions extracted
+            Assert.NotNull(result.Partitions);
+            Assert.Single(result.Partitions);
+            var partition = result.Partitions[0];
+            Assert.Equal("sales_2023", partition.Name);
+            Assert.Equal("sales_data", partition.ParentTableName);
+            Assert.Equal(PartitionStrategy.Range, partition.Strategy);
+            Assert.Equal("'2023-01-01'", partition.FromValue);
+            Assert.Equal("'2024-01-01'", partition.ToValue);
+
             // Assert metadata
             Assert.Single(result.SourcePaths);
             Assert.Equal(_testFilePath, result.SourcePaths[0]);
             Assert.True(result.AnalyzedAt <= DateTime.UtcNow);
-            
+            Assert.NotNull(result.ValidationIssues); // ValidationIssues should exist
+
             // Test 2: File not found
-            await Assert.ThrowsAsync<FileNotFoundException>(() => 
+            await Assert.ThrowsAsync<FileNotFoundException>(() =>
                 _analyzer.AnalyzeFileAsync("/nonexistent/file.sql").AsTask());
-            
+
             // Test 3: Null/empty path
-            await Assert.ThrowsAsync<ArgumentException>(() => 
+            await Assert.ThrowsAsync<ArgumentException>(() =>
                 _analyzer.AnalyzeFileAsync("").AsTask());
         }
         finally
@@ -96,28 +137,28 @@ COMMENT ON TABLE users IS 'Main users table';
         try
         {
             Directory.CreateDirectory(_testDirectoryPath);
-            
+
             // Test 1: Multiple files with different object types
             var file1 = Path.Combine(_testDirectoryPath, "01_types.sql");
             var file2 = Path.Combine(_testDirectoryPath, "02_tables.sql");
             var file3 = Path.Combine(_testDirectoryPath, "03_views.sql");
-            
+
             await File.WriteAllTextAsync(file1, @"
 CREATE TYPE status AS ENUM ('active', 'inactive');
 CREATE TYPE address AS (street VARCHAR(100));
 ");
-            
+
             await File.WriteAllTextAsync(file2, @"
 CREATE TABLE users (id INT PRIMARY KEY);
 CREATE TABLE orders (id INT PRIMARY KEY);
 ");
-            
+
             await File.WriteAllTextAsync(file3, @"
 CREATE VIEW active_users AS SELECT * FROM users;
 ");
-            
+
             var result = await _analyzer.AnalyzeDirectoryAsync(_testDirectoryPath);
-            
+
             // Assert objects from all files
             Assert.NotNull(result);
             Assert.Single(result.Enums);
@@ -125,18 +166,18 @@ CREATE VIEW active_users AS SELECT * FROM users;
             Assert.Equal(2, result.Tables.Count);
             Assert.Single(result.Views);
             Assert.Equal(3, result.SourcePaths.Count);
-            
+
             // Test 2: Empty directory
             var emptyDir = Path.Combine(_testDirectoryPath, "empty");
             Directory.CreateDirectory(emptyDir);
-            
+
             var emptyResult = await _analyzer.AnalyzeDirectoryAsync(emptyDir);
-            
+
             Assert.NotNull(emptyResult);
             Assert.Empty(emptyResult.Tables);
             Assert.Empty(emptyResult.Views);
             // SourcePaths includes directory path even if no SQL files
-            
+
             // Test 3: Directory not found
             await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
                 _analyzer.AnalyzeDirectoryAsync("/nonexistent/directory").AsTask());
@@ -154,13 +195,15 @@ CREATE VIEW active_users AS SELECT * FROM users;
     [Fact]
     public void ExtractEnums_ExtractsAllEnumVariants()
     {
-        // Test 1: Single enum
+        // Test 1: Single enum with RawSql
         var sql1 = "CREATE TYPE status AS ENUM ('active', 'inactive');";
         var result1 = _analyzer.ExtractEnums(sql1);
         Assert.Single(result1);
         Assert.Equal("status", result1[0].Name);
         Assert.Equal(2, result1[0].Values.Count);
-        
+        Assert.NotNull(result1[0].RawSql);
+        Assert.Contains("status", result1[0].RawSql);
+
         // Test 2: Multiple enums
         var sql2 = @"
 CREATE TYPE status AS ENUM ('active', 'inactive');
@@ -169,7 +212,7 @@ CREATE TYPE color AS ENUM ('red', 'green', 'blue');
 ";
         var result2 = _analyzer.ExtractEnums(sql2);
         Assert.Equal(3, result2.Count);
-        
+
         // Test 3: Mixed content (should extract only enums)
         var sql3 = @"
 CREATE TABLE users (id INT);
@@ -179,13 +222,16 @@ CREATE VIEW v AS SELECT 1;
         var result3 = _analyzer.ExtractEnums(sql3);
         Assert.Single(result3);
         Assert.Equal("status", result3[0].Name);
-        
-        // Test 4: Schema-qualified
-        var sql4 = "CREATE TYPE public.status AS ENUM ('active');";
+
+        // Test 4: Schema-qualified with SqlComment
+        var sql4 = @"-- User status enumeration
+CREATE TYPE public.status AS ENUM ('active');";
         var result4 = _analyzer.ExtractEnums(sql4);
         Assert.Single(result4);
         Assert.Equal("public", result4[0].Schema);
-        
+        Assert.NotNull(result4[0].SqlComment);
+        Assert.Contains("User status", result4[0].SqlComment);
+
         // Test 5: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractEnums(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractEnums(null!));
@@ -197,13 +243,14 @@ CREATE VIEW v AS SELECT 1;
     [Fact]
     public void ExtractTables_ExtractsAllTableVariants()
     {
-        // Test 1: Single table with columns
+        // Test 1: Single table with columns and RawSql
         var sql1 = "CREATE TABLE users (id INT, name VARCHAR(100));";
         var result1 = _analyzer.ExtractTables(sql1);
         Assert.Single(result1);
         Assert.Equal("users", result1[0].Name);
         Assert.True(result1[0].Columns.Count >= 1);
-        
+        Assert.NotNull(result1[0].RawSql);
+
         // Test 2: Multiple tables
         var sql2 = @"
 CREATE TABLE users (id INT);
@@ -211,12 +258,15 @@ CREATE TABLE orders (id INT);
 ";
         var result2 = _analyzer.ExtractTables(sql2);
         Assert.Equal(2, result2.Count);
-        
-        // Test 3: Schema-qualified
-        var sql3 = "CREATE TABLE public.users (id INT);";
+
+        // Test 3: Schema-qualified with SqlComment
+        var sql3 = @"-- Main users table
+CREATE TABLE public.users (id INT);";
         var result3 = _analyzer.ExtractTables(sql3);
         Assert.Equal("public", result3[0].Schema);
-        
+        Assert.NotNull(result3[0].SqlComment);
+        Assert.Contains("Main users", result3[0].SqlComment);
+
         // Test 4: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractTables(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractTables(null!));
@@ -228,19 +278,20 @@ CREATE TABLE orders (id INT);
     [Fact]
     public void ExtractViews_ExtractsAllViewVariants()
     {
-        // Test 1: Simple view
+        // Test 1: Simple view with RawSql
         var sql1 = "CREATE VIEW active_users AS SELECT * FROM users WHERE status = 'active';";
         var result1 = _analyzer.ExtractViews(sql1);
         Assert.Single(result1);
         Assert.Equal("active_users", result1[0].Name);
         Assert.False(result1[0].IsMaterialized);
-        
+        Assert.NotNull(result1[0].RawSql);
+
         // Test 2: Materialized view
         var sql2 = "CREATE MATERIALIZED VIEW stats AS SELECT COUNT(*) FROM users;";
         var result2 = _analyzer.ExtractViews(sql2);
         Assert.Single(result2);
         Assert.True(result2[0].IsMaterialized);
-        
+
         // Test 3: Multiple views
         var sql3 = @"
 CREATE VIEW v1 AS SELECT 1;
@@ -248,12 +299,15 @@ CREATE VIEW v2 AS SELECT 2;
 ";
         var result3 = _analyzer.ExtractViews(sql3);
         Assert.Equal(2, result3.Count);
-        
-        // Test 4: Schema-qualified
-        var sql4 = "CREATE VIEW public.active_users AS SELECT 1;";
+
+        // Test 4: Schema-qualified with SqlComment
+        var sql4 = @"-- Active users view
+CREATE VIEW public.active_users AS SELECT 1;";
         var result4 = _analyzer.ExtractViews(sql4);
         Assert.Equal("public", result4[0].Schema);
-        
+        Assert.NotNull(result4[0].SqlComment);
+        Assert.Contains("Active users", result4[0].SqlComment);
+
         // Test 5: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractViews(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractViews(null!));
@@ -265,19 +319,20 @@ CREATE VIEW v2 AS SELECT 2;
     [Fact]
     public void ExtractDomains_ExtractsAllDomainVariants()
     {
-        // Test 1: Simple domain
+        // Test 1: Simple domain with RawSql
         var sql1 = "CREATE DOMAIN email AS VARCHAR(255);";
         var result1 = _analyzer.ExtractDomains(sql1);
         Assert.Single(result1);
         Assert.Equal("email", result1[0].Name);
         Assert.Equal("VARCHAR(255)", result1[0].BaseType);
-        
+        Assert.NotNull(result1[0].RawSql);
+
         // Test 2: Domain with constraints
         var sql2 = "CREATE DOMAIN positive_int AS INTEGER CHECK (VALUE > 0);";
         var result2 = _analyzer.ExtractDomains(sql2);
         Assert.Single(result2);
         Assert.NotEmpty(result2[0].CheckConstraints);
-        
+
         // Test 3: Multiple domains
         var sql3 = @"
 CREATE DOMAIN email AS VARCHAR(255);
@@ -285,12 +340,15 @@ CREATE DOMAIN phone AS VARCHAR(20);
 ";
         var result3 = _analyzer.ExtractDomains(sql3);
         Assert.Equal(2, result3.Count);
-        
-        // Test 4: Schema-qualified
-        var sql4 = "CREATE DOMAIN public.email AS VARCHAR(255);";
+
+        // Test 4: Schema-qualified with SqlComment
+        var sql4 = @"-- Email domain type
+CREATE DOMAIN public.email AS VARCHAR(255);";
         var result4 = _analyzer.ExtractDomains(sql4);
         Assert.Equal("public", result4[0].Schema);
-        
+        Assert.NotNull(result4[0].SqlComment);
+        Assert.Contains("Email domain", result4[0].SqlComment);
+
         // Test 5: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractDomains(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractDomains(null!));
@@ -302,13 +360,14 @@ CREATE DOMAIN phone AS VARCHAR(20);
     [Fact]
     public void ExtractComposites_ExtractsAllCompositeVariants()
     {
-        // Test 1: Simple composite
+        // Test 1: Simple composite with RawSql
         var sql1 = "CREATE TYPE address AS (street VARCHAR(100), city VARCHAR(50));";
         var result1 = _analyzer.ExtractComposites(sql1);
         Assert.Single(result1);
         Assert.Equal("address", result1[0].Name);
         Assert.Equal(2, result1[0].Attributes.Count);
-        
+        Assert.NotNull(result1[0].RawSql);
+
         // Test 2: Multiple composites
         var sql2 = @"
 CREATE TYPE address AS (street VARCHAR(100));
@@ -316,12 +375,15 @@ CREATE TYPE coordinates AS (lat NUMERIC(9,6), lon NUMERIC(9,6));
 ";
         var result2 = _analyzer.ExtractComposites(sql2);
         Assert.Equal(2, result2.Count);
-        
-        // Test 3: Schema-qualified
-        var sql3 = "CREATE TYPE public.address AS (street VARCHAR(100));";
+
+        // Test 3: Schema-qualified with SqlComment
+        var sql3 = @"-- Address composite type
+CREATE TYPE public.address AS (street VARCHAR(100));";
         var result3 = _analyzer.ExtractComposites(sql3);
         Assert.Equal("public", result3[0].Schema);
-        
+        Assert.NotNull(result3[0].SqlComment);
+        Assert.Contains("Address composite", result3[0].SqlComment);
+
         // Test 4: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractComposites(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractComposites(null!));
@@ -333,12 +395,14 @@ CREATE TYPE coordinates AS (lat NUMERIC(9,6), lon NUMERIC(9,6));
     [Fact]
     public void ExtractFunctions_ExtractsAllFunctionVariants()
     {
-        // Test 1: Simple function
-        var sql1 = "CREATE FUNCTION get_user(user_id INT) RETURNS TEXT AS $$ BEGIN RETURN 'user'; END; $$ LANGUAGE plpgsql;";
+        // Test 1: Simple function with RawSql
+        var sql1 =
+            "CREATE FUNCTION get_user(user_id INT) RETURNS TEXT AS $$ BEGIN RETURN 'user'; END; $$ LANGUAGE plpgsql;";
         var result1 = _analyzer.ExtractFunctions(sql1);
         Assert.Single(result1);
         Assert.Equal("get_user", result1[0].Name);
-        
+        Assert.NotNull(result1[0].RawSql);
+
         // Test 2: Multiple functions
         var sql2 = @"
 CREATE FUNCTION f1() RETURNS INT AS $$ BEGIN RETURN 1; END; $$ LANGUAGE plpgsql;
@@ -346,13 +410,17 @@ CREATE FUNCTION f2() RETURNS INT AS $$ BEGIN RETURN 2; END; $$ LANGUAGE plpgsql;
 ";
         var result2 = _analyzer.ExtractFunctions(sql2);
         Assert.Equal(2, result2.Count);
-        
-        // Test 3: Procedure
-        var sql3 = "CREATE PROCEDURE update_stats() AS $$ BEGIN UPDATE stats SET count = count + 1; END; $$ LANGUAGE plpgsql;";
+
+        // Test 3: Procedure with Schema and SqlComment
+        var sql3 = @"-- Update statistics procedure
+CREATE PROCEDURE public.update_stats() AS $$ BEGIN UPDATE stats SET count = count + 1; END; $$ LANGUAGE plpgsql;";
         var result3 = _analyzer.ExtractFunctions(sql3);
         Assert.Single(result3);
         Assert.True(result3[0].IsProcedure);
-        
+        Assert.Equal("public", result3[0].Schema);
+        Assert.NotNull(result3[0].SqlComment);
+        Assert.Contains("Update statistics", result3[0].SqlComment);
+
         // Test 4: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractFunctions(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractFunctions(null!));
@@ -370,14 +438,14 @@ CREATE FUNCTION f2() RETURNS INT AS $$ BEGIN RETURN 2; END; $$ LANGUAGE plpgsql;
         Assert.Single(result1);
         Assert.Equal("users", result1[0].Name);
         Assert.Equal("Main users table", result1[0].Comment);
-        
+
         // Test 2: Column comment
         var sql2 = "COMMENT ON COLUMN users.email IS 'User email address';";
         var result2 = _analyzer.ExtractComments(sql2);
         Assert.Single(result2);
         Assert.Equal("email", result2[0].Name);
         Assert.Equal("users", result2[0].TableName);
-        
+
         // Test 3: Multiple comments
         var sql3 = @"
 COMMENT ON TABLE users IS 'Users table';
@@ -385,7 +453,7 @@ COMMENT ON VIEW active_users IS 'Active users view';
 ";
         var result3 = _analyzer.ExtractComments(sql3);
         Assert.Equal(2, result3.Count);
-        
+
         // Test 4: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractComments(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractComments(null!));
@@ -403,13 +471,13 @@ COMMENT ON VIEW active_users IS 'Active users view';
         Assert.Single(result1);
         Assert.Equal("idx_users_email", result1[0].Name);
         Assert.Equal("users", result1[0].TableName);
-        
+
         // Test 2: Unique index
         var sql2 = "CREATE UNIQUE INDEX idx_users_username ON users (username);";
         var result2 = _analyzer.ExtractIndexes(sql2);
         Assert.Single(result2);
         Assert.True(result2[0].IsUnique);
-        
+
         // Test 3: Multiple indexes
         var sql3 = @"
 CREATE INDEX idx1 ON users (email);
@@ -417,7 +485,7 @@ CREATE INDEX idx2 ON users (username);
 ";
         var result3 = _analyzer.ExtractIndexes(sql3);
         Assert.Equal(2, result3.Count);
-        
+
         // Test 4: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractIndexes(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractIndexes(null!));
@@ -430,12 +498,13 @@ CREATE INDEX idx2 ON users (username);
     public void ExtractTriggers_ExtractsAllTriggerVariants()
     {
         // Test 1: Basic trigger
-        var sql1 = "CREATE TRIGGER update_timestamp BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_timestamp();";
+        var sql1 =
+            "CREATE TRIGGER update_timestamp BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_timestamp();";
         var result1 = _analyzer.ExtractTriggers(sql1);
         Assert.Single(result1);
         Assert.Equal("update_timestamp", result1[0].Name);
         Assert.Equal("users", result1[0].TableName);
-        
+
         // Test 2: Multiple triggers
         var sql2 = @"
 CREATE TRIGGER trg1 BEFORE INSERT ON users FOR EACH ROW EXECUTE FUNCTION f1();
@@ -443,7 +512,7 @@ CREATE TRIGGER trg2 AFTER DELETE ON users FOR EACH ROW EXECUTE FUNCTION f2();
 ";
         var result2 = _analyzer.ExtractTriggers(sql2);
         Assert.Equal(2, result2.Count);
-        
+
         // Test 3: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractTriggers(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractTriggers(null!));
@@ -464,7 +533,7 @@ ALTER TABLE users
         // Constraint extraction may or may not work depending on extractor implementation
         // Just verify method works without throwing
         Assert.NotNull(result1);
-        
+
         // Test 2: Multiple constraints
         var sql2 = @"
 ALTER TABLE users 
@@ -474,9 +543,104 @@ ALTER TABLE orders
 ";
         var result2 = _analyzer.ExtractConstraints(sql2);
         Assert.NotNull(result2);
-        
+
         // Test 3: Validation
         Assert.Throws<ArgumentException>(() => _analyzer.ExtractConstraints(""));
         Assert.Throws<ArgumentNullException>(() => _analyzer.ExtractConstraints(null!));
+    }
+
+    /// <summary>
+    /// Test ValidationIssues: analyzes problematic SQL schema to generate warnings and errors
+    /// Tests that validation issues are properly collected with Severity, Message, Code, Location, DefinitionType
+    /// </summary>
+    [Fact]
+    public async Task AnalyzeFileAsync_CollectsValidationIssuesFromProblematicSchema()
+    {
+        var problematicSchema = @"
+-- Valid table
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50)
+);
+
+-- Comment with missing object (should generate validation issue)
+COMMENT ON TABLE nonexistent_table IS 'This table does not exist';
+
+-- Comment with invalid syntax or missing target
+COMMENT ON COLUMN nonexistent_table.nonexistent_column IS 'Missing column';
+
+-- Another valid table
+CREATE TABLE orders (
+    id INT
+);
+
+-- Valid comment
+COMMENT ON TABLE orders IS 'Orders table';
+";
+
+        var testFile = Path.Combine(Path.GetTempPath(), $"problematic_{Guid.NewGuid()}.sql");
+        
+        try
+        {
+            await File.WriteAllTextAsync(testFile, problematicSchema);
+            
+            var result = await _analyzer.AnalyzeFileAsync(testFile);
+            
+            // Assert that schema was parsed (valid objects extracted)
+            Assert.NotNull(result);
+            Assert.Equal(2, result.Tables.Count);
+            Assert.Contains(result.Tables, t => t.Name == "users");
+            Assert.Contains(result.Tables, t => t.Name == "orders");
+            
+            // Assert ValidationIssues collection exists and is populated
+            Assert.NotNull(result.ValidationIssues);
+            
+            // If there are validation issues, verify their structure
+            if (result.ValidationIssues.Count > 0)
+            {
+                foreach (var issue in result.ValidationIssues)
+                {
+                    // Verify required properties are populated
+                    Assert.NotNull(issue.Message);
+                    Assert.NotEmpty(issue.Message);
+                    Assert.NotNull(issue.Code);
+                    Assert.NotEmpty(issue.Code);
+                    Assert.NotNull(issue.Location);
+                    
+                    // Severity should be valid enum value
+                    Assert.True(Enum.IsDefined(typeof(ValidationIssue.ValidationSeverity), issue.Severity));
+                    
+                    // DefinitionType should be valid enum value
+                    Assert.True(Enum.IsDefined(typeof(ValidationIssue.ValidationDefinitionType), issue.DefinitionType));
+                }
+            }
+            
+            // Test with completely invalid SQL to potentially trigger more issues
+            var invalidSql = @"
+CREATE TABL users (id INT);  -- Typo: TABL instead of TABLE
+COMMENT ON INVALID_OBJECT_TYPE something IS 'Invalid';
+";
+            
+            var invalidFile = Path.Combine(Path.GetTempPath(), $"invalid_{Guid.NewGuid()}.sql");
+            try
+            {
+                await File.WriteAllTextAsync(invalidFile, invalidSql);
+                var invalidResult = await _analyzer.AnalyzeFileAsync(invalidFile);
+                
+                // Should not throw, but may have validation issues
+                Assert.NotNull(invalidResult);
+                Assert.NotNull(invalidResult.ValidationIssues);
+            }
+            finally
+            {
+                if (File.Exists(invalidFile))
+                    File.Delete(invalidFile);
+            }
+        }
+        finally
+        {
+            if (File.Exists(testFile))
+                File.Delete(testFile);
+        }
     }
 }

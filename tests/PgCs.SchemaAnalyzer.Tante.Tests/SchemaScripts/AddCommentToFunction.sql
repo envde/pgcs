@@ -1,0 +1,1 @@
+COMMENT ON FUNCTION update_category_search_vector() IS 'Автоматически обновляет поисковый вектор при изменении категории';

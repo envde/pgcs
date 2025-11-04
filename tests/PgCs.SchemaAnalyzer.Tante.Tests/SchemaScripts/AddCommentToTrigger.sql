@@ -1,0 +1,1 @@
+COMMENT ON TRIGGER trigger_update_category_search ON categories IS 'Триггер для автоматического обновления поискового вектора';

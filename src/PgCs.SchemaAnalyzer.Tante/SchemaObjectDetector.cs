@@ -23,6 +23,10 @@ public static partial class SchemaObjectDetector
     [GeneratedRegex(@"^\s*CREATE\s+TABLE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateTablePattern();
 
+    // CREATE TABLE ... PARTITION OF (must be checked before regular tables)
+    [GeneratedRegex(@"^\s*CREATE\s+TABLE\s+.*\s+PARTITION\s+OF\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex CreatePartitionPattern();
+
     // CREATE INDEX (объединено: обычные и уникальные индексы)
     [GeneratedRegex(@"^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateIndexPattern();
@@ -69,6 +73,10 @@ public static partial class SchemaObjectDetector
         // COMMENT ON - самый приоритетный, так как относится к метаданным объектов
         if (IsCommentOn(sqlBlock))
             return SchemaObjectType.Comments;
+
+        // CREATE TABLE ... PARTITION OF - проверяем раньше обычных таблиц
+        if (IsCreatePartition(sqlBlock))
+            return SchemaObjectType.Partitions;
 
         // CREATE TABLE
         if (IsCreateTable(sqlBlock))
@@ -122,6 +130,12 @@ public static partial class SchemaObjectDetector
     /// </summary>
     private static bool IsCreateTable(string sqlBlock)
         => CreateTablePattern().IsMatch(sqlBlock);
+
+    /// <summary>
+    /// Проверяет, является ли блок определением PARTITION
+    /// </summary>
+    private static bool IsCreatePartition(string sqlBlock)
+        => CreatePartitionPattern().IsMatch(sqlBlock);
 
     /// <summary>
     /// Проверяет, является ли блок определением INDEX (включая UNIQUE)

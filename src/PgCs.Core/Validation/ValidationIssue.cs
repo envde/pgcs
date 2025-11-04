@@ -109,6 +109,10 @@ public sealed record ValidationIssue
         /// Комментарий
         /// </summary>
         Comment,
+        /// <summary>
+        /// Партиция (Partition)
+        /// </summary>
+        Partition,
     }
 
     /// <summary>

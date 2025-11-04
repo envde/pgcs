@@ -1,0 +1,1 @@
+COMMENT ON DOMAIN email IS 'Email адрес с валидацией формата';
