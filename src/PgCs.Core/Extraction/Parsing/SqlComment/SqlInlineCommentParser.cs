@@ -10,7 +10,7 @@ namespace PgCs.Core.Extraction.Parsing.SqlComment;
 /// - comment(Описание колонки); type(BIGINT); rename(NewName);
 /// </para>
 /// </summary>
-public static partial class InlineCommentParser
+public static partial class SqlInlineCommentParser
 {
     /// <summary>
     /// Паттерн для формата: comment: значение;

@@ -3,7 +3,7 @@ namespace PgCs.Core.Extraction.Parsing.SqlComment;
 /// <summary>
 /// Результат парсинга inline-комментария
 /// </summary>
-public sealed record SqlComment
+public sealed record SqlInlineComment
 {
     /// <summary>
     /// Комментарий к колонке
