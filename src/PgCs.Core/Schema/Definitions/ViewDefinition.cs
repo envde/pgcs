@@ -30,11 +30,6 @@ public sealed record ViewDefinition: DefinitionBase
     public IReadOnlyList<TableColumn> Columns { get; init; } = [];
     
     /// <summary>
-    /// Список индексов (доступны только для материализованных представлений)
-    /// </summary>
-    public IReadOnlyList<IndexDefinition> Indexes { get; init; } = [];
-    
-    /// <summary>
     /// Опция безопасности представления (WITH CHECK OPTION)
     /// Определяет, можно ли изменять данные через представление
     /// </summary>

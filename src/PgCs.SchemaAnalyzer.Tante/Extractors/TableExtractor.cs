@@ -100,25 +100,6 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex WithParametersPattern();
 
-    /// <summary>
-    /// Паттерн для извлечения одной колонки
-    /// Упрощенный паттерн для базового извлечения имени и типа
-    /// </summary>
-    [GeneratedRegex(
-        @"^\s*(\w+)\s+([A-Za-z_][\w\s\(\),\[\]]+?)(?:\s+(NOT\s+NULL|NULL|PRIMARY\s+KEY|UNIQUE|DEFAULT\s+.+?))?(?:\s*,|\s*$)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
-    private static partial Regex ColumnPattern();
-
-    /// <summary>
-    /// Паттерн для извлечения CONSTRAINT на уровне таблицы
-    /// </summary>
-    [GeneratedRegex(
-        @"CONSTRAINT\s+(\w+)\s+(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|CHECK|EXCLUDE)",
-        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
-        matchTimeoutMilliseconds: 1000)]
-    private static partial Regex ConstraintPattern();
-
     // ============================================================================
     // Public Methods
     // ============================================================================
@@ -244,8 +225,6 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
             Name = name,
             Schema = schema,
             Columns = columns,
-            Constraints = [],
-            Indexes = [],
             IsPartitioned = partitionInfo != null,
             PartitionInfo = partitionInfo,
             IsPartition = false,
@@ -283,8 +262,6 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
             Name = name,
             Schema = schema,
             Columns = [],
-            Constraints = [],
-            Indexes = [],
             IsPartitioned = false,
             PartitionInfo = null,
             IsPartition = true,
@@ -458,7 +435,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                 // Ищем inline комментарий двумя способами:
                 // 1. Из block.InlineComments (для реального SchemaAnalyzer)
                 // 2. Из текущей строки (для unit тестов)
-                string? commentText = inlineCommentFromLine;
+                string commentText = inlineCommentFromLine;
                 
                 if (string.IsNullOrWhiteSpace(commentText) && block.InlineComments != null)
                 {
@@ -534,7 +511,6 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
         // Извлекаем тип данных - может состоять из нескольких частей (например, DECIMAL(10, 2))
         // Собираем части до первого ключевого слова или до конца
         var dataTypeBuilder = new System.Text.StringBuilder(parts[1]);
-        var typeEndIndex = 2;
         for (int i = 2; i < parts.Length; i++)
         {
             var part = parts[i];
@@ -545,13 +521,11 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                 part.Equals("DEFAULT", StringComparison.OrdinalIgnoreCase) ||
                 part.Equals("REFERENCES", StringComparison.OrdinalIgnoreCase))
             {
-                typeEndIndex = i;
                 break;
             }
             
             // Добавляем часть к типу (нужно для DECIMAL(10, 2) где пробел разделяет 10, и 2))
             dataTypeBuilder.Append(' ').Append(part);
-            typeEndIndex = i + 1;
         }
         
         var dataType = dataTypeBuilder.ToString().Trim();

@@ -188,7 +188,6 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             Query = query.Trim(),
             IsMaterialized = isMaterialized,
             Columns = columns,
-            Indexes = [],
             WithCheckOption = withCheckOption,
             IsSecurityBarrier = isSecurityBarrier,
             SqlComment = viewBlock.HeaderComment,

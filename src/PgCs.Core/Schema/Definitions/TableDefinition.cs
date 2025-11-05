@@ -18,16 +18,6 @@ public sealed record TableDefinition: DefinitionBase
     public required IReadOnlyList<TableColumn> Columns { get; init; }
     
     /// <summary>
-    /// Список ограничений целостности: PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, EXCLUDE
-    /// </summary>
-    public IReadOnlyList<ConstraintDefinition> Constraints { get; init; } = [];
-    
-    /// <summary>
-    /// Список индексов таблицы (созданных через CREATE INDEX)
-    /// </summary>
-    public IReadOnlyList<IndexDefinition> Indexes { get; init; } = [];
-    
-    /// <summary>
     /// Является ли таблица партиционированной (PARTITION BY)
     /// Партиционированные таблицы физически разделены на части
     /// </summary>
