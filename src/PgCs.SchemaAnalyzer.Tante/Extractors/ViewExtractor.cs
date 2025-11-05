@@ -398,7 +398,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
                 Name = columnName,
                 DataType = dataType,
                 ReName = renameTo,
-                Comment = comment,
+                SqlComment = comment,
                 IsNullable = true,
                 OrdinalPosition = position++,
                 MaxLength = maxLength,

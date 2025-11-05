@@ -67,12 +67,7 @@ public sealed record TableColumn
     /// <summary>
     /// Комментарий к колонке
     /// </summary>
-    public string? Comment { get; init; }
-    
-    /// <summary>
-    /// Список CHECK ограничений, применяемых к колонке
-    /// </summary>
-    public IReadOnlyList<string> CheckConstraints { get; init; } = [];
+    public string? SqlComment { get; init; }
     
     /// <summary>
     /// Является ли колонка автоинкрементной (SERIAL, BIGSERIAL, GENERATED ALWAYS AS IDENTITY)

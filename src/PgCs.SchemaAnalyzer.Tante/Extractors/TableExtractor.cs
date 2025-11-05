@@ -457,7 +457,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                     {
                         column = column with 
                         { 
-                            Comment = parsedComment.Comment,
+                            SqlComment = parsedComment.Comment,
                             ReName = parsedComment.RenameTo
                             // parsedComment.DataType можно использовать для валидации или переопределения
                         };
@@ -576,7 +576,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
             IsGenerated = isGenerated,
             GenerationExpression = generationExpression,
             Collation = collation,
-            Comment = null
+            SqlComment = null
         };
     }
 

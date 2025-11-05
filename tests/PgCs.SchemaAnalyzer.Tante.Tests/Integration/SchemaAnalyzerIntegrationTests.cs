@@ -233,31 +233,31 @@ public sealed class SchemaAnalyzerIntegrationTests
             // id BIGSERIAL PRIMARY KEY, -- comment: Уникальный идентификатор; type: BIGSERIAL; rename: UserId
             var idColumn = usersTable.Columns.FirstOrDefault(c => c.Name == "id");
             Assert.NotNull(idColumn);
-            Assert.Equal("Уникальный идентификатор", idColumn.Comment);
+            Assert.Equal("Уникальный идентификатор", idColumn.SqlComment);
             Assert.Equal("UserId", idColumn.ReName);
 
             // username VARCHAR(50) NOT NULL UNIQUE, -- comment: Логин пользователя; type: VARCHAR(50); rename: UserName
             var usernameColumn = usersTable.Columns.FirstOrDefault(c => c.Name == "username");
             Assert.NotNull(usernameColumn);
-            Assert.Equal("Логин пользователя", usernameColumn.Comment);
+            Assert.Equal("Логин пользователя", usernameColumn.SqlComment);
             Assert.Equal("UserName", usernameColumn.ReName);
 
             // email email NOT NULL UNIQUE, -- comment: Email адрес; type: email; rename: EmailAddress
             var emailColumn = usersTable.Columns.FirstOrDefault(c => c.Name == "email");
             Assert.NotNull(emailColumn);
-            Assert.Equal("Email адрес", emailColumn.Comment);
+            Assert.Equal("Email адрес", emailColumn.SqlComment);
             Assert.Equal("EmailAddress", emailColumn.ReName);
 
             // full_name VARCHAR(255), -- comment: Полное имя; type: VARCHAR(255); rename: FullName
             var fullNameColumn = usersTable.Columns.FirstOrDefault(c => c.Name == "full_name");
             Assert.NotNull(fullNameColumn);
-            Assert.Equal("Полное имя", fullNameColumn.Comment);
+            Assert.Equal("Полное имя", fullNameColumn.SqlComment);
             Assert.Equal("FullName", fullNameColumn.ReName);
 
             // is_verified BOOLEAN NOT NULL DEFAULT FALSE, -- comment: Email подтвержден; type: BOOLEAN; rename: IsVerified
             var isVerifiedColumn = usersTable.Columns.FirstOrDefault(c => c.Name == "is_verified");
             Assert.NotNull(isVerifiedColumn);
-            Assert.Equal("Email подтвержден", isVerifiedColumn.Comment);
+            Assert.Equal("Email подтвержден", isVerifiedColumn.SqlComment);
             Assert.Equal("IsVerified", isVerifiedColumn.ReName);
         }
 
@@ -268,31 +268,31 @@ public sealed class SchemaAnalyzerIntegrationTests
             // id SERIAL PRIMARY KEY, -- comment: Идентификатор категории; type: SERIAL; rename: CategoryId
             var idColumn = categoriesTable.Columns.FirstOrDefault(c => c.Name == "id");
             Assert.NotNull(idColumn);
-            Assert.Equal("Идентификатор категории", idColumn.Comment);
+            Assert.Equal("Идентификатор категории", idColumn.SqlComment);
             Assert.Equal("CategoryId", idColumn.ReName);
 
             // name VARCHAR(100) NOT NULL, -- comment: Название категории; type: VARCHAR(100); rename: CategoryName
             var nameColumn = categoriesTable.Columns.FirstOrDefault(c => c.Name == "name");
             Assert.NotNull(nameColumn);
-            Assert.Equal("Название категории", nameColumn.Comment);
+            Assert.Equal("Название категории", nameColumn.SqlComment);
             Assert.Equal("CategoryName", nameColumn.ReName);
 
             // slug VARCHAR(100) NOT NULL UNIQUE, -- comment: URL-идентификатор; type: VARCHAR(100); rename: UrlSlug
             var slugColumn = categoriesTable.Columns.FirstOrDefault(c => c.Name == "slug");
             Assert.NotNull(slugColumn);
-            Assert.Equal("URL-идентификатор", slugColumn.Comment);
+            Assert.Equal("URL-идентификатор", slugColumn.SqlComment);
             Assert.Equal("UrlSlug", slugColumn.ReName);
 
             // description TEXT, -- comment: Описание категории; type: TEXT; rename: Description
             var descriptionColumn = categoriesTable.Columns.FirstOrDefault(c => c.Name == "description");
             Assert.NotNull(descriptionColumn);
-            Assert.Equal("Описание категории", descriptionColumn.Comment);
+            Assert.Equal("Описание категории", descriptionColumn.SqlComment);
             Assert.Equal("Description", descriptionColumn.ReName);
 
             // parent_id INTEGER, -- comment: Родительская категория; type: INTEGER; rename: ParentCategoryId
             var parentIdColumn = categoriesTable.Columns.FirstOrDefault(c => c.Name == "parent_id");
             Assert.NotNull(parentIdColumn);
-            Assert.Equal("Родительская категория", parentIdColumn.Comment);
+            Assert.Equal("Родительская категория", parentIdColumn.SqlComment);
             Assert.Equal("ParentCategoryId", parentIdColumn.ReName);
         }
 

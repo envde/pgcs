@@ -49,15 +49,15 @@ public sealed class TableExtractorTests
         // Проверка комментариев
         var id = table.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(id);
-        Assert.Equal("Уникальный идентификатор", id.Comment);
+        Assert.Equal("Уникальный идентификатор", id.SqlComment);
         
         var email = table.Columns.FirstOrDefault(c => c.Name == "email");
         Assert.NotNull(email);
-        Assert.Equal("Электронная почта", email.Comment);
+        Assert.Equal("Электронная почта", email.SqlComment);
         
         var passwordHash = table.Columns.FirstOrDefault(c => c.Name == "password_hash");
         Assert.NotNull(passwordHash);
-        Assert.Equal("Хеш пароля", passwordHash.Comment); // Проверка --- комментария
+        Assert.Equal("Хеш пароля", passwordHash.SqlComment); // Проверка --- комментария
 
         // BIGSERIAL PRIMARY KEY
         Assert.Equal("BIGSERIAL", id.DataType);
@@ -129,7 +129,7 @@ public sealed class TableExtractorTests
         // Проверка inline комментариев
         var tempId = tempTable.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(tempId);
-        Assert.Equal("Идентификатор сессии", tempId.Comment);
+        Assert.Equal("Идентификатор сессии", tempId.SqlComment);
 
         // TEMP (альтернативный синтаксис)
         var temp2Blocks = CreateBlocks("CREATE TEMP TABLE temp_session (session_id UUID);");
@@ -165,7 +165,7 @@ public sealed class TableExtractorTests
         // Проверка комментария с тройным дефисом
         var cacheValue = unloggedTable.Columns.FirstOrDefault(c => c.Name == "value");
         Assert.NotNull(cacheValue);
-        Assert.Equal("Значение кэша", cacheValue.Comment);
+        Assert.Equal("Значение кэша", cacheValue.SqlComment);
     }
 
     [Fact]
@@ -197,11 +197,11 @@ public sealed class TableExtractorTests
         // Проверка inline комментариев
         var measuredAt = rangeTable.Columns.FirstOrDefault(c => c.Name == "measured_at");
         Assert.NotNull(measuredAt);
-        Assert.Equal("Время измерения", measuredAt.Comment);
+        Assert.Equal("Время измерения", measuredAt.SqlComment);
         
         var value = rangeTable.Columns.FirstOrDefault(c => c.Name == "value");
         Assert.NotNull(value);
-        Assert.Equal("Значение", value.Comment);
+        Assert.Equal("Значение", value.SqlComment);
 
         // LIST
         var listBlocks = CreateBlocks("CREATE TABLE orders_by_region (id BIGINT, region VARCHAR(50)) PARTITION BY LIST (region);");
@@ -273,11 +273,11 @@ public sealed class TableExtractorTests
         // Проверка inline комментариев с разными форматами
         var empId = inheritTable.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(empId);
-        Assert.Equal("ID сотрудника", empId.Comment);
+        Assert.Equal("ID сотрудника", empId.SqlComment);
         
         var empName = inheritTable.Columns.FirstOrDefault(c => c.Name == "name");
         Assert.NotNull(empName);
-        Assert.Equal("Имя", empName.Comment); // Тройной дефис
+        Assert.Equal("Имя", empName.SqlComment); // Тройной дефис
 
         // Multiple inheritance
         var multiBlocks = CreateBlocks("CREATE TABLE premium_users (premium_level INTEGER) INHERITS (users, customers);");
@@ -366,43 +366,43 @@ public sealed class TableExtractorTests
         // Формат 1: comment: ...; type: ...; rename: ... (без завершающей ;)
         var id = table.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(id);
-        Assert.Equal("Уникальный идентификатор товара", id.Comment);
+        Assert.Equal("Уникальный идентификатор товара", id.SqlComment);
         Assert.Equal("product_id", id.ReName);
 
         // Формат 2: comment(...); type(...); rename(...) (без завершающей ;)
         var legacyName = table.Columns.FirstOrDefault(c => c.Name == "legacy_name");
         Assert.NotNull(legacyName);
-        Assert.Equal("Устаревшее имя товара", legacyName.Comment);
+        Assert.Equal("Устаревшее имя товара", legacyName.SqlComment);
         Assert.Equal("product_name", legacyName.ReName);
 
         // Частичный формат: только comment и rename (без завершающей ;)
         var categoryId = table.Columns.FirstOrDefault(c => c.Name == "category_id");
         Assert.NotNull(categoryId);
-        Assert.Equal("ID категории", categoryId.Comment);
+        Assert.Equal("ID категории", categoryId.SqlComment);
         Assert.Equal("cat_id", categoryId.ReName);
 
         // Только comment в скобках (без завершающей ;)
         var description = table.Columns.FirstOrDefault(c => c.Name == "description");
         Assert.NotNull(description);
-        Assert.Equal("Полное описание товара", description.Comment);
+        Assert.Equal("Полное описание товара", description.SqlComment);
         Assert.Null(description.ReName);
 
         // type перед comment (без завершающей ;)
         var price = table.Columns.FirstOrDefault(c => c.Name == "price");
         Assert.NotNull(price);
-        Assert.Equal("Цена товара", price.Comment);
+        Assert.Equal("Цена товара", price.SqlComment);
         Assert.Null(price.ReName);
 
         // rename перед comment (без завершающей ;)
         var stockCount = table.Columns.FirstOrDefault(c => c.Name == "stock_count");
         Assert.NotNull(stockCount);
-        Assert.Equal("Количество на складе", stockCount.Comment);
+        Assert.Equal("Количество на складе", stockCount.SqlComment);
         Assert.Equal("quantity", stockCount.ReName);
 
         // Простой комментарий без служебных слов
         var simpleColumn = table.Columns.FirstOrDefault(c => c.Name == "simple_comment_column");
         Assert.NotNull(simpleColumn);
-        Assert.Equal("Простой комментарий без служебных слов", simpleColumn.Comment);
+        Assert.Equal("Простой комментарий без служебных слов", simpleColumn.SqlComment);
         Assert.Null(simpleColumn.ReName);
     }
 
