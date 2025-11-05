@@ -53,7 +53,7 @@ public static partial class SqlInlineCommentParser
     /// </summary>
     /// <param name="comment">Текст комментария (без префикса --)</param>
     /// <returns>Извлеченные данные или null, если комментарий не содержит метаданных</returns>
-    public static SqlComment? Parse(string? comment)
+    public static SqlInlineComment? Parse(string? comment)
     {
         if (string.IsNullOrWhiteSpace(comment))
         {
@@ -73,7 +73,7 @@ public static partial class SqlInlineCommentParser
             return null;
         }
 
-        return new SqlComment
+        return new SqlInlineComment
         {
             Comment = commentText,
             DataType = dataType,
