@@ -235,10 +235,10 @@ public sealed class ViewExtractorTests
         var blocks = CreateBlocks(@"
             CREATE VIEW product_info AS
             SELECT 
-                id, -- comment: ID товара; rename: product_id;
-                legacy_code, -- comment(Устаревший код); rename(product_code);
+                id, -- comment: ID товара; to_name: product_id;
+                legacy_code, -- comment(Устаревший код); to_name(product_code);
                 name as product_name, -- Название товара
-                price -- comment: Цена; type: DECIMAL;
+                price -- comment: Цена; to_type: DECIMAL;
             FROM products;
         ");
 

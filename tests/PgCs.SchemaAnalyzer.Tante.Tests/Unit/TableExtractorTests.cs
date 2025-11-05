@@ -336,16 +336,16 @@ public sealed class TableExtractorTests
     public void Extract_SpecialFormatComments_ParsesMetadata()
     {
         // Покрывает: специальные форматы комментариев с метаданными
-        // Формат 1: comment: Описание; type: ТИП; rename: НовоеИмя;
-        // Формат 2: comment(Описание); type(ТИП); rename(НовоеИмя);
+        // Формат 1: comment: Описание; to_type: ТИП; to_name: НовоеИмя;
+        // Формат 2: comment(Описание); to_type(ТИП); to_name(НовоеИмя);
         var blocks = CreateBlocks(@"
             CREATE TABLE products (
-                id BIGSERIAL PRIMARY KEY, -- comment: Уникальный идентификатор товара; type: BIGINT; rename: product_id
-                legacy_name VARCHAR(100), -- comment(Устаревшее имя товара); type(TEXT); rename(product_name)
-                category_id INTEGER, -- comment: ID категории; rename: cat_id
+                id BIGSERIAL PRIMARY KEY, -- comment: Уникальный идентификатор товара; to_type: BIGINT; to_name: product_id
+                legacy_name VARCHAR(100), -- comment(Устаревшее имя товара); to_type(TEXT); to_name(product_name)
+                category_id INTEGER, -- comment: ID категории; to_name: cat_id
                 description TEXT, -- comment(Полное описание товара)
-                price NUMERIC(10,2), -- type: DECIMAL; comment: Цена товара
-                stock_count INTEGER, -- rename: quantity; comment: Количество на складе
+                price NUMERIC(10,2), -- to_type: DECIMAL; comment: Цена товара
+                stock_count INTEGER, -- to_name: quantity; comment: Количество на складе
                 simple_comment_column TEXT -- Простой комментарий без служебных слов
             );
         ");
@@ -363,47 +363,47 @@ public sealed class TableExtractorTests
         Assert.Equal("products", table.Name);
         Assert.Equal(7, table.Columns.Count);
 
-        // Формат 1: comment: ...; type: ...; rename: ... (без завершающей ;)
+        // Формат 1: comment: ...; to_type: ...; to_name: ... (без завершающей ;)
         var id = table.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(id);
         Assert.Equal("Уникальный идентификатор товара", id.SqlComment);
-        Assert.Equal("product_id", id.ReName);
+        Assert.Equal("product_id", id.ToName);
 
-        // Формат 2: comment(...); type(...); rename(...) (без завершающей ;)
+        // Формат 2: comment(...); to_type(...); to_name(...) (без завершающей ;)
         var legacyName = table.Columns.FirstOrDefault(c => c.Name == "legacy_name");
         Assert.NotNull(legacyName);
         Assert.Equal("Устаревшее имя товара", legacyName.SqlComment);
-        Assert.Equal("product_name", legacyName.ReName);
+        Assert.Equal("product_name", legacyName.ToName);
 
-        // Частичный формат: только comment и rename (без завершающей ;)
+        // Частичный формат: только comment и to_name (без завершающей ;)
         var categoryId = table.Columns.FirstOrDefault(c => c.Name == "category_id");
         Assert.NotNull(categoryId);
         Assert.Equal("ID категории", categoryId.SqlComment);
-        Assert.Equal("cat_id", categoryId.ReName);
+        Assert.Equal("cat_id", categoryId.ToName);
 
         // Только comment в скобках (без завершающей ;)
         var description = table.Columns.FirstOrDefault(c => c.Name == "description");
         Assert.NotNull(description);
         Assert.Equal("Полное описание товара", description.SqlComment);
-        Assert.Null(description.ReName);
+        Assert.Null(description.ToName);
 
         // type перед comment (без завершающей ;)
         var price = table.Columns.FirstOrDefault(c => c.Name == "price");
         Assert.NotNull(price);
         Assert.Equal("Цена товара", price.SqlComment);
-        Assert.Null(price.ReName);
+        Assert.Null(price.ToName);
 
         // rename перед comment (без завершающей ;)
         var stockCount = table.Columns.FirstOrDefault(c => c.Name == "stock_count");
         Assert.NotNull(stockCount);
         Assert.Equal("Количество на складе", stockCount.SqlComment);
-        Assert.Equal("quantity", stockCount.ReName);
+        Assert.Equal("quantity", stockCount.ToName);
 
         // Простой комментарий без служебных слов
         var simpleColumn = table.Columns.FirstOrDefault(c => c.Name == "simple_comment_column");
         Assert.NotNull(simpleColumn);
         Assert.Equal("Простой комментарий без служебных слов", simpleColumn.SqlComment);
-        Assert.Null(simpleColumn.ReName);
+        Assert.Null(simpleColumn.ToName);
     }
 
     [Fact]

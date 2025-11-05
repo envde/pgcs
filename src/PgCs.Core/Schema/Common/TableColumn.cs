@@ -13,12 +13,17 @@ public sealed record TableColumn
     /// <summary>
     /// Содержит переименованное название колонки, которое можно указать с помощью специального комментария
     /// </summary>
-    public string? ReName { get; init; }
+    public string? ToName { get; init; }
     
     /// <summary>
     /// Тип данных PostgreSQL (varchar, integer, timestamp, uuid и т.д.)
     /// </summary>
     public required string DataType { get; init; }
+    
+    /// <summary>
+    /// Измененный тип данных, который задается через служебный комментарий
+    /// </summary>
+    public string? ReDataDape {get; init;}
     
     /// <summary>
     /// Допускает ли колонка NULL значения

@@ -13,10 +13,10 @@ public sealed record SqlInlineComment
     /// <summary>
     /// Тип данных колонки
     /// </summary>
-    public string? DataType { get; init; }
+    public string? ToDateType { get; init; }
         
     /// <summary>
     /// Переименованное имя колонки
     /// </summary>
-    public string? RenameTo { get; init; }
+    public string? ToName { get; init; }
 }

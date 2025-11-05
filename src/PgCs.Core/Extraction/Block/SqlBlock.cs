@@ -31,10 +31,10 @@ public sealed record SqlBlock
     /// Ключ - позиция символа в Content, значение - текст комментария.
     /// Поддерживает также служебные слова, например.
     /// <code>
-    /// -- comment: Комментарий; type: BIGINT; rename: ID;
+    /// -- comment: Комментарий; to_type: BIGINT; to_name: ID;
     /// или
-    /// -- comment(Комментарий); type(BIGINT); rename(ID);
-    /// Где, comment - комментарий, type - тип данных, указанные пользователем, rename: переименованное
+    /// -- comment(Комментарий); to_type(BIGINT); to_name(ID);
+    /// Где, comment - комментарий, to_type - тип данных, указанные пользователем, to_name: переименованное
     /// название параметра.
     /// </code>
     /// </summary>

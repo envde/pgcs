@@ -458,7 +458,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                         column = column with 
                         { 
                             SqlComment = parsedComment.Comment,
-                            ReName = parsedComment.RenameTo
+                            ToName = parsedComment.ToName
                             // parsedComment.DataType можно использовать для валидации или переопределения
                         };
                     }

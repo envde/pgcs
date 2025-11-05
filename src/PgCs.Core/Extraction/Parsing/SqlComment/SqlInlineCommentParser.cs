@@ -6,17 +6,17 @@ namespace PgCs.Core.Extraction.Parsing.SqlComment;
 /// Парсер inline-комментариев специального формата для извлечения метаданных колонок
 /// <para>
 /// Поддерживает два формата:
-/// - comment: Описание колонки; type: BIGINT; rename: NewName;
-/// - comment(Описание колонки); type(BIGINT); rename(NewName);
+/// - comment: Описание колонки; to_type: BIGINT; to_name: NewName;
+/// - comment(Описание колонки); to_type(BIGINT); to_name(NewName);
 /// </para>
 /// </summary>
 public static partial class SqlInlineCommentParser
 {
     /// <summary>
     /// Паттерн для формата: comment: значение (может быть с или без завершающей ;)
-    /// Захватывает текст до следующего ключевого слова (type:, rename:) или до конца строки
+    /// Захватывает текст до следующего ключевого слова (to_type:, to_name:) или до конца строки
     /// </summary>
-    [GeneratedRegex(@"comment\s*:\s*([^;]+?)(?:\s*;\s*(?:type|rename)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"comment\s*:\s*([^;]+?)(?:\s*;\s*(?:to_type|to_name)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex CommentColonPattern();
 
     /// <summary>
@@ -26,29 +26,29 @@ public static partial class SqlInlineCommentParser
     private static partial Regex CommentParenPattern();
 
     /// <summary>
-    /// Паттерн для формата: type: значение (может быть с или без завершающей ;)
-    /// Захватывает текст до следующего ключевого слова (comment:, rename:) или до конца строки
+    /// Паттерн для формата: to_type: значение (может быть с или без завершающей ;)
+    /// Захватывает текст до следующего ключевого слова (comment:, to_name:) или до конца строки
     /// </summary>
-    [GeneratedRegex(@"type\s*:\s*([^;]+?)(?:\s*;\s*(?:comment|rename)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"to_type\s*:\s*([^;]+?)(?:\s*;\s*(?:comment|to_name)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TypeColonPattern();
 
     /// <summary>
-    /// Паттерн для формата: type(значение)
+    /// Паттерн для формата: to_type(значение)
     /// </summary>
-    [GeneratedRegex(@"type\s*\(([^)]+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"to_type\s*\(([^)]+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TypeParenPattern();
 
     /// <summary>
-    /// Паттерн для формата: rename: значение (может быть с или без завершающей ;)
-    /// Захватывает текст до следующего ключевого слова (comment:, type:) или до конца строки
+    /// Паттерн для формата: to_name: значение (может быть с или без завершающей ;)
+    /// Захватывает текст до следующего ключевого слова (comment:, to_type:) или до конца строки
     /// </summary>
-    [GeneratedRegex(@"rename\s*:\s*([^;]+?)(?:\s*;\s*(?:comment|type)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"to_name\s*:\s*([^;]+?)(?:\s*;\s*(?:comment|to_type)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex RenameColonPattern();
 
     /// <summary>
-    /// Паттерн для формата: rename(значение)
+    /// Паттерн для формата: to_name(значение)
     /// </summary>
-    [GeneratedRegex(@"rename\s*\(([^)]+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"to_name\s*\(([^)]+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex RenameParenPattern();
 
     /// <summary>
@@ -58,7 +58,7 @@ public static partial class SqlInlineCommentParser
     /// <returns>Извлеченные данные или null, если комментарий пустой</returns>
     /// <remarks>
     /// Поддерживает:
-    /// - Комментарии со служебными словами: comment: ...; type: ...; rename: ...
+    /// - Комментарии со служебными словами: comment: ...; to_type: ...; to_name: ...
     /// - Комментарии со служебными словами в любом порядке
     /// - Комментарии с частичным набором служебных слов
     /// - Простые комментарии без служебных слов
@@ -84,16 +84,16 @@ public static partial class SqlInlineCommentParser
             return new SqlInlineComment
             {
                 Comment = cleanComment,
-                DataType = null,
-                RenameTo = null
+                ToDateType = null,
+                ToName = null
             };
         }
 
         return new SqlInlineComment
         {
             Comment = commentText,
-            DataType = dataType,
-            RenameTo = renameTo
+            ToDateType = dataType,
+            ToName = renameTo
         };
     }
 
@@ -124,14 +124,14 @@ public static partial class SqlInlineCommentParser
     /// </summary>
     private static string? ExtractDataType(string text)
     {
-        // Пробуем формат: type: значение;
+        // Пробуем формат: to_type: значение;
         var match = TypeColonPattern().Match(text);
         if (match.Success)
         {
             return match.Groups[1].Value.Trim();
         }
 
-        // Пробуем формат: type(значение)
+        // Пробуем формат: to_type(значение)
         match = TypeParenPattern().Match(text);
         if (match.Success)
         {
@@ -146,14 +146,14 @@ public static partial class SqlInlineCommentParser
     /// </summary>
     private static string? ExtractRenameTo(string text)
     {
-        // Пробуем формат: rename: значение;
+        // Пробуем формат: to_name: значение;
         var match = RenameColonPattern().Match(text);
         if (match.Success)
         {
             return match.Groups[1].Value.Trim();
         }
 
-        // Пробуем формат: rename(значение)
+        // Пробуем формат: to_name(значение)
         match = RenameParenPattern().Match(text);
         if (match.Success)
         {

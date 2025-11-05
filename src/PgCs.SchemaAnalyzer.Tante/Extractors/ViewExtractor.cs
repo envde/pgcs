@@ -359,8 +359,8 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             if (parsedComment is not null)
             {
                 // Если есть распарсенный комментарий с метаданными, используем его данные
-                dataType = parsedComment.DataType ?? "unknown";
-                renameTo = parsedComment.RenameTo;
+                dataType = parsedComment.ToDateType ?? "unknown";
+                renameTo = parsedComment.ToName;
                 comment = parsedComment.Comment;
             }
             else if (inlineComment is not null)
@@ -397,7 +397,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             {
                 Name = columnName,
                 DataType = dataType,
-                ReName = renameTo,
+                ToName = renameTo,
                 SqlComment = comment,
                 IsNullable = true,
                 OrdinalPosition = position++,

@@ -132,10 +132,10 @@ public sealed class EnumExtractorTests
     {
         // Покрывает: comment: формат и comment() формат для enum типов
         
-        // Format 1: comment: Text; rename: NewName; type: TYPE;
+        // Format 1: comment: Text; to_name: NewName; to_type: TYPE;
         var blocks1 = CreateBlocks(
             "CREATE TYPE status AS ENUM ('active', 'inactive', 'pending');",
-            "comment: Статус пользователя в системе; rename: UserStatus; type: STATUS;");
+            "comment: Статус пользователя в системе; to_name: UserStatus; to_type: STATUS;");
         var result1 = _extractor.Extract(blocks1);
         
         Assert.True(result1.IsSuccess);
@@ -143,12 +143,12 @@ public sealed class EnumExtractorTests
         Assert.NotNull(result1.Definition.SqlComment);
         Assert.Contains("comment:", result1.Definition.SqlComment);
         Assert.Contains("Статус пользователя", result1.Definition.SqlComment);
-        Assert.Contains("rename:", result1.Definition.SqlComment);
+        Assert.Contains("to_name:", result1.Definition.SqlComment);
         
-        // Format 2: comment(Text); rename(NewName); type(TYPE);
+        // Format 2: comment(Text); to_name(NewName); to_type(TYPE);
         var blocks2 = CreateBlocks(
             "CREATE TYPE order_status AS ENUM ('new', 'processing', 'completed', 'cancelled');",
-            "comment(Статус заказа); rename(OrderStatus); type(ORDER_STATUS);");
+            "comment(Статус заказа); to_name(OrderStatus); to_type(ORDER_STATUS);");
         var result2 = _extractor.Extract(blocks2);
         
         Assert.True(result2.IsSuccess);
@@ -156,7 +156,7 @@ public sealed class EnumExtractorTests
         Assert.NotNull(result2.Definition.SqlComment);
         Assert.Contains("comment(", result2.Definition.SqlComment);
         Assert.Contains("Статус заказа", result2.Definition.SqlComment);
-        Assert.Contains("rename(", result2.Definition.SqlComment);
+        Assert.Contains("to_name(", result2.Definition.SqlComment);
         
         // Regular header comment
         var blocks3 = CreateBlocks(

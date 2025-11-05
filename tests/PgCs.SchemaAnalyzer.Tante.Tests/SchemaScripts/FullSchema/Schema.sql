@@ -21,11 +21,11 @@ COMMENT
 -- Структурированный адрес
 CREATE TYPE address AS
 (
-    street   VARCHAR(255), -- comment: Улица; type: VARCHAR(255); rename: StreetAddress
-    city     VARCHAR(100), -- comment: Город; type: VARCHAR(100); rename: CityName
-    state    VARCHAR(50),  -- comment: Штат/область; type: VARCHAR(50); rename: StateName
-    zip_code VARCHAR(20),  -- comment: Почтовый индекс; type: VARCHAR(20); rename: PostalCode
-    country  VARCHAR(50)   -- comment: Страна; type: VARCHAR(50); rename: CountryName
+    street   VARCHAR(255), -- comment: Улица; to_type: VARCHAR(255); to_name: StreetAddress
+    city     VARCHAR(100), -- comment: Город; to_type: VARCHAR(100); to_name: CityName
+    state    VARCHAR(50),  -- comment: Штат/область; to_type: VARCHAR(50); to_name: StateName
+    zip_code VARCHAR(20),  -- comment: Почтовый индекс; to_type: VARCHAR(20); to_name: PostalCode
+    country  VARCHAR(50)   -- comment: Страна; to_type: VARCHAR(50); to_name: CountryName
 );
 COMMENT
     ON TYPE address IS 'Структурированный тип данных для хранения адреса';
@@ -33,10 +33,10 @@ COMMENT
 -- Информация о контакте
 CREATE TYPE contact_info AS
 (
-    phone            VARCHAR(20),  -- comment: Телефонный номер; type: VARCHAR(20); rename: MainPhone
-    email            VARCHAR(255), -- comment: Почта; type: VARCHAR(255); rename: EmailAddress
-    telegram         VARCHAR(50),  -- comment: Телеграмм; type: VARCHAR(50); rename: TelegramHandle
-    preferred_method VARCHAR(20)   -- comment: Предпочитаемый способ связи; type: VARCHAR(20); rename: PreferredContactMethod
+    phone            VARCHAR(20),  -- comment: Телефонный номер; to_type: VARCHAR(20); to_name: MainPhone
+    email            VARCHAR(255), -- comment: Почта; to_type: VARCHAR(255); to_name: EmailAddress
+    telegram         VARCHAR(50),  -- comment: Телеграмм; to_type: VARCHAR(50); to_name: TelegramHandle
+    preferred_method VARCHAR(20)   -- comment: Предпочитаемый способ связи; to_type: VARCHAR(20); to_name: PreferredContactMethod
 );
 COMMENT
     ON TYPE contact_info IS 'Контактная информация с указанием предпочитаемого способа связи';
@@ -68,46 +68,46 @@ COMMENT
 -- Таблица пользователей
 CREATE TABLE users
 (
-    id                    BIGSERIAL PRIMARY KEY,                                                 -- comment: Уникальный идентификатор; type: BIGSERIAL; rename: UserId
+    id                    BIGSERIAL PRIMARY KEY,                                                 -- comment: Уникальный идентификатор; to_type: BIGSERIAL; to_name: UserId
 
-    username              VARCHAR(50)                 NOT NULL UNIQUE,                           -- comment: Логин пользователя; type: VARCHAR(50); rename: UserName
-    email                 email                       NOT NULL UNIQUE,                           -- comment: Email адрес; type: email; rename: EmailAddress
-    password_hash         VARCHAR(255)                NOT NULL,                                  -- comment: Хеш пароля; type: VARCHAR(255); rename: PasswordHash
-    full_name             VARCHAR(255),                                                          -- comment: Полное имя; type: VARCHAR(255); rename: FullName
-    status                user_status                 NOT NULL DEFAULT 'active',                 -- comment: Статус аккаунта; type: user_status; rename: AccountStatus
+    username              VARCHAR(50)                 NOT NULL UNIQUE,                           -- comment: Логин пользователя; to_type: VARCHAR(50); to_name: UserName
+    email                 email                       NOT NULL UNIQUE,                           -- comment: Email адрес; to_type: email; to_name: EmailAddress
+    password_hash         VARCHAR(255)                NOT NULL,                                  -- to_name: PasswordHash
+    full_name             VARCHAR(255),                                                          -- comment: Полное имя; to_type: VARCHAR(255); to_name: FullName
+    status                user_status                 NOT NULL DEFAULT 'active',                 -- to_name: AccountStatus; to_type: user_status;
 
-    preferences           JSONB                                DEFAULT '{}',                     -- comment: Настройки пользователя; type: JSONB; rename: UserPreferences
-    metadata              JSONB,                                                                 -- comment: Дополнительные метаданные; type: JSONB; rename: Metadata
+    preferences           JSONB                                DEFAULT '{}',                     -- comment: Настройки пользователя; to_type: JSONB; to_name: UserPreferences
+    metadata              JSONB,                                                                 -- comment: Дополнительные метаданные; to_type: JSONB; to_name: Metadata
 
-    billing_address       address,                                                               -- comment: Адрес выставления счетов; type: address; rename: BillingAddress
-    contact               contact_info,                                                          -- comment: Контактная информация; type: contact_info; rename: ContactInfo
+    billing_address       address,                                                               -- comment: Адрес выставления счетов; to_type: address; to_name: BillingAddress
+    contact               contact_info,                                                          -- comment: Контактная информация; to_type: contact_info; to_name: ContactInfo
 
-    phone_numbers         phone_number[],                                                        -- comment: Массив телефонных номеров; type: phone_number[]; rename: PhoneNumbers
-    tags                  TEXT[],                                                                -- comment: Теги пользователя; type: TEXT[]; rename: UserTags
-    roles                 VARCHAR(50)[],                                                         -- comment: Роли пользователя; type: VARCHAR(50)[]; rename: UserRoles
+    phone_numbers         phone_number[],                                                        -- comment: Массив телефонных номеров; to_type: phone_number[]; to_name: PhoneNumbers
+    tags                  TEXT[],                                                                -- comment: Теги пользователя; to_type: TEXT[]; to_name: UserTags
+    roles                 VARCHAR(50)[],                                                         -- comment: Роли пользователя; to_type: VARCHAR(50)[]; to_name: UserRoles
 
-    created_at            TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,        -- comment: Дата создания; type: TIMESTAMP(6) WITH TIME ZONE; rename: CreatedAt
-    updated_at            TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,        -- comment: Дата обновления; type: TIMESTAMP(6) WITH TIME ZONE; rename: UpdatedAt
-    last_login_at         TIMESTAMP(6) WITH TIME ZONE,                                           -- comment: Последний вход; type: TIMESTAMP(6) WITH TIME ZONE; rename: LastLoginAt
-    deleted_at            TIMESTAMP(6) WITH TIME ZONE,                                           -- comment: Дата удаления; type: TIMESTAMP(6) WITH TIME ZONE; rename: DeletedAt
+    created_at            TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,        -- comment: Дата создания; to_type: TIMESTAMP(6) WITH TIME ZONE; to_name: CreatedAt
+    updated_at            TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,        -- comment: Дата обновления; to_type: TIMESTAMP(6) WITH TIME ZONE; to_name: UpdatedAt
+    last_login_at         TIMESTAMP(6) WITH TIME ZONE,                                           -- comment: Последний вход; to_type: TIMESTAMP(6) WITH TIME ZONE; to_name: LastLoginAt
+    deleted_at            TIMESTAMP(6) WITH TIME ZONE,                                           -- comment: Дата удаления; to_type: TIMESTAMP(6) WITH TIME ZONE; to_name: DeletedAt
 
-    balance               positive_numeric                     DEFAULT 0.00,                     -- comment: Баланс пользователя; type: positive_numeric; rename: UserBalance
-    loyalty_points        INTEGER                              DEFAULT 0,                        -- comment: Баллы лояльности; type: INTEGER; rename: LoyaltyPoints
-    discount_percent      percentage                           DEFAULT 0,                        -- comment: Процент скидки; type: percentage; rename: DiscountPercent
+    balance               positive_numeric                     DEFAULT 0.00,                     -- comment: Баланс пользователя; to_type: positive_numeric; to_name: UserBalance
+    loyalty_points        INTEGER                              DEFAULT 0,                        -- comment: Баллы лояльности; to_type: INTEGER; to_name: LoyaltyPoints
+    discount_percent      percentage                           DEFAULT 0,                        -- comment: Процент скидки; to_type: percentage; to_name: DiscountPercent
 
-    is_verified           BOOLEAN                     NOT NULL DEFAULT FALSE,                    -- comment: Email подтвержден; type: BOOLEAN; rename: IsVerified
-    is_premium            BOOLEAN                     NOT NULL DEFAULT FALSE,                    -- comment: Премиум аккаунт; type: BOOLEAN; rename: IsPremium
-    is_deleted            BOOLEAN                     NOT NULL DEFAULT FALSE,                    -- comment: Удален; type: BOOLEAN; rename: IsDeleted
+    is_verified           BOOLEAN                     NOT NULL DEFAULT FALSE,                    -- comment: Email подтвержден; to_type: BOOLEAN; to_name: IsVerified
+    is_premium            BOOLEAN                     NOT NULL DEFAULT FALSE,                    -- comment: Премиум аккаунт; to_type: BOOLEAN; to_name: IsPremium
+    is_deleted            BOOLEAN                     NOT NULL DEFAULT FALSE,                    -- comment: Удален; to_type: BOOLEAN; to_name: IsDeleted
 
-    avatar                BYTEA,                                                                 -- comment: Аватар пользователя; type: BYTEA; rename: AvatarImage
+    avatar                BYTEA,                                                                 -- comment: Аватар пользователя; to_type: BYTEA; to_name: AvatarImage
 
-    external_id           UUID                        NOT NULL DEFAULT gen_random_uuid() UNIQUE, -- comment: Внешний идентификатор; type: UUID; rename: ExternalId
+    external_id           UUID                        NOT NULL DEFAULT gen_random_uuid() UNIQUE, -- comment: Внешний идентификатор; to_type: UUID; to_name: ExternalId
 
-    date_of_birth         DATE,                                                                  -- comment: Дата рождения; type: DATE; rename: BirthDate
+    date_of_birth         DATE,                                                                  -- comment: Дата рождения; to_type: DATE; to_name: BirthDate
 
-    subscription_duration INTERVAL,                                                              -- comment: Длительность подписки; type: INTERVAL; rename: SubscriptionDuration
+    subscription_duration INTERVAL,                                                              -- comment: Длительность подписки; to_type: INTERVAL; to_name: SubscriptionDuration
 
-    active_period         TSTZRANGE,                                                             -- comment: Период активности; type: TSTZRANGE; rename: ActivePeriod
+    active_period         TSTZRANGE,                                                             -- comment: Период активности; to_type: TSTZRANGE; to_name: ActivePeriod
 
     CONSTRAINT check_balance CHECK (balance >= 0),
     CONSTRAINT check_loyalty_points CHECK (loyalty_points >= 0),
@@ -223,25 +223,25 @@ COMMENT
 -- Таблица категорий товаров
 CREATE TABLE categories
 (
-    id            SERIAL PRIMARY KEY,                                               -- comment: Идентификатор категории; type: SERIAL; rename: CategoryId
+    id            SERIAL PRIMARY KEY,                                               -- comment: Идентификатор категории; to_type: SERIAL; to_name: CategoryId
 
-    name          VARCHAR(100)                NOT NULL,                             -- comment: Название категории; type: VARCHAR(100); rename: CategoryName
-    slug          VARCHAR(100)                NOT NULL UNIQUE,                      -- comment: URL-идентификатор; type: VARCHAR(100); rename: UrlSlug
-    description   TEXT,                                                             -- comment: Описание категории; type: TEXT; rename: Description
+    name          VARCHAR(100)                NOT NULL,                             -- comment: Название категории; to_type: VARCHAR(100); to_name: CategoryName
+    slug          VARCHAR(100)                NOT NULL UNIQUE,                      -- comment: URL-идентификатор; to_type: VARCHAR(100); to_name: UrlSlug
+    description   TEXT,                                                             -- comment: Описание категории; to_type: TEXT; to_name: Description
 
-    parent_id     INTEGER,                                                          -- comment: Родительская категория; type: INTEGER; rename: ParentCategoryId
-    level         INTEGER                     NOT NULL DEFAULT 0,                   -- comment: Уровень вложенности; type: INTEGER; rename: HierarchyLevel
-    path          INTEGER[]                   NOT NULL DEFAULT ARRAY []::INTEGER[], -- comment: Путь в иерархии; type: INTEGER[]; rename: HierarchyPath
+    parent_id     INTEGER,                                                          -- comment: Родительская категория; to_type: INTEGER; to_name: ParentCategoryId
+    level         INTEGER                     NOT NULL DEFAULT 0,                   -- comment: Уровень вложенности; to_type: INTEGER; to_name: HierarchyLevel
+    path          INTEGER[]                   NOT NULL DEFAULT ARRAY []::INTEGER[], -- comment: Путь в иерархии; to_type: INTEGER[]; to_name: HierarchyPath
 
-    search_vector TSVECTOR,                                                         -- comment: Вектор для поиска; type: TSVECTOR; rename: SearchVector
+    search_vector TSVECTOR,                                                         -- comment: Вектор для поиска; to_type: TSVECTOR; to_name: SearchVector
 
-    metadata      JSONB                                DEFAULT '{}',                -- comment: Метаданные категории; type: JSONB; rename: CategoryMetadata
+    metadata      JSONB                                DEFAULT '{}',                -- comment: Метаданные категории; to_type: JSONB; to_name: CategoryMetadata
 
-    sort_order    INTEGER                     NOT NULL DEFAULT 0,                   -- comment: Порядок сортировки; type: INTEGER; rename: SortOrder
-    is_active     BOOLEAN                     NOT NULL DEFAULT TRUE,                -- comment: Активна ли категория; type: BOOLEAN; rename: IsActive
+    sort_order    INTEGER                     NOT NULL DEFAULT 0,                   -- comment: Порядок сортировки; to_type: INTEGER; to_name: SortOrder
+    is_active     BOOLEAN                     NOT NULL DEFAULT TRUE,                -- comment: Активна ли категория; to_type: BOOLEAN; to_name: IsActive
 
-    created_at    TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,   -- comment: Дата создания; type: TIMESTAMP(6) WITH TIME ZONE; rename: CreatedAt
-    updated_at    TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,   -- comment: Дата обновления; type: TIMESTAMP(6) WITH TIME ZONE; rename: UpdatedAt
+    created_at    TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,   -- comment: Дата создания; to_type: TIMESTAMP(6) WITH TIME ZONE; to_name: CreatedAt
+    updated_at    TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,   -- comment: Дата обновления; to_type: TIMESTAMP(6) WITH TIME ZONE; to_name: UpdatedAt
 
     CONSTRAINT fk_parent_category FOREIGN KEY (parent_id)
         REFERENCES categories (id)

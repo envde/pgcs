@@ -4,15 +4,15 @@ CREATE TABLE users
     id               BIGSERIAL PRIMARY KEY,                                 -- Первичный ключ
     username         VARCHAR(50)                 NOT NULL UNIQUE,           -- Имя пользователя
     email            email                       NOT NULL UNIQUE,           -- Электронная почта
-    password_hash    VARCHAR(255)                NOT NULL,                  -- comment: Хэш пароля; type: VARCHAR(255); rename: PasswordHash;
+    password_hash    VARCHAR(255)                NOT NULL,                  -- comment: Хэш пароля; to_type: VARCHAR(255); to_name: PasswordHash;
     full_name        VARCHAR(255),                                          -- Полное имя пользователя
     status           user_status                 NOT NULL DEFAULT 'active', -- Статус аккаунта
 
     -- JSON данные для гибкости
     preferences      JSONB                                DEFAULT '{}',
     metadata         JSONB,
-    billing_address  address, -- comment: Адрес; type: address;
-    contact          contact_info, -- comment: Информация о контакте; rename: ContactInfo;
+    billing_address  address, -- comment: Адрес; to_type: address;
+    contact          contact_info, -- comment: Информация о контакте; to_name: ContactInfo;
 
     -- Массивы
     phone_numbers    phone_number[],
