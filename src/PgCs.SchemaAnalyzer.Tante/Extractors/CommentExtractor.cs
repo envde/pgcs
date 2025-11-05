@@ -34,7 +34,7 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
     /// Группы: schema, table, comment
     /// </summary>
     [GeneratedRegex(
-        @"^\s*COMMENT\s+ON\s+TABLE\s+(?:(?<schema>\w+)\.)?(?<table>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
+        @"\A\s*COMMENT\s+ON\s+TABLE\s+(?:(?<schema>\w+)\.)?(?<table>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex TableCommentPattern();
@@ -44,7 +44,7 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
     /// Группы: schema, table, column, comment
     /// </summary>
     [GeneratedRegex(
-        @"^\s*COMMENT\s+ON\s+COLUMN\s+(?:(?<schema>\w+)\.)?(?<table>\w+)\.(?<column>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
+        @"\A\s*COMMENT\s+ON\s+COLUMN\s+(?:(?<schema>\w+)\.)?(?<table>\w+)\.(?<column>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex ColumnCommentPattern();
@@ -54,7 +54,7 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
     /// Группы: schema, function, params, comment
     /// </summary>
     [GeneratedRegex(
-        @"^\s*COMMENT\s+ON\s+(?:FUNCTION|PROCEDURE)\s+(?:(?<schema>\w+)\.)?(?<function>\w+)\s*\((?<params>[^)]*)\)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
+        @"\A\s*COMMENT\s+ON\s+(?:FUNCTION|PROCEDURE)\s+(?:(?<schema>\w+)\.)?(?<function>\w+)\s*\((?<params>[^)]*)\)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex FunctionCommentPattern();
@@ -64,7 +64,7 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
     /// Группы: schema, index, comment
     /// </summary>
     [GeneratedRegex(
-        @"^\s*COMMENT\s+ON\s+INDEX\s+(?:(?<schema>\w+)\.)?(?<index>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
+        @"\A\s*COMMENT\s+ON\s+INDEX\s+(?:(?<schema>\w+)\.)?(?<index>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex IndexCommentPattern();
@@ -74,7 +74,7 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
     /// Группы: trigger, schema, table, comment
     /// </summary>
     [GeneratedRegex(
-        @"^\s*COMMENT\s+ON\s+TRIGGER\s+(?<trigger>\w+)\s+ON\s+(?:(?<schema>\w+)\.)?(?<table>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
+        @"\A\s*COMMENT\s+ON\s+TRIGGER\s+(?<trigger>\w+)\s+ON\s+(?:(?<schema>\w+)\.)?(?<table>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex TriggerCommentPattern();
@@ -84,7 +84,7 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
     /// Группы: constraint, schema, table, comment
     /// </summary>
     [GeneratedRegex(
-        @"^\s*COMMENT\s+ON\s+CONSTRAINT\s+(?<constraint>\w+)\s+ON\s+(?:(?<schema>\w+)\.)?(?<table>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
+        @"\A\s*COMMENT\s+ON\s+CONSTRAINT\s+(?<constraint>\w+)\s+ON\s+(?:(?<schema>\w+)\.)?(?<table>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex ConstraintCommentPattern();
@@ -94,7 +94,7 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
     /// Группы: schema, type, comment
     /// </summary>
     [GeneratedRegex(
-        @"^\s*COMMENT\s+ON\s+TYPE\s+(?:(?<schema>\w+)\.)?(?<type>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
+        @"\A\s*COMMENT\s+ON\s+TYPE\s+(?:(?<schema>\w+)\.)?(?<type>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex TypeCommentPattern();
@@ -104,7 +104,7 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
     /// Группы: schema, view, comment
     /// </summary>
     [GeneratedRegex(
-        @"^\s*COMMENT\s+ON\s+(?:MATERIALIZED\s+)?VIEW\s+(?:(?<schema>\w+)\.)?(?<view>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
+        @"\A\s*COMMENT\s+ON\s+(?:MATERIALIZED\s+)?VIEW\s+(?:(?<schema>\w+)\.)?(?<view>\w+)\s+IS\s+'(?<comment>(?:[^']|'')*)'",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex ViewCommentPattern();
@@ -124,7 +124,8 @@ public sealed partial class CommentExtractor : IExtractor<CommentDefinition>
         }
 
         var content = blocks[0].Content;
-        return content.Contains("COMMENT ON", StringComparison.OrdinalIgnoreCase);
+        // Use regex to match COMMENT followed by any whitespace and ON
+        return Regex.IsMatch(content, @"\ACOMMENT\s+ON\s+", RegexOptions.IgnoreCase | RegexOptions.Singleline);
     }
 
     /// <inheritdoc />

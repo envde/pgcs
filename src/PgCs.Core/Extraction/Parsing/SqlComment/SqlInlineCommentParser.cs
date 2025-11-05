@@ -13,9 +13,10 @@ namespace PgCs.Core.Extraction.Parsing.SqlComment;
 public static partial class SqlInlineCommentParser
 {
     /// <summary>
-    /// Паттерн для формата: comment: значение;
+    /// Паттерн для формата: comment: значение (может быть с или без завершающей ;)
+    /// Захватывает текст до следующего ключевого слова (type:, rename:) или до конца строки
     /// </summary>
-    [GeneratedRegex(@"comment\s*:\s*([^;]+);?", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"comment\s*:\s*([^;]+?)(?:\s*;\s*(?:type|rename)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex CommentColonPattern();
 
     /// <summary>
@@ -25,9 +26,10 @@ public static partial class SqlInlineCommentParser
     private static partial Regex CommentParenPattern();
 
     /// <summary>
-    /// Паттерн для формата: type: значение;
+    /// Паттерн для формата: type: значение (может быть с или без завершающей ;)
+    /// Захватывает текст до следующего ключевого слова (comment:, rename:) или до конца строки
     /// </summary>
-    [GeneratedRegex(@"type\s*:\s*([^;]+);?", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"type\s*:\s*([^;]+?)(?:\s*;\s*(?:comment|rename)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TypeColonPattern();
 
     /// <summary>
@@ -37,9 +39,10 @@ public static partial class SqlInlineCommentParser
     private static partial Regex TypeParenPattern();
 
     /// <summary>
-    /// Паттерн для формата: rename: значение;
+    /// Паттерн для формата: rename: значение (может быть с или без завершающей ;)
+    /// Захватывает текст до следующего ключевого слова (comment:, type:) или до конца строки
     /// </summary>
-    [GeneratedRegex(@"rename\s*:\s*([^;]+);?", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"rename\s*:\s*([^;]+?)(?:\s*;\s*(?:comment|type)|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex RenameColonPattern();
 
     /// <summary>
@@ -52,7 +55,14 @@ public static partial class SqlInlineCommentParser
     /// Парсит inline-комментарий и извлекает метаданные
     /// </summary>
     /// <param name="comment">Текст комментария (без префикса --)</param>
-    /// <returns>Извлеченные данные или null, если комментарий не содержит метаданных</returns>
+    /// <returns>Извлеченные данные или null, если комментарий пустой</returns>
+    /// <remarks>
+    /// Поддерживает:
+    /// - Комментарии со служебными словами: comment: ...; type: ...; rename: ...
+    /// - Комментарии со служебными словами в любом порядке
+    /// - Комментарии с частичным набором служебных слов
+    /// - Простые комментарии без служебных слов
+    /// </remarks>
     public static SqlInlineComment? Parse(string? comment)
     {
         if (string.IsNullOrWhiteSpace(comment))
@@ -67,10 +77,16 @@ public static partial class SqlInlineCommentParser
         var dataType = ExtractDataType(cleanComment);
         var renameTo = ExtractRenameTo(cleanComment);
 
-        // Если ничего не найдено, возвращаем null
+        // Если ничего не найдено через ключевые слова, считаем весь текст комментарием
         if (commentText is null && dataType is null && renameTo is null)
         {
-            return null;
+            // Просто комментарий без служебных слов
+            return new SqlInlineComment
+            {
+                Comment = cleanComment,
+                DataType = null,
+                RenameTo = null
+            };
         }
 
         return new SqlInlineComment

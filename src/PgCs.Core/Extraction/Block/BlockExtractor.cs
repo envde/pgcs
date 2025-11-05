@@ -80,13 +80,11 @@ public sealed class BlockExtractor : IBlockExtractor
         List<SqlBlock> blocks,
         int lineNumber)
     {
-        if (state.IsInsideBlock && !accumulator.IsEmpty)
-        {
-            blocks.Add(accumulator.BuildBlock(lineNumber - 1));
-            accumulator.Reset();
-            state.ExitBlock();
-        }
-        else if (accumulator.HasHeaderComments)
+        // Пустые строки внутри блока (например, между колонками CREATE TABLE) - игнорируем
+        // Блок заканчивается только на semicolon, не на пустой строке
+        
+        // Если комментарии перед блоком, отмечаем пустую строку после комментария
+        if (accumulator.HasHeaderComments && !state.IsInsideBlock)
         {
             state.MarkEmptyLineAfterComment();
         }

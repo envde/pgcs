@@ -85,15 +85,15 @@ public sealed class BlockAccumulator
     /// Извлекает ключ (имя поля, параметра) из кода перед комментарием.
     /// </summary>
     /// <param name="code">Код перед комментарием</param>
-    /// <returns>Последний идентификатор в коде</returns>
+    /// <returns>Первый идентификатор в коде (имя колонки или параметра)</returns>
     private static string ExtractKeyFromCode(string code)
     {
         // Убираем лишние пробелы и запятые в конце
         var trimmed = code.Trim().TrimEnd(',', ' ', '\t');
         
-        // Ищем последнее слово (идентификатор)
+        // Ищем первое слово (идентификатор) - это имя колонки или параметра
         var parts = trimmed.Split([' ', '\t', '\n', '\r', ',', '(', ')'], StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length > 0 ? parts[^1] : trimmed;
+        return parts.Length > 0 ? parts[0] : trimmed;
     }
 
     /// <summary>

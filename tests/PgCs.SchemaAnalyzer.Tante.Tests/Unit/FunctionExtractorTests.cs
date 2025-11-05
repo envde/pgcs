@@ -292,6 +292,36 @@ public sealed class FunctionExtractorTests
         Assert.False(emptyResult.IsSuccess);
     }
 
+    [Fact]
+    public void Extract_MultilineCreateFunction_ShouldWork()
+    {
+        // Test для CREATE на отдельной строке от OR REPLACE FUNCTION
+        var sql = @"CREATE
+    OR REPLACE FUNCTION update_category_search_vector()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    NEW.search_vector := setweight(to_tsvector('english', COALESCE(NEW.name, '')), 'A');
+    RETURN NEW;
+END;
+$$
+    LANGUAGE plpgsql;";
+        
+        var blocks = CreateBlocks(sql);
+        
+        // Act
+        var canExtract = _extractor.CanExtract(blocks);
+        var result = _extractor.Extract(blocks);
+        
+        // Assert
+        Assert.True(canExtract, "CanExtract should return true for multiline CREATE");
+        Assert.True(result.IsSuccess, $"Extract should succeed. Issues: {string.Join(", ", result.ValidationIssues.Select(i => i.Message))}");
+        Assert.NotNull(result.Definition);
+        Assert.Equal("update_category_search_vector", result.Definition.Name);
+        Assert.Equal("TRIGGER", result.Definition.ReturnType);
+        Assert.Equal("plpgsql", result.Definition.Language);
+    }
+
     private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? headerComment = null)
     {
         var lines = sql.Split('\n');

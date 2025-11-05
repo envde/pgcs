@@ -34,7 +34,7 @@ public sealed partial class FunctionExtractor : IExtractor<FunctionDefinition>
     /// - name: имя функции
     /// </summary>
     [GeneratedRegex(
-        @"^\s*CREATE\s+(?:(OR\s+REPLACE)\s+)?(FUNCTION|PROCEDURE)\s+(?:(\w+)\.)?(\w+)\s*\(",
+        @"\s*CREATE\s+(?:(OR\s+REPLACE)\s+)?(FUNCTION|PROCEDURE)\s+(?:(\w+)\.)?(\w+)\s*\(",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex CreateFunctionPattern();
@@ -459,19 +459,14 @@ public sealed partial class FunctionExtractor : IExtractor<FunctionDefinition>
     /// </summary>
     private static string? ExtractBody(string sql)
     {
-        // Ищем AS или BEGIN
-        var asIndex = sql.IndexOf(" AS ", StringComparison.OrdinalIgnoreCase);
-        if (asIndex == -1)
-        {
-            asIndex = sql.IndexOf("\nAS ", StringComparison.OrdinalIgnoreCase);
-        }
-
-        if (asIndex == -1)
+        // Ищем AS (с учётом что после AS может быть любой whitespace, включая переносы)
+        var asMatch = Regex.Match(sql, @"\bAS\s+", RegexOptions.IgnoreCase);
+        if (!asMatch.Success)
         {
             return null;
         }
 
-        var bodyStart = asIndex + 4;
+        var bodyStart = asMatch.Index + asMatch.Length;
         
         // Ищем конец функции (обычно это последняя точка с запятой или конец блока)
         var bodyEnd = sql.Length;

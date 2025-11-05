@@ -13,46 +13,46 @@ public static partial class SchemaObjectDetector
     // ============================================================================
     
     // CREATE TYPE / DOMAIN
-    [GeneratedRegex(@"^\s*CREATE\s+TYPE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*CREATE\s+TYPE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateTypePattern();
 
-    [GeneratedRegex(@"^\s*CREATE\s+DOMAIN\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*CREATE\s+DOMAIN\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateDomainPattern();
 
     // CREATE TABLE
-    [GeneratedRegex(@"^\s*CREATE\s+TABLE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*CREATE\s+TABLE\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateTablePattern();
 
     // CREATE TABLE ... PARTITION OF (must be checked before regular tables)
-    [GeneratedRegex(@"^\s*CREATE\s+TABLE\s+.*\s+PARTITION\s+OF\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*CREATE\s+TABLE\s+.*\s+PARTITION\s+OF\s+", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled)]
     private static partial Regex CreatePartitionPattern();
 
     // CREATE INDEX (объединено: обычные и уникальные индексы)
-    [GeneratedRegex(@"^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateIndexPattern();
 
     // CREATE VIEW (объединено: обычные и материализованные)
-    [GeneratedRegex(@"^\s*CREATE\s+(?:MATERIALIZED\s+)?(?:OR\s+REPLACE\s+)?VIEW\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*CREATE\s+(?:MATERIALIZED\s+)?(?:OR\s+REPLACE\s+)?VIEW\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateViewPattern();
 
     // CREATE FUNCTION/PROCEDURE (объединено)
-    [GeneratedRegex(@"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateFunctionPattern();
 
     // CREATE TRIGGER
-    [GeneratedRegex(@"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CreateTriggerPattern();
 
     // ALTER TABLE ADD CONSTRAINT
-    [GeneratedRegex(@"^\s*ALTER\s+TABLE\s+\S+\s+ADD\s+CONSTRAINT\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*ALTER\s+TABLE\s+\S+\s+ADD\s+CONSTRAINT\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex AlterTableAddConstraintPattern();
 
     // COMMENT ON (объединено в один паттерн)
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*COMMENT\s+ON\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CommentOnPattern();
 
     // Дополнительные паттерны для уточнения типа COMMENT ON
-    [GeneratedRegex(@"^\s*COMMENT\s+ON\s+(TYPE|DOMAIN|TABLE|COLUMN|INDEX|VIEW|MATERIALIZED\s+VIEW|FUNCTION|PROCEDURE|TRIGGER|CONSTRAINT)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\A\s*COMMENT\s+ON\s+(TYPE|DOMAIN|TABLE|COLUMN|INDEX|VIEW|MATERIALIZED\s+VIEW|FUNCTION|PROCEDURE|TRIGGER|CONSTRAINT)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CommentOnObjectTypePattern();
 
     // ============================================================================

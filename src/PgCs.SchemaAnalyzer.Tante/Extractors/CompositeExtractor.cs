@@ -24,7 +24,7 @@ namespace PgCs.SchemaAnalyzer.Tante.Extractors;
 public sealed partial class CompositeExtractor : IExtractor<CompositeTypeDefinition>
 {
     // Regex для определения CREATE TYPE AS (...)
-    [GeneratedRegex(@"^\s*CREATE\s+TYPE\s+(?:(?<schema>\w+)\.)?(?<name>\w+)\s+AS\s*\(\s*(?<attributes>.*?)\s*\)\s*;?\s*$",
+    [GeneratedRegex(@"\s*CREATE\s+TYPE\s+(?:(?<schema>\w+)\.)?(?<name>\w+)\s+AS\s*\(\s*(?<attributes>.*)\s*\)\s*;\s*",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled,
         matchTimeoutMilliseconds: 1000)]
     private static partial Regex CompositePattern();
@@ -49,7 +49,7 @@ public sealed partial class CompositeExtractor : IExtractor<CompositeTypeDefinit
         var block = blocks[0];
         var content = block.Content;
         return content.Contains("CREATE TYPE", StringComparison.OrdinalIgnoreCase) &&
-               content.Contains(" AS ", StringComparison.OrdinalIgnoreCase) &&
+               content.Contains(" AS", StringComparison.OrdinalIgnoreCase) &&
                content.Contains('(') &&
                !content.Contains("AS ENUM", StringComparison.OrdinalIgnoreCase);
     }

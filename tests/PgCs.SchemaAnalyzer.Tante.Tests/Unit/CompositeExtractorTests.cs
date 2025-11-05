@@ -234,6 +234,61 @@ public sealed class CompositeExtractorTests
         Assert.Throws<ArgumentNullException>(() => _extractor.Extract(null!));
     }
 
+    [Fact]
+    public void Extract_CompositeWithInlineComments_ShouldIgnoreComments()
+    {
+        // Arrange - SQL с inline комментариями как в Schema.sql
+        var sql = @"CREATE TYPE address AS
+(
+    street   VARCHAR(255), -- comment: Улица; type: VARCHAR(255); rename: StreetAddress
+    city     VARCHAR(100), -- comment: Город; type: VARCHAR(100); rename: CityName
+    state    VARCHAR(50),  -- comment: Штат/область; type: VARCHAR(50); rename: StateName
+    zip_code VARCHAR(20),  -- comment: Почтовый индекс; type: VARCHAR(20); rename: PostalCode
+    country  VARCHAR(50)   -- comment: Страна; type: VARCHAR(50); rename: CountryName
+);";
+        
+        // Важно: Нужно симулировать поведение BlockExtractor - удалить inline комментарии из Content
+        var sqlWithoutComments = @"CREATE TYPE address AS
+(
+    street   VARCHAR(255),
+    city     VARCHAR(100),
+    state    VARCHAR(50),
+    zip_code VARCHAR(20),
+    country  VARCHAR(50)
+);";
+
+        var blocks = new List<SqlBlock>
+        {
+            new SqlBlock
+            {
+                Content = sqlWithoutComments,
+                RawContent = sql,
+                StartLine = 1,
+                EndLine = 9,
+                HeaderComment = null
+            }
+        };
+        
+        // Act
+        var result = _extractor.Extract(blocks);
+        
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Definition);
+        Assert.Equal("address", result.Definition.Name);
+        Assert.Equal(5, result.Definition.Attributes.Count);
+        
+        Assert.Equal("street", result.Definition.Attributes[0].Name);
+        Assert.Equal("VARCHAR", result.Definition.Attributes[0].DataType);
+        Assert.Equal(255, result.Definition.Attributes[0].MaxLength);
+        
+        Assert.Equal("city", result.Definition.Attributes[1].Name);
+        Assert.Equal(100, result.Definition.Attributes[1].MaxLength);
+        
+        Assert.Equal("zip_code", result.Definition.Attributes[3].Name);
+        Assert.Equal(20, result.Definition.Attributes[3].MaxLength);
+    }
+
     private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? headerComment = null)
     {
         return [new SqlBlock

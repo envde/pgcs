@@ -340,12 +340,13 @@ public sealed class TableExtractorTests
         // Формат 2: comment(Описание); type(ТИП); rename(НовоеИмя);
         var blocks = CreateBlocks(@"
             CREATE TABLE products (
-                id BIGSERIAL PRIMARY KEY, -- comment: Уникальный идентификатор товара; type: BIGINT; rename: product_id;
-                legacy_name VARCHAR(100), -- comment(Устаревшее имя товара); type(TEXT); rename(product_name);
-                category_id INTEGER, -- comment: ID категории; rename: cat_id;
-                description TEXT, -- comment(Полное описание товара);
-                price NUMERIC(10,2), -- type: DECIMAL; comment: Цена товара;
-                stock_count INTEGER -- rename(quantity); comment(Количество на складе);
+                id BIGSERIAL PRIMARY KEY, -- comment: Уникальный идентификатор товара; type: BIGINT; rename: product_id
+                legacy_name VARCHAR(100), -- comment(Устаревшее имя товара); type(TEXT); rename(product_name)
+                category_id INTEGER, -- comment: ID категории; rename: cat_id
+                description TEXT, -- comment(Полное описание товара)
+                price NUMERIC(10,2), -- type: DECIMAL; comment: Цена товара
+                stock_count INTEGER, -- rename: quantity; comment: Количество на складе
+                simple_comment_column TEXT -- Простой комментарий без служебных слов
             );
         ");
 
@@ -360,47 +361,49 @@ public sealed class TableExtractorTests
         var table = result.Definition;
         Assert.NotNull(table);
         Assert.Equal("products", table.Name);
-        Assert.Equal(6, table.Columns.Count);
+        Assert.Equal(7, table.Columns.Count);
 
-        // Формат 1: comment: ...; type: ...; rename: ...;
+        // Формат 1: comment: ...; type: ...; rename: ... (без завершающей ;)
         var id = table.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(id);
-        // Полный комментарий сохранён как есть
-        Assert.Contains("comment:", id.Comment);
-        Assert.Contains("Уникальный идентификатор товара", id.Comment);
-        Assert.Contains("type:", id.Comment);
-        Assert.Contains("rename:", id.Comment);
+        Assert.Equal("Уникальный идентификатор товара", id.Comment);
+        Assert.Equal("product_id", id.ReName);
 
-        // Формат 2: comment(...); type(...); rename(...);
+        // Формат 2: comment(...); type(...); rename(...) (без завершающей ;)
         var legacyName = table.Columns.FirstOrDefault(c => c.Name == "legacy_name");
         Assert.NotNull(legacyName);
-        Assert.Contains("comment(", legacyName.Comment);
-        Assert.Contains("Устаревшее имя товара", legacyName.Comment);
-        Assert.Contains("type(TEXT)", legacyName.Comment);
-        Assert.Contains("rename(product_name)", legacyName.Comment);
+        Assert.Equal("Устаревшее имя товара", legacyName.Comment);
+        Assert.Equal("product_name", legacyName.ReName);
 
-        // Частичный формат: только comment и rename
+        // Частичный формат: только comment и rename (без завершающей ;)
         var categoryId = table.Columns.FirstOrDefault(c => c.Name == "category_id");
         Assert.NotNull(categoryId);
-        Assert.Contains("ID категории", categoryId.Comment);
-        Assert.Contains("rename:", categoryId.Comment);
+        Assert.Equal("ID категории", categoryId.Comment);
+        Assert.Equal("cat_id", categoryId.ReName);
 
-        // Только comment
+        // Только comment в скобках (без завершающей ;)
         var description = table.Columns.FirstOrDefault(c => c.Name == "description");
         Assert.NotNull(description);
-        Assert.Contains("Полное описание товара", description.Comment);
+        Assert.Equal("Полное описание товара", description.Comment);
+        Assert.Null(description.ReName);
 
-        // type перед comment
+        // type перед comment (без завершающей ;)
         var price = table.Columns.FirstOrDefault(c => c.Name == "price");
         Assert.NotNull(price);
-        Assert.Contains("type:", price.Comment);
-        Assert.Contains("Цена товара", price.Comment);
+        Assert.Equal("Цена товара", price.Comment);
+        Assert.Null(price.ReName);
 
-        // Формат 2 с обратным порядком
+        // rename перед comment (без завершающей ;)
         var stockCount = table.Columns.FirstOrDefault(c => c.Name == "stock_count");
         Assert.NotNull(stockCount);
-        Assert.Contains("rename(quantity)", stockCount.Comment);
-        Assert.Contains("Количество на складе", stockCount.Comment);
+        Assert.Equal("Количество на складе", stockCount.Comment);
+        Assert.Equal("quantity", stockCount.ReName);
+
+        // Простой комментарий без служебных слов
+        var simpleColumn = table.Columns.FirstOrDefault(c => c.Name == "simple_comment_column");
+        Assert.NotNull(simpleColumn);
+        Assert.Equal("Простой комментарий без служебных слов", simpleColumn.Comment);
+        Assert.Null(simpleColumn.ReName);
     }
 
     [Fact]
@@ -435,6 +438,81 @@ public sealed class TableExtractorTests
         var mixedResult = _extractor.Extract(mixedBlocks);
         Assert.True(mixedResult.IsSuccess);
         Assert.Equal("Orders", mixedResult.Definition!.Name);
+    }
+
+    [Fact]
+    public void Extract_IdentityGeneratedCollateColumns_ExtractsAdvancedFeatures()
+    {
+        // Покрывает: GENERATED ALWAYS AS IDENTITY, GENERATED BY DEFAULT AS IDENTITY, 
+        // GENERATED ALWAYS AS ... STORED, COLLATE
+        var blocks = CreateBlocks(@"
+            CREATE TABLE advanced_features (
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                sequence_id INTEGER GENERATED BY DEFAULT AS IDENTITY,
+                full_name VARCHAR(200) COLLATE ""en_US"" NOT NULL,
+                display_name VARCHAR(100) COLLATE en_US,
+                total_price NUMERIC(10,2) GENERATED ALWAYS AS (unit_price * quantity) STORED,
+                description TEXT,
+                status VARCHAR(20) DEFAULT 'active'
+            );
+        ");
+
+        var result = _extractor.Extract(blocks);
+        if (!result.IsSuccess)
+        {
+            var issues = string.Join(", ", result.ValidationIssues.Select(i => i.Message));
+            Assert.Fail($"Extraction failed with issues: {issues}");
+        }
+
+        Assert.True(result.IsSuccess);
+        var table = result.Definition;
+        Assert.NotNull(table);
+        Assert.Equal("advanced_features", table.Name);
+        Assert.Equal(7, table.Columns.Count);
+
+        // Проверка GENERATED ALWAYS AS IDENTITY
+        var id = table.Columns.FirstOrDefault(c => c.Name == "id");
+        Assert.NotNull(id);
+        Assert.True(id.IsIdentity);
+        Assert.Equal("ALWAYS", id.IdentityGeneration);
+
+        // Проверка GENERATED BY DEFAULT AS IDENTITY
+        var sequenceId = table.Columns.FirstOrDefault(c => c.Name == "sequence_id");
+        Assert.NotNull(sequenceId);
+        Assert.True(sequenceId.IsIdentity);
+        Assert.Equal("BY DEFAULT", sequenceId.IdentityGeneration);
+
+        // Проверка COLLATE с кавычками
+        var fullName = table.Columns.FirstOrDefault(c => c.Name == "full_name");
+        Assert.NotNull(fullName);
+        Assert.Equal("en_US", fullName.Collation);
+
+        // Проверка COLLATE без кавычек
+        var displayName = table.Columns.FirstOrDefault(c => c.Name == "display_name");
+        Assert.NotNull(displayName);
+        Assert.Equal("en_US", displayName.Collation);
+
+        // Проверка GENERATED ALWAYS AS ... STORED
+        var totalPrice = table.Columns.FirstOrDefault(c => c.Name == "total_price");
+        Assert.NotNull(totalPrice);
+        Assert.True(totalPrice.IsGenerated);
+        Assert.Equal("unit_price * quantity", totalPrice.GenerationExpression);
+
+        // Проверка обычной колонки без спецфич
+        var description = table.Columns.FirstOrDefault(c => c.Name == "description");
+        Assert.NotNull(description);
+        Assert.False(description.IsIdentity);
+        Assert.Null(description.IdentityGeneration);
+        Assert.False(description.IsGenerated);
+        Assert.Null(description.GenerationExpression);
+        Assert.Null(description.Collation);
+
+        // Проверка колонки с DEFAULT (не должно путаться с IDENTITY)
+        var status = table.Columns.FirstOrDefault(c => c.Name == "status");
+        Assert.NotNull(status);
+        Assert.False(status.IsIdentity);
+        Assert.Null(status.IdentityGeneration);
+        Assert.Equal("'active'", status.DefaultValue);
     }
 
     private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? comment = null)
