@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using PgCs.Core.Extraction;
-using PgCs.Core.Extraction.Block;
-using PgCs.Core.Parsing.CommentParsing.Metadata;
+using PgCs.Core.Parsing.Blocks;
+using PgCs.Core.Parsing.Comments;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
 using PgCs.Core.Validation;
@@ -133,8 +133,8 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
                 "Failed to parse CREATE VIEW statement",
                 new ValidationIssue.ValidationLocation
                 {
-                    Segment = viewBlock.Content.Length > 100 
-                        ? viewBlock.Content[..100] + "..." 
+                    Segment = viewBlock.Content.Length > 100
+                        ? viewBlock.Content[..100] + "..."
                         : viewBlock.Content,
                     Line = viewBlock.StartLine,
                     Column = 1
@@ -157,8 +157,8 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
                 $"No SELECT query found in VIEW definition for '{name}'",
                 new ValidationIssue.ValidationLocation
                 {
-                    Segment = viewBlock.Content.Length > 100 
-                        ? viewBlock.Content[..100] + "..." 
+                    Segment = viewBlock.Content.Length > 100
+                        ? viewBlock.Content[..100] + "..."
                         : viewBlock.Content,
                     Line = viewBlock.StartLine,
                     Column = 1
@@ -171,8 +171,8 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
         var columnNames = ExtractColumnNames(viewBlock.Content);
 
         // Если колонки не указаны явно, пытаемся извлечь их из SELECT запроса с использованием inline-комментариев
-        var columns = columnNames is not null 
-            ? CreateColumnsFromNames(columnNames) 
+        var columns = columnNames is not null
+            ? CreateColumnsFromNames(columnNames)
             : ExtractColumnsFromSelect(query, viewBlock, blocks, issues);
 
         // Извлечение WITH CHECK OPTION
@@ -286,8 +286,8 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
     /// Извлекает колонки из SELECT запроса с учетом inline-комментариев и типов из таблиц
     /// </summary>
     private static IReadOnlyList<TableColumn> ExtractColumnsFromSelect(
-        string query, 
-        SqlBlock viewBlock, 
+        string query,
+        SqlBlock viewBlock,
         IReadOnlyList<SqlBlock> allBlocks,
         List<ValidationIssue> issues)
     {
@@ -315,7 +315,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
         // Извлекаем таблицы из всех блоков, кроме самого VIEW
         var tableExtractor = new TableExtractor();
         var availableTables = new Dictionary<string, TableDefinition>();
-        
+
         foreach (var block in allBlocks)
         {
             // Пропускаем сам блок с VIEW
@@ -323,7 +323,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             {
                 continue;
             }
-            
+
             if (tableExtractor.CanExtract([block]))
             {
                 var result = tableExtractor.Extract([block]);
@@ -346,7 +346,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             // Пытаемся найти inline-комментарий для этой колонки
             // Нужно попробовать найти по полному выражению и по короткому имени
             var inlineComment = FindInlineCommentForColumnExpression(viewBlock, rawColumnExpression, columnName);
-            var parsedComment = new InlineCommentMetadataParser().Parse(inlineComment?.Comment);
+            var parsedComment = new CommentMetadataParser().Parse(inlineComment?.Comment);
 
             string dataType = "unknown";
             string? renameTo = null;
@@ -356,32 +356,24 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             int? numericScale = null;
             bool isArray = false;
 
-            if (parsedComment is not null)
+            // Если есть распарсенный комментарий с метаданными, используем его данные
+            if (!string.IsNullOrEmpty(parsedComment.ToDataType))
             {
-                // Если есть распарсенный комментарий с метаданными, используем его данные
-                dataType = parsedComment.ToDataType ?? "unknown";
-                renameTo = parsedComment.ToName;
-                comment = parsedComment.Comment;
+                dataType = parsedComment.ToDataType;
             }
-            else if (inlineComment is not null)
+
+            renameTo = parsedComment.ToName;
+            comment = !string.IsNullOrEmpty(parsedComment.Comment) ? parsedComment.Comment : null;
+
+            // If no metadata was found but inline comment exists, use it
+            if (string.IsNullOrEmpty(parsedComment.ToDataType) && inlineComment is not null)
             {
-                // Если inline-комментарий есть, но не содержит метаданных,
-                // используем его как обычный комментарий
                 comment = inlineComment.Comment;
-                // Пытаемся найти тип из таблицы
-                var sourceColumn = FindColumnFromTables(columnName, availableTables);
-                if (sourceColumn is not null)
-                {
-                    dataType = sourceColumn.DataType;
-                    maxLength = sourceColumn.MaxLength;
-                    numericPrecision = sourceColumn.NumericPrecision;
-                    numericScale = sourceColumn.NumericScale;
-                    isArray = sourceColumn.IsArray;
-                }
             }
-            else
+
+            // Try to find column type from source tables if not specified in metadata
+            if (dataType == "unknown")
             {
-                // Если комментария вообще нет, пытаемся найти тип из таблицы
                 var sourceColumn = FindColumnFromTables(columnName, availableTables);
                 if (sourceColumn is not null)
                 {
@@ -490,14 +482,14 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
     {
         // Удаляем кавычки и скобки
         var cleaned = name.Trim().Trim('"', '\'', '`', '[', ']');
-        
+
         // Удаляем префикс таблицы/алиаса (все до последней точки)
         var dotIndex = cleaned.LastIndexOf('.');
         if (dotIndex > 0 && dotIndex < cleaned.Length - 1)
         {
             cleaned = cleaned.Substring(dotIndex + 1);
         }
-        
+
         return cleaned;
     }
 
@@ -520,9 +512,9 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
     /// Ищет inline-комментарий для выражения колонки в блоке VIEW
     /// Пытается найти комментарий по полному выражению (например, "u.id") или по короткому имени ("id")
     /// </summary>
-    private static BlockInlineComment? FindInlineCommentForColumnExpression(
-        SqlBlock viewBlock, 
-        string rawExpression, 
+    private static InlineComment? FindInlineCommentForColumnExpression(
+        SqlBlock viewBlock,
+        string rawExpression,
         string cleanedColumnName)
     {
         if (viewBlock.InlineComments is null || viewBlock.InlineComments.Count == 0)
@@ -533,10 +525,10 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
         // Сначала пытаемся найти по полному выражению из кода (например, "u.id")
         // Извлекаем последний идентификатор из rawExpression (это то, что BlockAccumulator использует как Key)
         var key = ExtractKeyFromExpression(rawExpression);
-        
+
         var comment = viewBlock.InlineComments
             .FirstOrDefault(c => c.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
-        
+
         if (comment is not null)
         {
             return comment;
@@ -562,14 +554,14 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
     /// Ищет колонку в доступных таблицах
     /// </summary>
     private static TableColumn? FindColumnFromTables(
-        string columnName, 
+        string columnName,
         Dictionary<string, TableDefinition> availableTables)
     {
         foreach (var table in availableTables.Values)
         {
-            var column = table.Columns.FirstOrDefault(c => 
+            var column = table.Columns.FirstOrDefault(c =>
                 c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
-            
+
             if (column is not null)
             {
                 return column;

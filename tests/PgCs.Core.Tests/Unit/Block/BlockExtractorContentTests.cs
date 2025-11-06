@@ -1,4 +1,5 @@
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
+
 
 namespace PgCs.Core.Tests.Unit.Block;
 
@@ -7,7 +8,6 @@ namespace PgCs.Core.Tests.Unit.Block;
 /// </summary>
 public sealed class BlockExtractorContentTests
 {
-    private readonly BlockExtractor _extractor = new();
 
     [Fact]
     public void Extract_RawContentPreservesFormatting_ContentIsClean()
@@ -22,7 +22,7 @@ public sealed class BlockExtractorContentTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -41,7 +41,7 @@ public sealed class BlockExtractorContentTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -63,7 +63,7 @@ public sealed class BlockExtractorContentTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -82,7 +82,7 @@ public sealed class BlockExtractorContentTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.True(blocks[0].HasComments);
@@ -98,7 +98,7 @@ public sealed class BlockExtractorContentTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         // InlineComments может быть null или пустым в текущей реализации
@@ -113,7 +113,7 @@ public sealed class BlockExtractorContentTests
         var sql = "SELECT * FROM users;";
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.False(blocks[0].HasComments);

@@ -1,4 +1,4 @@
-namespace PgCs.Core.Tokenization;
+namespace PgCs.Core.Tokenization.Scanners;
 
 /// <summary>
 /// Сканер SQL комментариев
@@ -13,16 +13,16 @@ public sealed class SqlCommentScanner
     public static ScanResult ScanLineComment(TextCursor cursor)
     {
         var start = cursor.Position;
-        
+
         // Пропускаем второй '-'
         cursor.Advance();
-        
+
         // Читаем до конца строки
         while (!cursor.IsAtEnd() && cursor.Current != '\n')
         {
             cursor.Advance();
         }
-        
+
         var length = cursor.Position - start;
         return new ScanResult(TokenType.LineComment, length);
     }
@@ -35,10 +35,10 @@ public sealed class SqlCommentScanner
     {
         var start = cursor.Position;
         var nestLevel = 1; // Уровень вложенности
-        
+
         // Пропускаем '*' после '/'
         cursor.Advance();
-        
+
         while (!cursor.IsAtEnd() && nestLevel > 0)
         {
             // Проверяем начало вложенного комментария /*
@@ -49,7 +49,7 @@ public sealed class SqlCommentScanner
                 cursor.Advance(); // *
                 continue;
             }
-            
+
             // Проверяем конец комментария */
             if (cursor.Current == '*' && cursor.Peek() == '/')
             {
@@ -58,10 +58,10 @@ public sealed class SqlCommentScanner
                 cursor.Advance(); // /
                 continue;
             }
-            
+
             cursor.Advance();
         }
-        
+
         var length = cursor.Position - start;
         return new ScanResult(TokenType.BlockComment, length);
     }

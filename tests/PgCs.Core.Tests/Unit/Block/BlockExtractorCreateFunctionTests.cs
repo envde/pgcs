@@ -1,4 +1,5 @@
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
+
 
 namespace PgCs.Core.Tests.Unit.Block;
 
@@ -7,7 +8,6 @@ namespace PgCs.Core.Tests.Unit.Block;
 /// </summary>
 public sealed class BlockExtractorCreateFunctionTests
 {
-    private readonly BlockExtractor _extractor = new();
 
     [Fact]
     public void Extract_CreateFunction_ExtractsMultipleBlocks()
@@ -26,7 +26,7 @@ public sealed class BlockExtractorCreateFunctionTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         // Функция разбивается на несколько блоков из-за точек с запятой внутри
@@ -51,7 +51,7 @@ public sealed class BlockExtractorCreateFunctionTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.True(blocks.Count >= 1);

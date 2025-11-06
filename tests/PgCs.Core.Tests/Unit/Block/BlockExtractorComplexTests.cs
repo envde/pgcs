@@ -1,4 +1,5 @@
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
+
 
 namespace PgCs.Core.Tests.Unit.Block;
 
@@ -7,7 +8,6 @@ namespace PgCs.Core.Tests.Unit.Block;
 /// </summary>
 public sealed class BlockExtractorComplexTests
 {
-    private readonly BlockExtractor _extractor = new();
 
     [Fact]
     public void Extract_CompleteTableWithComments_ExtractsAll()
@@ -29,7 +29,7 @@ public sealed class BlockExtractorComplexTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(5, blocks.Count);
@@ -56,7 +56,7 @@ public sealed class BlockExtractorComplexTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(4, blocks.Count);
@@ -84,7 +84,7 @@ public sealed class BlockExtractorComplexTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         // Функция разбивается на несколько блоков + триггер

@@ -1,4 +1,4 @@
-namespace PgCs.Core.Extraction.Block;
+namespace PgCs.Core.Parsing.Blocks;
 
 /// <summary>
 /// Представляет отдельный блок SQL кода - одну команду PostgreSQL с контекстом.
@@ -38,7 +38,7 @@ public sealed record SqlBlock
     /// название параметра.
     /// </code>
     /// </summary>
-    public IReadOnlyList<BlockInlineComment>? InlineComments { get; init; }
+    public IReadOnlyList<Comments.InlineComment>? InlineComments { get; init; }
 
     /// <summary>
     /// Номер строки начала блока в исходном файле (нумерация с 1).

@@ -1,6 +1,4 @@
-using PgCs.Core.Tokenization;
-
-namespace PgCs.Core.Parsing.Common;
+namespace PgCs.Core.Tokenization;
 
 /// <summary>
 /// Вспомогательный класс для работы с последовательностями токенов

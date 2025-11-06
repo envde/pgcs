@@ -1,6 +1,6 @@
 using PgCs.Core.Extraction;
-using PgCs.Core.Extraction.Block;
-using PgCs.Core.Parsing.CommentParsing.Metadata;
+using PgCs.Core.Parsing.Blocks;
+using PgCs.Core.Parsing.Comments;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
@@ -527,7 +527,7 @@ public sealed class TableExtractorTests
     private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? comment = null)
     {
         // Парсим inline комментарии из SQL и создаём чистый Content (как делает ContentBuilder)
-        var inlineComments = new List<BlockInlineComment>();
+        var inlineComments = new List<InlineComment>();
         var cleanLines = new List<string>();
         var lines = sql.Split(['\r', '\n'], StringSplitOptions.None);
 
@@ -554,7 +554,7 @@ public sealed class TableExtractorTests
 
                         if (!string.IsNullOrWhiteSpace(columnName) && !string.IsNullOrWhiteSpace(commentText))
                         {
-                            inlineComments.Add(new BlockInlineComment
+                            inlineComments.Add(new InlineComment
                             {
                                 Key = columnName,
                                 Comment = commentText,

@@ -1,9 +1,9 @@
-namespace PgCs.Core.Parsing.Common;
+namespace PgCs.Core.Tokenization;
 
 /// <summary>
-/// Вспомогательный класс для работы с текстом в парсере блоков
+/// Вспомогательный класс для работы с текстовым содержимым SQL токенов
 /// </summary>
-public static class TextHelper
+public static class SqlTextHelper
 {
     /// <summary>
     /// Извлекает текст комментария (убирает префикс --)

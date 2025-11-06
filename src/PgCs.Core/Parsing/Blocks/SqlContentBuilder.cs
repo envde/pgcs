@@ -1,14 +1,13 @@
 using System.Text;
-using PgCs.Core.Parsing.Common;
 using PgCs.Core.Tokenization;
 
-namespace PgCs.Core.Parsing.BlockParsing;
+namespace PgCs.Core.Parsing.Blocks;
 
 /// <summary>
-/// Строитель Content из токенов
+/// Строитель SQL Content из токенов
 /// Собирает SQL код из токенов с правильными пробелами
 /// </summary>
-public sealed class ContentBuilder
+public sealed class SqlContentBuilder
 {
     /// <summary>
     /// Строит Content из токенов (без trivia)
@@ -57,7 +56,7 @@ public sealed class ContentBuilder
         }
 
         // Не нужен пробел перед пунктуацией
-        if (current.Type is TokenType.Comma or TokenType.Semicolon 
+        if (current.Type is TokenType.Comma or TokenType.Semicolon
             or TokenType.CloseParen or TokenType.Dot)
         {
             return false;

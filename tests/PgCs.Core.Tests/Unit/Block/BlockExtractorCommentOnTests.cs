@@ -1,4 +1,5 @@
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
+
 
 namespace PgCs.Core.Tests.Unit.Block;
 
@@ -7,7 +8,6 @@ namespace PgCs.Core.Tests.Unit.Block;
 /// </summary>
 public sealed class BlockExtractorCommentOnTests
 {
-    private readonly BlockExtractor _extractor = new();
 
     [Fact]
     public void Extract_CommentOnTable_ExtractsCorrectly()
@@ -18,7 +18,7 @@ public sealed class BlockExtractorCommentOnTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -34,7 +34,7 @@ public sealed class BlockExtractorCommentOnTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -52,7 +52,7 @@ public sealed class BlockExtractorCommentOnTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(3, blocks.Count);

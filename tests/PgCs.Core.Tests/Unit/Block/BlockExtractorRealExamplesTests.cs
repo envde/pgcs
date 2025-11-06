@@ -1,4 +1,5 @@
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
+
 
 namespace PgCs.Core.Tests.Unit.Block;
 
@@ -7,7 +8,6 @@ namespace PgCs.Core.Tests.Unit.Block;
 /// </summary>
 public sealed class BlockExtractorRealExamplesTests
 {
-    private readonly BlockExtractor _extractor = new();
 
     [Fact]
     public void Extract_RealEnumWithComment_ExtractsCorrectly()
@@ -20,7 +20,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(2, blocks.Count);
@@ -46,7 +46,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -67,7 +67,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(3, blocks.Count);
@@ -96,7 +96,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -124,7 +124,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(2, blocks.Count);
@@ -144,7 +144,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(2, blocks.Count);
@@ -167,7 +167,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(3, blocks.Count);
@@ -192,7 +192,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -219,7 +219,7 @@ public sealed class BlockExtractorRealExamplesTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(4, blocks.Count);

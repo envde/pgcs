@@ -1,4 +1,5 @@
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
+
 
 namespace PgCs.Core.Tests.Unit.Block;
 
@@ -7,20 +8,19 @@ namespace PgCs.Core.Tests.Unit.Block;
 /// </summary>
 public sealed class BlockExtractorBasicTests
 {
-    private readonly BlockExtractor _extractor = new();
 
     [Fact]
     public void Extract_EmptyString_ThrowsArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => _extractor.Extract(""));
+        Assert.Throws<ArgumentException>(() => BlockParser.Parse(""));
     }
 
     [Fact]
     public void Extract_WhitespaceOnly_ThrowsArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => _extractor.Extract("   \n\t  "));
+        Assert.Throws<ArgumentException>(() => BlockParser.Parse("   \n\t  "));
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public sealed class BlockExtractorBasicTests
         var sql = "SELECT * FROM users;";
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Single(blocks);
@@ -50,7 +50,7 @@ public sealed class BlockExtractorBasicTests
             """;
 
         // Act
-        var blocks = _extractor.Extract(sql);
+        var blocks = BlockParser.Parse(sql);
 
         // Assert
         Assert.Equal(3, blocks.Count);

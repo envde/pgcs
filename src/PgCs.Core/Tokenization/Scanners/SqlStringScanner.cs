@@ -1,4 +1,4 @@
-namespace PgCs.Core.Tokenization;
+namespace PgCs.Core.Tokenization.Scanners;
 
 /// <summary>
 /// Сканер строковых литералов PostgreSQL
@@ -13,30 +13,30 @@ public sealed class SqlStringScanner
     public static ScanResult ScanStringLiteral(TextCursor cursor)
     {
         var start = cursor.Position;
-        
+
         // Пропускаем открывающую кавычку
         cursor.Advance();
-        
+
         while (!cursor.IsAtEnd())
         {
             if (cursor.Current == '\'')
             {
                 cursor.Advance();
-                
+
                 // Проверяем двойную кавычку '' (экранирование)
                 if (cursor.Current == '\'')
                 {
                     cursor.Advance(); // Пропускаем вторую кавычку
                     continue;
                 }
-                
+
                 // Конец строки
                 break;
             }
-            
+
             cursor.Advance();
         }
-        
+
         var length = cursor.Position - start;
         return new ScanResult(TokenType.StringLiteral, length);
     }
@@ -48,32 +48,32 @@ public sealed class SqlStringScanner
     public static ScanResult ScanDollarQuotedString(TextCursor cursor)
     {
         var start = cursor.Position;
-        
+
         // Читаем открывающий тег: $ + [optional_tag] + $
         cursor.Advance(); // Первый $
-        
+
         var tagStart = cursor.Position;
-        
+
         // Читаем тег (может быть пустым)
         while (!cursor.IsAtEnd() && SqlCharClassifier.IsIdentifierPart(cursor.Current))
         {
             cursor.Advance();
         }
-        
+
         var tagEnd = cursor.Position;
-        
+
         // Должен быть закрывающий $ тега
         if (cursor.Current != '$')
         {
             // Это не dollar-quoted string, а просто оператор $
             return new ScanResult(TokenType.Operator, 1);
         }
-        
+
         cursor.Advance(); // Закрывающий $ тега
-        
+
         var tag = cursor.GetText(tagStart, tagEnd - tagStart);
         var closingTag = $"${tag}$";
-        
+
         // Ищем закрывающий тег
         while (!cursor.IsAtEnd())
         {
@@ -86,10 +86,10 @@ public sealed class SqlStringScanner
                 }
                 break;
             }
-            
+
             cursor.Advance();
         }
-        
+
         var length = cursor.Position - start;
         return new ScanResult(TokenType.DollarQuotedString, length);
     }
@@ -101,20 +101,20 @@ public sealed class SqlStringScanner
     public static ScanResult ScanQuotedIdentifier(TextCursor cursor)
     {
         var start = cursor.Position;
-        
+
         // Пропускаем открывающую кавычку
         cursor.Advance();
-        
+
         while (!cursor.IsAtEnd() && cursor.Current != '"')
         {
             cursor.Advance();
         }
-        
+
         if (!cursor.IsAtEnd())
         {
             cursor.Advance(); // Закрывающая кавычка
         }
-        
+
         var length = cursor.Position - start;
         return new ScanResult(TokenType.QuotedIdentifier, length);
     }

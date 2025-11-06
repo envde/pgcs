@@ -1,4 +1,4 @@
-namespace PgCs.Core.Tokenization;
+namespace PgCs.Core.Tokenization.Scanners;
 
 /// <summary>
 /// Сканер SQL операторов PostgreSQL
@@ -14,16 +14,16 @@ public sealed class SqlOperatorScanner
     {
         var start = cursor.Position;
         var first = cursor.Current;
-        
+
         cursor.Advance();
-        
+
         if (cursor.IsAtEnd())
         {
             return new ScanResult(TokenType.Operator, 1);
         }
-        
+
         var second = cursor.Current;
-        
+
         // Двухсимвольные операторы
         var twoCharOp = $"{first}{second}";
         if (IsTwoCharOperator(twoCharOp))
@@ -31,13 +31,13 @@ public sealed class SqlOperatorScanner
             cursor.Advance();
             return new ScanResult(TokenType.Operator, 2);
         }
-        
+
         // Проверяем трёхсимвольные операторы
         if (!cursor.IsAtEnd())
         {
             var third = cursor.Peek();
             var threeCharOp = $"{first}{second}{third}";
-            
+
             if (IsThreeCharOperator(threeCharOp))
             {
                 cursor.Advance();
@@ -45,7 +45,7 @@ public sealed class SqlOperatorScanner
                 return new ScanResult(TokenType.Operator, 3);
             }
         }
-        
+
         return new ScanResult(TokenType.Operator, 1);
     }
 

@@ -1,4 +1,4 @@
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
 using PgCs.Core.Schema.Common;
 
 namespace PgCs.Core.Extraction;
@@ -6,7 +6,7 @@ namespace PgCs.Core.Extraction;
 /// <summary>
 /// Извлекает объект из SqlBlock (ENUM, COMMENT, TABLE, etc..)
 /// </summary>
-public interface IExtractor<T> where T: DefinitionBase
+public interface IExtractor<T> where T : DefinitionBase
 {
     /// <summary>
     /// Извлекает PostgreSQL объект (ENUM, COMMENT, TABLE, SELECT, etc..) из блока SqlBlock
@@ -18,7 +18,7 @@ public interface IExtractor<T> where T: DefinitionBase
     /// </param>
     /// <returns>Результат извлечения объекта. Тип производный от DefinitionBase</returns>
     ExtractionResult<T> Extract(IReadOnlyList<SqlBlock> blocks);
-    
+
     /// <summary>
     /// Проверяет, содержит ли блок определение представления
     /// </summary>

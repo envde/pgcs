@@ -1,10 +1,10 @@
-namespace PgCs.Core.Parsing.CommentParsing;
+namespace PgCs.Core.Parsing.Comments;
 
 /// <summary>
-/// Сборщик header комментариев перед SQL блоком
+/// Парсер header комментариев перед SQL блоком
 /// Отслеживает комментарии до начала блока и правила их сброса
 /// </summary>
-public sealed class HeaderCommentCollector
+public sealed class HeaderCommentParser
 {
     private readonly List<string> _comments = [];
     private bool _hasEmptyLineAfterComment;

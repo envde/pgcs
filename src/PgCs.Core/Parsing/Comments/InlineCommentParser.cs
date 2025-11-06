@@ -1,26 +1,24 @@
-using PgCs.Core.Extraction.Block;
-using PgCs.Core.Parsing.BlockParsing;
-using PgCs.Core.Parsing.Common;
+using PgCs.Core.Parsing.Blocks;
 using PgCs.Core.Tokenization;
 
-namespace PgCs.Core.Parsing.CommentParsing;
+namespace PgCs.Core.Parsing.Comments;
 
 /// <summary>
-/// Извлекатель inline комментариев из токенов
+/// Парсер inline комментариев из токенов
 /// Находит комментарии внутри блока и связывает их с ключами
 /// </summary>
-public sealed class InlineCommentExtractor
+public sealed class InlineCommentParser
 {
-    private readonly ContentBuilder _contentBuilder = new();
+    private readonly SqlContentBuilder _contentBuilder = new();
 
     /// <summary>
     /// Извлекает inline комментарии из токенов блока
     /// </summary>
     /// <param name="allTokens">Все токены (включая trivia)</param>
     /// <returns>Список inline комментариев с позициями</returns>
-    public IReadOnlyList<BlockInlineComment> Extract(IReadOnlyList<SqlToken> allTokens)
+    public IReadOnlyList<InlineComment> Extract(IReadOnlyList<SqlToken> allTokens)
     {
-        var comments = new List<BlockInlineComment>();
+        var comments = new List<InlineComment>();
         var contentPosition = 0;
 
         for (var i = 0; i < allTokens.Count; i++)
@@ -43,10 +41,10 @@ public sealed class InlineCommentExtractor
             // Inline комментарий (только LineComment)
             if (token.Type == TokenType.LineComment)
             {
-                var commentText = TextHelper.ExtractCommentText(token.Value);
+                var commentText = SqlTextHelper.ExtractCommentText(token.Value);
                 var key = FindKeyBeforeComment(allTokens, i);
 
-                comments.Add(new BlockInlineComment
+                comments.Add(new InlineComment
                 {
                     Key = key,
                     Comment = commentText,
@@ -62,7 +60,7 @@ public sealed class InlineCommentExtractor
     /// Находит ключ (идентификатор) перед комментарием
     /// Ищет ближайший идентификатор перед комментарием, игнорируя keywords и литералы
     /// </summary>
-    public string FindKeyBeforeComment(IReadOnlyList<SqlToken> tokens, int commentIndex)
+    private static string FindKeyBeforeComment(IReadOnlyList<SqlToken> tokens, int commentIndex)
     {
         // Ищем назад первый значащий идентификатор
         for (var i = commentIndex - 1; i >= 0; i--)
@@ -82,7 +80,7 @@ public sealed class InlineCommentExtractor
             }
 
             // Нашли идентификатор - возвращаем его
-            return TextHelper.UnquoteIdentifier(token.Value);
+            return SqlTextHelper.UnquoteIdentifier(token.Value);
         }
 
         return "unknown";

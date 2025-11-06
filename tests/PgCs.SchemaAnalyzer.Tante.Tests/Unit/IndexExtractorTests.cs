@@ -1,4 +1,4 @@
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
 using PgCs.Core.Schema.Common;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
 

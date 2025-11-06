@@ -1,6 +1,4 @@
-using PgCs.Core.Tokenization;
-
-namespace PgCs.Core.Parsing.Common;
+namespace PgCs.Core.Tokenization;
 
 /// <summary>
 /// Методы расширения для работы с SQL токенами
@@ -12,14 +10,14 @@ public static class SqlTokenExtensions
     /// Trivia токены не влияют на синтаксический анализ, но важны для форматирования
     /// </summary>
     public static bool IsTrivia(this SqlToken token) =>
-        token.Type is TokenType.Whitespace 
-            or TokenType.LineComment 
+        token.Type is TokenType.Whitespace
+            or TokenType.LineComment
             or TokenType.BlockComment;
 
     /// <summary>
     /// Проверяет, является ли токен значащим (не trivia)
     /// </summary>
-    public static bool IsSignificant(this SqlToken token) => 
+    public static bool IsSignificant(this SqlToken token) =>
         !token.IsTrivia();
 
     /// <summary>

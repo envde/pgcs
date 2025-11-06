@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using PgCs.Core.Extraction;
-using PgCs.Core.Extraction.Block;
-using PgCs.Core.Parsing.CommentParsing.Metadata;
+using PgCs.Core.Parsing.Blocks;
+using PgCs.Core.Parsing.Comments;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
 using PgCs.Core.Validation;
@@ -439,15 +439,13 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                     if (inlineComment != null)
                     {
                         var commentText = inlineComment.Comment;
-                        var parsedComment = new InlineCommentMetadataParser().Parse(commentText);
-                        if (parsedComment != null)
+                        var parsedComment = new CommentMetadataParser().Parse(commentText);
+
+                        column = column with
                         {
-                            column = column with
-                            {
-                                SqlComment = parsedComment.Comment,
-                                ToName = parsedComment.ToName
-                            };
-                        }
+                            SqlComment = parsedComment.Comment,
+                            ToName = parsedComment.ToName
+                        };
                     }
                 }
 

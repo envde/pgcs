@@ -1,3 +1,5 @@
+using PgCs.Core.Tokenization.Scanners;
+
 namespace PgCs.Core.Tokenization;
 
 /// <summary>
@@ -13,7 +15,7 @@ public sealed class SqlTokenizer
     public IReadOnlyList<SqlToken> Tokenize(string sql)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sql);
-        
+
         var cursor = new TextCursor(sql);
         var tokens = new List<SqlToken>();
 
@@ -40,7 +42,7 @@ public sealed class SqlTokenizer
         var startPos = cursor.Position;
         var startLine = cursor.Line;
         var startColumn = cursor.Column;
-        
+
         var ch = cursor.Current;
         cursor.Advance();
 
@@ -48,23 +50,23 @@ public sealed class SqlTokenizer
         {
             // Whitespace
             ' ' or '\t' or '\r' or '\n' => ScanWhitespace(cursor, sourceText, startPos, startLine, startColumn),
-            
+
             // Comments
             '-' when cursor.Current == '-' => ScanLineComment(cursor, sourceText, startPos, startLine, startColumn),
             '/' when cursor.Current == '*' => ScanBlockComment(cursor, sourceText, startPos, startLine, startColumn),
-            
+
             // Dollar-quoted strings or operator $
             '$' => ScanDollarQuotedOrOperator(cursor, sourceText, startPos, startLine, startColumn),
-            
+
             // String literals
             '\'' => ScanStringLiteral(cursor, sourceText, startPos, startLine, startColumn),
-            
+
             // Quoted identifiers
             '"' => ScanQuotedIdentifier(cursor, sourceText, startPos, startLine, startColumn),
-            
+
             // Numbers
             >= '0' and <= '9' => ScanNumber(cursor, sourceText, startPos, startLine, startColumn),
-            
+
             // Punctuation
             '(' => CreateToken(TokenType.OpenParen, "(", startPos, startLine, startColumn),
             ')' => CreateToken(TokenType.CloseParen, ")", startPos, startLine, startColumn),
@@ -73,15 +75,15 @@ public sealed class SqlTokenizer
             ';' => CreateToken(TokenType.Semicolon, ";", startPos, startLine, startColumn),
             ',' => CreateToken(TokenType.Comma, ",", startPos, startLine, startColumn),
             '.' => CreateToken(TokenType.Dot, ".", startPos, startLine, startColumn),
-            
+
             // Operators
-            _ when SqlCharClassifier.IsOperatorChar(ch) 
+            _ when SqlCharClassifier.IsOperatorChar(ch)
                 => ScanOperator(cursor, sourceText, startPos, startLine, startColumn),
-            
+
             // Identifiers & Keywords
-            _ when SqlCharClassifier.IsIdentifierStart(ch) 
+            _ when SqlCharClassifier.IsIdentifierStart(ch)
                 => ScanIdentifierOrKeyword(cursor, sourceText, startPos, startLine, startColumn),
-            
+
             _ => CreateToken(TokenType.Unknown, ch.ToString(), startPos, startLine, startColumn)
         };
 
@@ -94,7 +96,7 @@ public sealed class SqlTokenizer
         {
             cursor.Advance();
         }
-        
+
         var length = cursor.Position - start;
         var value = text.Substring(start, length);
         return CreateToken(TokenType.Whitespace, value, start, line, column);
@@ -125,7 +127,7 @@ public sealed class SqlTokenizer
         // Откатываем на 1 символ назад (на $)
         var snapshot = cursor.CreateSnapshot();
         cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-        
+
         var result = SqlStringScanner.ScanDollarQuotedString(cursor);
         var value = text.Substring(start, result.Length);
         return CreateToken(result.Type, value, start, line, column);
@@ -136,7 +138,7 @@ public sealed class SqlTokenizer
         // Откатываем на 1 символ назад (на ')
         var snapshot = cursor.CreateSnapshot();
         cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-        
+
         var result = SqlStringScanner.ScanStringLiteral(cursor);
         var value = text.Substring(start, result.Length);
         return CreateToken(result.Type, value, start, line, column);
@@ -147,7 +149,7 @@ public sealed class SqlTokenizer
         // Откатываем на 1 символ назад (на ")
         var snapshot = cursor.CreateSnapshot();
         cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-        
+
         var result = SqlStringScanner.ScanQuotedIdentifier(cursor);
         var value = text.Substring(start, result.Length);
         return CreateToken(result.Type, value, start, line, column);
@@ -158,7 +160,7 @@ public sealed class SqlTokenizer
         // Откатываем на 1 символ назад (на цифру)
         var snapshot = cursor.CreateSnapshot();
         cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-        
+
         var result = SqlNumberScanner.ScanNumber(cursor);
         var value = text.Substring(start, result.Length);
         return CreateToken(result.Type, value, start, line, column);
@@ -168,7 +170,7 @@ public sealed class SqlTokenizer
     {
         // Откатываем на 1 символ назад (на оператор)
         cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-        
+
         var result = SqlOperatorScanner.ScanOperator(cursor);
         var value = text.Substring(start, result.Length);
         return CreateToken(result.Type, value, start, line, column);
@@ -180,11 +182,11 @@ public sealed class SqlTokenizer
         {
             cursor.Advance();
         }
-        
+
         var length = cursor.Position - start;
         var value = text.Substring(start, length);
         var type = PostgresKeywords.IsKeyword(value) ? TokenType.Keyword : TokenType.Identifier;
-        
+
         return CreateToken(type, value, start, line, column);
     }
 

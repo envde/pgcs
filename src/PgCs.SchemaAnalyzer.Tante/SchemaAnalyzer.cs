@@ -1,5 +1,5 @@
 using PgCs.Core.Extraction;
-using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.Blocks;
 using PgCs.Core.Schema.Analyzer;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
@@ -14,7 +14,6 @@ namespace PgCs.SchemaAnalyzer.Tante;
 /// </summary>
 public sealed class SchemaAnalyzer : ISchemaAnalyzer
 {
-    private readonly IBlockExtractor _blockExtractor;
     private readonly IExtractor<EnumTypeDefinition> _enumExtractor;
     private readonly IExtractor<CompositeTypeDefinition> _compositeExtractor;
     private readonly IExtractor<DomainTypeDefinition> _domainExtractor;
@@ -31,7 +30,6 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     /// Создает новый экземпляр анализатора схемы с инжекцией зависимостей
     /// </summary>
     public SchemaAnalyzer(
-        IBlockExtractor blockExtractor,
         IExtractor<EnumTypeDefinition> enumExtractor,
         IExtractor<CompositeTypeDefinition> compositeExtractor,
         IExtractor<DomainTypeDefinition> domainExtractor,
@@ -44,7 +42,6 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         IExtractor<PartitionDefinition> partitionExtractor,
         IExtractor<CommentDefinition> commentExtractor)
     {
-        ArgumentNullException.ThrowIfNull(blockExtractor);
         ArgumentNullException.ThrowIfNull(enumExtractor);
         ArgumentNullException.ThrowIfNull(compositeExtractor);
         ArgumentNullException.ThrowIfNull(domainExtractor);
@@ -56,8 +53,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         ArgumentNullException.ThrowIfNull(constraintExtractor);
         ArgumentNullException.ThrowIfNull(partitionExtractor);
         ArgumentNullException.ThrowIfNull(commentExtractor);
-        
-        _blockExtractor = blockExtractor;
+
         _enumExtractor = enumExtractor;
         _compositeExtractor = compositeExtractor;
         _domainExtractor = domainExtractor;
@@ -75,7 +71,6 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     /// Создает новый экземпляр анализатора схемы с реализациями по умолчанию
     /// </summary>
     public SchemaAnalyzer() : this(
-        new BlockExtractor(),
         new EnumExtractor(),
         new CompositeExtractor(),
         new DomainExtractor(),
@@ -94,18 +89,18 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public async ValueTask<SchemaMetadata> AnalyzeFileAsync(string schemaFilePath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(schemaFilePath);
-        
+
         if (!File.Exists(schemaFilePath))
         {
             throw new FileNotFoundException($"Schema file not found: {schemaFilePath}", schemaFilePath);
         }
 
         var sqlContent = await File.ReadAllTextAsync(schemaFilePath, cancellationToken);
-        var blocks = _blockExtractor.Extract(sqlContent);
-        
+        var blocks = BlockParser.Parse(sqlContent);
+
         // Добавляем информацию о файле-источнике к блокам
         var blocksWithSource = blocks.Select(b => b with { SourcePath = schemaFilePath }).ToList();
-        
+
         return AnalyzeBlocks(blocksWithSource, [schemaFilePath]);
     }
 
@@ -113,7 +108,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public async ValueTask<SchemaMetadata> AnalyzeDirectoryAsync(string schemaDirectoryPath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(schemaDirectoryPath);
-        
+
         if (!Directory.Exists(schemaDirectoryPath))
         {
             throw new DirectoryNotFoundException($"Schema directory not found: {schemaDirectoryPath}");
@@ -134,10 +129,10 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         foreach (var filePath in sqlFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             var sqlContent = await File.ReadAllTextAsync(filePath, cancellationToken);
-            var blocks = _blockExtractor.Extract(sqlContent);
-            
+            var blocks = BlockParser.Parse(sqlContent);
+
             // Добавляем информацию о файле-источнике
             var blocksWithSource = blocks.Select(b => b with { SourcePath = filePath });
             allBlocks.AddRange(blocksWithSource);
@@ -151,14 +146,14 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<EnumTypeDefinition> ExtractEnums(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var enums = new List<EnumTypeDefinition>();
 
         foreach (var block in blocks)
         {
             var blockList = new[] { block };
-            
+
             if (!_enumExtractor.CanExtract(blockList))
             {
                 continue;
@@ -177,8 +172,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<TableDefinition> ExtractTables(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var tables = new List<TableDefinition>();
 
         foreach (var block in blocks)
@@ -201,14 +196,14 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<ViewDefinition> ExtractViews(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript).ToList();
+
+        var blocks = BlockParser.Parse(sqlScript).ToList();
         var views = new List<ViewDefinition>();
 
         for (int i = 0; i < blocks.Count; i++)
         {
             var block = blocks[i];
-            
+
             // Проверяем, содержит ли блок VIEW
             if (!_viewExtractor.CanExtract([block]))
             {
@@ -230,15 +225,15 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<DomainTypeDefinition> ExtractDomains(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var domains = new List<DomainTypeDefinition>();
 
         foreach (var block in blocks)
         {
             var blockList = new[] { block };
             var result = _domainExtractor.Extract(blockList);
-            
+
             if (result.IsSuccess && result.Definition is not null)
             {
                 domains.Add(result.Definition);
@@ -251,8 +246,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<CompositeTypeDefinition> ExtractComposites(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var composites = new List<CompositeTypeDefinition>();
 
         foreach (var block in blocks)
@@ -275,15 +270,15 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<FunctionDefinition> ExtractFunctions(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var functions = new List<FunctionDefinition>();
 
         foreach (var block in blocks)
         {
             var blockList = new[] { block };
             var result = _functionExtractor.Extract(blockList);
-            
+
             if (result.IsSuccess && result.Definition is not null)
             {
                 functions.Add(result.Definition);
@@ -299,14 +294,14 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<CommentDefinition> ExtractComments(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var comments = new List<CommentDefinition>();
 
         foreach (var block in blocks)
         {
             var blockList = new[] { block };
-            
+
             if (!_commentExtractor.CanExtract(blockList))
             {
                 continue;
@@ -325,8 +320,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<IndexDefinition> ExtractIndexes(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var indexes = new List<IndexDefinition>();
 
         foreach (var block in blocks)
@@ -349,8 +344,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<TriggerDefinition> ExtractTriggers(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var triggers = new List<TriggerDefinition>();
 
         foreach (var block in blocks)
@@ -373,8 +368,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     public IReadOnlyList<ConstraintDefinition> ExtractConstraints(string sqlScript)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sqlScript);
-        
-        var blocks = _blockExtractor.Extract(sqlScript);
+
+        var blocks = BlockParser.Parse(sqlScript);
         var constraints = new List<ConstraintDefinition>();
 
         foreach (var block in blocks)
@@ -420,7 +415,7 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         for (int i = 0; i < blocksList.Count; i++)
         {
             var block = blocksList[i];
-            
+
             // Определяем тип объекта в блоке
             var objectType = SchemaObjectDetector.DetectObjectType(block.Content);
 
@@ -595,8 +590,8 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
     /// </summary>
     private static SchemaMetadata CreateEmptyMetadata(IReadOnlyList<string> sourcePaths, string? directoryPath = null)
     {
-        var paths = directoryPath is not null 
-            ? new[] { directoryPath } 
+        var paths = directoryPath is not null
+            ? new[] { directoryPath }
             : sourcePaths;
 
         return new SchemaMetadata
