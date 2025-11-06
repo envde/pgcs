@@ -71,8 +71,18 @@ public sealed class SqlStringScanner
 
         cursor.Advance(); // Закрывающий $ тега
 
-        var tag = cursor.GetText(tagStart, tagEnd - tagStart);
-        var closingTag = $"${tag}$";
+        // Получаем тег как Span (zero-allocation)
+        ReadOnlySpan<char> tag = cursor.GetTextSpan(tagStart, tagEnd - tagStart);
+
+        // Создаём закрывающий тег: $tag$
+        // Используем stackalloc для небольших строк (до 128 символов)
+        Span<char> closingTag = tag.Length <= 126
+            ? stackalloc char[tag.Length + 2]
+            : new char[tag.Length + 2];
+
+        closingTag[0] = '$';
+        tag.CopyTo(closingTag[1..]);
+        closingTag[^1] = '$';
 
         // Ищем закрывающий тег
         while (!cursor.IsAtEnd())

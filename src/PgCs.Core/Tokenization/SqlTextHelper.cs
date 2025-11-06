@@ -2,6 +2,7 @@ namespace PgCs.Core.Tokenization;
 
 /// <summary>
 /// Вспомогательный класс для работы с текстовым содержимым SQL токенов
+/// Использует ReadOnlySpan для zero-allocation операций
 /// </summary>
 public static class SqlTextHelper
 {
@@ -15,9 +16,23 @@ public static class SqlTextHelper
     /// "-- User table" → "User table"
     /// "-- comment: Description;" → "comment: Description;"
     /// </example>
-    public static string ExtractCommentText(string commentToken)
+    public static ReadOnlySpan<char> ExtractCommentText(ReadOnlySpan<char> commentToken)
     {
-        return commentToken.TrimStart('-', ' ', '\t').TrimEnd('\r', '\n');
+        var span = commentToken;
+
+        // Trim start: убираем '-', ' ', '\t'
+        while (span.Length > 0 && (span[0] == '-' || span[0] == ' ' || span[0] == '\t'))
+        {
+            span = span[1..];
+        }
+
+        // Trim end: убираем '\r', '\n'
+        while (span.Length > 0 && (span[^1] == '\r' || span[^1] == '\n'))
+        {
+            span = span[..^1];
+        }
+
+        return span;
     }
 
     /// <summary>
@@ -31,9 +46,28 @@ public static class SqlTextHelper
     /// "\r\n\r\n" → true
     /// "  \n  " → false
     /// </example>
-    public static bool ContainsEmptyLine(string whitespace)
+    public static bool ContainsEmptyLine(ReadOnlySpan<char> whitespace)
     {
-        return whitespace.Contains("\n\n") || whitespace.Contains("\r\n\r\n");
+        // Проверяем наличие "\n\n"
+        for (int i = 0; i < whitespace.Length - 1; i++)
+        {
+            if (whitespace[i] == '\n' && whitespace[i + 1] == '\n')
+            {
+                return true;
+            }
+        }
+
+        // Проверяем наличие "\r\n\r\n"
+        for (int i = 0; i < whitespace.Length - 3; i++)
+        {
+            if (whitespace[i] == '\r' && whitespace[i + 1] == '\n' &&
+                whitespace[i + 2] == '\r' && whitespace[i + 3] == '\n')
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -45,7 +79,7 @@ public static class SqlTextHelper
     /// "\"Table Name\"" → "Table Name"
     /// "username" → "username"
     /// </example>
-    public static string UnquoteIdentifier(string quotedIdentifier)
+    public static ReadOnlySpan<char> UnquoteIdentifier(ReadOnlySpan<char> quotedIdentifier)
     {
         return quotedIdentifier.Trim('"');
     }

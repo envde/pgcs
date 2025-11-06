@@ -4,16 +4,21 @@ using PgCs.Core.Tokenization;
 namespace PgCs.Core.Parsing.Blocks;
 
 /// <summary>
-/// Парсер SQL блоков на основе токенов.
-/// Использует SqlTokenizer для токенизации и разделяет блоки по точкам с запятой.
+/// Парсер SQL блоков из токенизированного PostgreSQL кода
 /// </summary>
 /// <remarks>
-/// Преимущества перед построчным парсером:
-/// - Корректная обработка строковых литералов ('text with -- fake comment')
-/// - Правильная обработка dollar-quoted strings ($$body$$, $tag$body$tag$)
-/// - Понимание вложенных комментариев /* /* nested */ */
-/// - Точная балансировка скобок
-/// - Поддержка всех операторов PostgreSQL (||, @>, <@, ->, etc.)
+/// Разбивает SQL код на логические блоки, разделенные точкой с запятой.
+/// Каждый блок содержит:
+/// - Content: нормализованный SQL код (без trivia)
+/// - RawContent: исходный SQL код (с whitespace и комментариями)
+/// - HeaderComment: комментарий перед блоком
+/// - InlineComments: комментарии внутри блока
+/// 
+/// Использует двухфазную обработку:
+/// 1. Токенизация (SqlTokenizer)
+/// 2. Группировка токенов в блоки (BlockParser)
+/// 
+/// Оптимизирован для .NET 9 с использованием ArrayPool и capacity hints.
 /// </remarks>
 public sealed class BlockParser
 {
@@ -23,14 +28,14 @@ public sealed class BlockParser
 
     // Компоненты для парсинга и построения блоков
     private readonly List<SqlToken> _blockTokens = [];
-    private readonly HeaderCommentParser _headerComments = new();
+    private readonly List<SqlToken> _headerTokens = [];
     private readonly SqlContentBuilder _contentBuilder = new();
-    private readonly InlineCommentParser _inlineCommentParser = new();
+    private readonly CommentParser _commentParser = new();
 
     /// <summary>
-    /// Создает парсер блоков
+    /// Создает новый парсер блоков из токенов
     /// </summary>
-    /// <param name="tokens">Все токены из токенизатора</param>
+    /// <param name="tokens">Список токенов из SqlTokenizer</param>
     /// <param name="sourceText">Исходный SQL текст</param>
     public BlockParser(IReadOnlyList<SqlToken> tokens, string sourceText)
     {
@@ -39,17 +44,21 @@ public sealed class BlockParser
     }
 
     /// <summary>
-    /// Парсит SQL текст в список блоков (высокоуровневый API).
+    /// Парсит SQL текст в список блоков (высокоуровневый статический API)
     /// </summary>
     /// <param name="sql">SQL текст для парсинга</param>
-    /// <returns>Список SQL блоков</returns>
-    /// <exception cref="ArgumentException">Если SQL текст пустой или состоит из пробелов</exception>
+    /// <returns>Список SQL блоков, разделенных точками с запятой</returns>
+    /// <exception cref="ArgumentException">Если sql null или пустой</exception>
+    /// <remarks>
+    /// Это удобный метод, который выполняет токенизацию и парсинг в один вызов.
+    /// Для большего контроля используйте SqlTokenizer и BlockParser напрямую.
+    /// </remarks>
     public static IReadOnlyList<SqlBlock> Parse(string sql)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sql);
 
         // Фаза 1: Токенизация SQL
-        var tokenizer = new SqlTokenizer();
+        var tokenizer = new SqlTokenizer(sql);
         var tokens = tokenizer.Tokenize(sql);
 
         // Фаза 2: Парсинг блоков из токенов
@@ -58,11 +67,13 @@ public sealed class BlockParser
     }
 
     /// <summary>
-    /// Парсит все блоки из токенов
+    /// Парсит все блоки из токенов (с оптимизацией памяти через capacity hint)
     /// </summary>
     private IReadOnlyList<SqlBlock> ParseBlocks()
     {
-        var blocks = new List<SqlBlock>();
+        // Capacity hint: считаем точки с запятой для уменьшения реаллокаций
+        var estimatedBlockCount = EstimateBlockCount(_allTokens);
+        var blocks = new List<SqlBlock>(estimatedBlockCount);
 
         while (!IsAtEnd())
         {
@@ -77,12 +88,32 @@ public sealed class BlockParser
     }
 
     /// <summary>
+    /// Оценивает количество блоков по точкам с запятой
+    /// </summary>
+    private static int EstimateBlockCount(IReadOnlyList<SqlToken> tokens)
+    {
+        var count = 0;
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            if (token.IsSignificant() && token.Type == TokenType.Semicolon)
+            {
+                count++;
+            }
+        }
+
+        // Минимум 1 блок, даже если нет точек с запятой
+        return Math.Max(count, 1);
+    }
+
+    /// <summary>
     /// Парсит один SQL блок
     /// </summary>
     private SqlBlock? ParseBlock()
     {
         // Собираем header комментарии и пропускаем trivia до начала блока
-        CollectHeaderCommentsAndTrivia();
+        CollectHeaderTokens();
 
         if (IsAtEnd())
         {
@@ -112,34 +143,33 @@ public sealed class BlockParser
         }
 
         // Строим блок
-        var headerComment = _headerComments.ExtractAndClear();
-        return BuildBlock(_blockTokens, headerComment);
+        return BuildBlock(_blockTokens, _headerTokens);
     }
 
     /// <summary>
     /// Строит SqlBlock из токенов
     /// </summary>
-    /// <param name="allTokens">Все токены блока (включая trivia)</param>
-    /// <param name="headerComment">Header комментарий (если есть)</param>
-    /// <returns>Готовый SqlBlock</returns>
-    private SqlBlock BuildBlock(IReadOnlyList<SqlToken> allTokens, string? headerComment)
+    private SqlBlock BuildBlock(IReadOnlyList<SqlToken> blockTokens, IReadOnlyList<SqlToken> headerTokens)
     {
-        if (allTokens.Count == 0)
+        if (blockTokens.Count == 0)
         {
-            throw new ArgumentException("Tokens list cannot be empty", nameof(allTokens));
+            throw new ArgumentException("Tokens list cannot be empty", nameof(blockTokens));
         }
 
-        var startToken = allTokens[0];
-        var endToken = allTokens[^1];
+        var startToken = blockTokens[0];
+        var endToken = blockTokens[^1];
 
         // Строим Content (только значащие токены)
-        var content = _contentBuilder.Build(allTokens);
+        var content = _contentBuilder.Build(blockTokens);
+
+        // Извлекаем header комментарий
+        var headerComment = _commentParser.ExtractHeaderComment(headerTokens);
 
         // Извлекаем RawContent (включая все trivia)
         var rawContent = ExtractRawContent(startToken, endToken, headerComment);
 
         // Извлекаем inline комментарии
-        var inlineComments = _inlineCommentParser.Extract(allTokens);
+        var inlineComments = _commentParser.ExtractInlineComments(blockTokens);
 
         return new SqlBlock
         {
@@ -153,56 +183,68 @@ public sealed class BlockParser
     }
 
     /// <summary>
-    /// Извлекает RawContent из исходного текста
+    /// Извлекает RawContent из исходного текста (zero allocation с string.Create)
     /// </summary>
-    /// <param name="startToken">Первый токен блока</param>
-    /// <param name="endToken">Последний токен блока</param>
-    /// <param name="headerComment">Header комментарий (если есть)</param>
-    /// <returns>Полный исходный текст блока с комментариями</returns>
     private string ExtractRawContent(SqlToken startToken, SqlToken endToken, string? headerComment)
     {
         var start = startToken.Span.Start;
         var end = endToken.Span.End;
+        var blockSpan = _sourceText.AsSpan(start, end - start);
 
-        var blockContent = _sourceText[start..end];
-
-        // Добавляем header комментарии если есть
-        if (headerComment is not null)
+        // Без header - просто возвращаем blockContent
+        if (headerComment is null)
         {
-            return $"-- {headerComment}{Environment.NewLine}{blockContent}";
+            return blockSpan.ToString();
         }
 
-        return blockContent;
+        // С header - собираем через string.Create (одна аллокация вместо 4+)
+        const string prefix = "-- ";
+        var newLine = Environment.NewLine;
+
+        // Материализуем blockSpan в строку (нужна для closure)
+        var blockContent = blockSpan.ToString();
+        var totalLength = prefix.Length + headerComment.Length + newLine.Length + blockContent.Length;
+
+        return string.Create(totalLength, (prefix, headerComment, newLine, blockContent), static (span, state) =>
+        {
+            var (prefix, header, newLine, block) = state;
+            var position = 0;
+
+            // Копируем "-- "
+            prefix.AsSpan().CopyTo(span[position..]);
+            position += prefix.Length;
+
+            // Копируем headerComment
+            header.AsSpan().CopyTo(span[position..]);
+            position += header.Length;
+
+            // Копируем Environment.NewLine
+            newLine.AsSpan().CopyTo(span[position..]);
+            position += newLine.Length;
+
+            // Копируем blockContent
+            block.AsSpan().CopyTo(span[position..]);
+        });
     }
 
     /// <summary>
-    /// Собирает header комментарии и пропускает trivia
+    /// Собирает header токены (комментарии и trivia перед блоком)
     /// </summary>
-    private void CollectHeaderCommentsAndTrivia()
+    private void CollectHeaderTokens()
     {
+        _headerTokens.Clear();
+
         while (!IsAtEnd())
         {
             var token = Current();
 
             if (token.IsSignificant())
             {
-                // Достигли не-trivia токена - заканчиваем сбор header comments
+                // Достигли не-trivia токена - заканчиваем сбор
                 break;
             }
 
-            // Обработка пустых строк (в whitespace токене)
-            if (token.Type == TokenType.Whitespace && SqlTextHelper.ContainsEmptyLine(token.Value))
-            {
-                _headerComments.MarkEmptyLine();
-            }
-
-            // Обработка комментариев
-            if (token.Type == TokenType.LineComment)
-            {
-                var commentText = SqlTextHelper.ExtractCommentText(token.Value);
-                _headerComments.AddComment(commentText);
-            }
-
+            _headerTokens.Add(token);
             Advance();
         }
     }

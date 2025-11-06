@@ -439,7 +439,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                     if (inlineComment != null)
                     {
                         var commentText = inlineComment.Comment;
-                        var parsedComment = new CommentMetadataParser().Parse(commentText);
+                        var parsedComment = new CommentParser().ParseMetadata(commentText);
 
                         column = column with
                         {

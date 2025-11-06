@@ -346,7 +346,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             // Пытаемся найти inline-комментарий для этой колонки
             // Нужно попробовать найти по полному выражению и по короткому имени
             var inlineComment = FindInlineCommentForColumnExpression(viewBlock, rawColumnExpression, columnName);
-            var parsedComment = new CommentMetadataParser().Parse(inlineComment?.Comment);
+            var parsedComment = new CommentParser().ParseMetadata(inlineComment?.Comment);
 
             string dataType = "unknown";
             string? renameTo = null;

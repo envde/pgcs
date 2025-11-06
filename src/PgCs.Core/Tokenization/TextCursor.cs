@@ -39,7 +39,7 @@ public sealed class TextCursor
     {
         var ch = _text[_position];
         _position++;
-        
+
         if (ch == '\n')
         {
             _line++;
@@ -49,30 +49,30 @@ public sealed class TextCursor
         {
             _column++;
         }
-        
+
         return ch;
     }
 
     /// <summary>Проверяет, совпадает ли текущая позиция с последовательностью</summary>
-    public bool MatchSequence(string sequence)
+    public bool MatchSequence(ReadOnlySpan<char> sequence)
     {
         if (_position + sequence.Length > _text.Length)
         {
             return false;
         }
-        
-        return _text.AsSpan(_position, sequence.Length).SequenceEqual(sequence.AsSpan());
+
+        return _text.AsSpan(_position, sequence.Length).SequenceEqual(sequence);
     }
 
-    /// <summary>Извлекает подстроку</summary>
-    public string GetText(int start, int length)
+    /// <summary>Извлекает подстроку как Span (zero-allocation)</summary>
+    public ReadOnlySpan<char> GetTextSpan(int start, int length)
     {
         if (start + length > _text.Length)
         {
             length = _text.Length - start;
         }
-        
-        return _text.Substring(start, length);
+
+        return _text.AsSpan(start, length);
     }
 
     /// <summary>Создаёт снимок текущей позиции</summary>

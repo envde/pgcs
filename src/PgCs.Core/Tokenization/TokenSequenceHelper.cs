@@ -149,3 +149,4 @@ public static class TokenSequenceHelper
         return tokens.Any(t => t.Type == type);
     }
 }
+

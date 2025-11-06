@@ -1,3 +1,4 @@
+
 using PgCs.Core.Tokenization.Scanners;
 
 namespace PgCs.Core.Tokenization;
@@ -7,11 +8,40 @@ namespace PgCs.Core.Tokenization;
 /// Преобразует PostgreSQL SQL текст в последовательность токенов
 /// Поддерживает PostgreSQL 18 синтаксис
 /// </summary>
+/// <remarks>
+/// Токенизатор поддерживает полный синтаксис PostgreSQL, включая:
+/// - Dollar-quoted strings ($tag$...$tag$)
+/// - Quoted identifiers ("table_name")
+/// - Line (--) и block (/* */) комментарии
+/// - Числа (integer, decimal, scientific notation, hex, binary, octal)
+/// - Операторы (::, ->, @>, <@, и т.д.)
+/// - Ключевые слова PostgreSQL
+/// </remarks>
 public sealed class SqlTokenizer
 {
+    private readonly string _sourceText;
+
     /// <summary>
-    /// Токенизирует SQL текст
+    /// Создает новый экземпляр токенизатора для указанного SQL текста
     /// </summary>
+    /// <param name="sourceText">Исходный SQL текст для токенизации</param>
+    /// <exception cref="ArgumentException">Если sourceText null или пустой</exception>
+    public SqlTokenizer(string sourceText)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceText);
+        _sourceText = sourceText;
+    }
+
+    /// <summary>
+    /// Токенизирует SQL текст и возвращает список токенов
+    /// </summary>
+    /// <param name="sql">SQL текст для токенизации</param>
+    /// <returns>Список токенов, включая завершающий EOF токен</returns>
+    /// <exception cref="ArgumentException">Если sql null или пустой</exception>
+    /// <remarks>
+    /// Метод всегда возвращает как минимум один токен (EOF).
+    /// Все whitespace и комментарии сохраняются как trivia токены для точного воспроизведения оригинального текста.
+    /// </remarks>
     public IReadOnlyList<SqlToken> Tokenize(string sql)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sql);
@@ -29,7 +59,7 @@ public sealed class SqlTokenizer
         }
 
         // Добавляем EOF токен
-        tokens.Add(CreateEofToken(cursor));
+        tokens.Add(CreateEofToken(cursor, sql));
 
         return tokens;
     }
@@ -37,7 +67,7 @@ public sealed class SqlTokenizer
     /// <summary>
     /// Сканирует следующий токен
     /// </summary>
-    private static SqlToken? ScanToken(TextCursor cursor, string sourceText)
+    private SqlToken? ScanToken(TextCursor cursor, string sourceText)
     {
         var startPos = cursor.Position;
         var startLine = cursor.Line;
@@ -52,42 +82,72 @@ public sealed class SqlTokenizer
             ' ' or '\t' or '\r' or '\n' => ScanWhitespace(cursor, sourceText, startPos, startLine, startColumn),
 
             // Comments
-            '-' when cursor.Current == '-' => ScanLineComment(cursor, sourceText, startPos, startLine, startColumn),
-            '/' when cursor.Current == '*' => ScanBlockComment(cursor, sourceText, startPos, startLine, startColumn),
+            '-' when cursor.Current == '-' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlCommentScanner.ScanLineComment),
+            '/' when cursor.Current == '*' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlCommentScanner.ScanBlockComment),
 
             // Dollar-quoted strings or operator $
-            '$' => ScanDollarQuotedOrOperator(cursor, sourceText, startPos, startLine, startColumn),
+            '$' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlStringScanner.ScanDollarQuotedString),
 
             // String literals
-            '\'' => ScanStringLiteral(cursor, sourceText, startPos, startLine, startColumn),
+            '\'' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlStringScanner.ScanStringLiteral),
 
             // Quoted identifiers
-            '"' => ScanQuotedIdentifier(cursor, sourceText, startPos, startLine, startColumn),
+            '"' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlStringScanner.ScanQuotedIdentifier),
 
             // Numbers
-            >= '0' and <= '9' => ScanNumber(cursor, sourceText, startPos, startLine, startColumn),
+            >= '0' and <= '9' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlNumberScanner.ScanNumber),
 
             // Punctuation
-            '(' => CreateToken(TokenType.OpenParen, "(", startPos, startLine, startColumn),
-            ')' => CreateToken(TokenType.CloseParen, ")", startPos, startLine, startColumn),
-            '[' => CreateToken(TokenType.OpenBracket, "[", startPos, startLine, startColumn),
-            ']' => CreateToken(TokenType.CloseBracket, "]", startPos, startLine, startColumn),
-            ';' => CreateToken(TokenType.Semicolon, ";", startPos, startLine, startColumn),
-            ',' => CreateToken(TokenType.Comma, ",", startPos, startLine, startColumn),
-            '.' => CreateToken(TokenType.Dot, ".", startPos, startLine, startColumn),
+            '(' => CreateToken(TokenType.OpenParen, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn),
+            ')' => CreateToken(TokenType.CloseParen, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn),
+            '[' => CreateToken(TokenType.OpenBracket, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn),
+            ']' => CreateToken(TokenType.CloseBracket, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn),
+            ';' => CreateToken(TokenType.Semicolon, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn),
+            ',' => CreateToken(TokenType.Comma, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn),
+            '.' => CreateToken(TokenType.Dot, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn),
 
             // Operators
             _ when SqlCharClassifier.IsOperatorChar(ch)
-                => ScanOperator(cursor, sourceText, startPos, startLine, startColumn),
+                => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlOperatorScanner.ScanOperator),
 
             // Identifiers & Keywords
             _ when SqlCharClassifier.IsIdentifierStart(ch)
                 => ScanIdentifierOrKeyword(cursor, sourceText, startPos, startLine, startColumn),
 
-            _ => CreateToken(TokenType.Unknown, ch.ToString(), startPos, startLine, startColumn)
+            _ => CreateToken(TokenType.Unknown, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn)
         };
 
         return result;
+    }
+
+    /// <summary>
+    /// Универсальный метод сканирования с откатом курсора.
+    /// Устраняет дублирование кода во всех Scan* методах.
+    /// </summary>
+    /// <param name="cursor">Курсор текста</param>
+    /// <param name="sourceText">Исходный текст</param>
+    /// <param name="start">Начальная позиция</param>
+    /// <param name="line">Номер строки</param>
+    /// <param name="column">Номер колонки</param>
+    /// <param name="scanFunc">Функция сканирования конкретного типа токена</param>
+    /// <returns>Отсканированный токен</returns>
+    private static SqlToken ScanWithRewind(
+        TextCursor cursor,
+        string sourceText,
+        int start,
+        int line,
+        int column,
+        Func<TextCursor, ScanResult> scanFunc)
+    {
+        // Откатываем курсор к начальной позиции
+        cursor.RestoreSnapshot(new CursorPosition(start, line, column));
+
+        // Сканируем токен
+        var result = scanFunc(cursor);
+
+        // Создаем токен с zero-allocation через Memory
+        var valueMemory = sourceText.AsMemory(start, result.Length);
+        return CreateToken(result.Type, valueMemory, start, line, column);
     }
 
     private static SqlToken ScanWhitespace(TextCursor cursor, string text, int start, int line, int column)
@@ -98,82 +158,8 @@ public sealed class SqlTokenizer
         }
 
         var length = cursor.Position - start;
-        var value = text.Substring(start, length);
-        return CreateToken(TokenType.Whitespace, value, start, line, column);
-    }
-
-    private static SqlToken ScanLineComment(TextCursor cursor, string text, int start, int line, int column)
-    {
-        var result = SqlCommentScanner.ScanLineComment(cursor);
-        // result.Length is from cursor position (after first '-') to end of line
-        // but start is at the first '-', so we need to add 1
-        var totalLength = result.Length + 1;
-        var value = text.Substring(start, totalLength);
-        return CreateToken(result.Type, value, start, line, column);
-    }
-
-    private static SqlToken ScanBlockComment(TextCursor cursor, string text, int start, int line, int column)
-    {
-        var result = SqlCommentScanner.ScanBlockComment(cursor);
-        // result.Length is from cursor position (after '/') to end of comment
-        // but start is at the '/', so we need to add 1
-        var totalLength = result.Length + 1;
-        var value = text.Substring(start, totalLength);
-        return CreateToken(result.Type, value, start, line, column);
-    }
-
-    private static SqlToken ScanDollarQuotedOrOperator(TextCursor cursor, string text, int start, int line, int column)
-    {
-        // Откатываем на 1 символ назад (на $)
-        var snapshot = cursor.CreateSnapshot();
-        cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-
-        var result = SqlStringScanner.ScanDollarQuotedString(cursor);
-        var value = text.Substring(start, result.Length);
-        return CreateToken(result.Type, value, start, line, column);
-    }
-
-    private static SqlToken ScanStringLiteral(TextCursor cursor, string text, int start, int line, int column)
-    {
-        // Откатываем на 1 символ назад (на ')
-        var snapshot = cursor.CreateSnapshot();
-        cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-
-        var result = SqlStringScanner.ScanStringLiteral(cursor);
-        var value = text.Substring(start, result.Length);
-        return CreateToken(result.Type, value, start, line, column);
-    }
-
-    private static SqlToken ScanQuotedIdentifier(TextCursor cursor, string text, int start, int line, int column)
-    {
-        // Откатываем на 1 символ назад (на ")
-        var snapshot = cursor.CreateSnapshot();
-        cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-
-        var result = SqlStringScanner.ScanQuotedIdentifier(cursor);
-        var value = text.Substring(start, result.Length);
-        return CreateToken(result.Type, value, start, line, column);
-    }
-
-    private static SqlToken ScanNumber(TextCursor cursor, string text, int start, int line, int column)
-    {
-        // Откатываем на 1 символ назад (на цифру)
-        var snapshot = cursor.CreateSnapshot();
-        cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-
-        var result = SqlNumberScanner.ScanNumber(cursor);
-        var value = text.Substring(start, result.Length);
-        return CreateToken(result.Type, value, start, line, column);
-    }
-
-    private static SqlToken ScanOperator(TextCursor cursor, string text, int start, int line, int column)
-    {
-        // Откатываем на 1 символ назад (на оператор)
-        cursor.RestoreSnapshot(new CursorPosition(start, line, column));
-
-        var result = SqlOperatorScanner.ScanOperator(cursor);
-        var value = text.Substring(start, result.Length);
-        return CreateToken(result.Type, value, start, line, column);
+        var valueMemory = text.AsMemory(start, length);
+        return CreateToken(TokenType.Whitespace, valueMemory, start, line, column);
     }
 
     private static SqlToken ScanIdentifierOrKeyword(TextCursor cursor, string text, int start, int line, int column)
@@ -184,30 +170,33 @@ public sealed class SqlTokenizer
         }
 
         var length = cursor.Position - start;
-        var value = text.Substring(start, length);
-        var type = PostgresKeywords.IsKeyword(value) ? TokenType.Keyword : TokenType.Identifier;
+        var valueMemory = text.AsMemory(start, length);
 
-        return CreateToken(type, value, start, line, column);
+        // Проверяем ключевое слово используя Span для избежания аллокации
+        var valueSpan = valueMemory.Span;
+        var type = PostgresKeywords.IsKeyword(valueSpan) ? TokenType.Keyword : TokenType.Identifier;
+
+        return CreateToken(type, valueMemory, start, line, column);
     }
 
-    private static SqlToken CreateToken(TokenType type, string value, int start, int line, int column)
+    private static SqlToken CreateToken(TokenType type, ReadOnlyMemory<char> valueMemory, int start, int line, int column)
     {
         return new SqlToken
         {
             Type = type,
-            Value = value,
-            Span = new TextSpan(start, value.Length),
+            ValueMemory = valueMemory,
+            Span = new TextSpan(start, valueMemory.Length),
             Line = line,
             Column = column
         };
     }
 
-    private static SqlToken CreateEofToken(TextCursor cursor)
+    private static SqlToken CreateEofToken(TextCursor cursor, string sourceText)
     {
         return new SqlToken
         {
             Type = TokenType.EndOfFile,
-            Value = string.Empty,
+            ValueMemory = ReadOnlyMemory<char>.Empty,
             Span = new TextSpan(cursor.Position, 0),
             Line = cursor.Line,
             Column = cursor.Column

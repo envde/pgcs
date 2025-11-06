@@ -21,12 +21,6 @@ public static class SqlTokenExtensions
         !token.IsTrivia();
 
     /// <summary>
-    /// Проверяет, является ли токен комментарием (любого типа)
-    /// </summary>
-    public static bool IsComment(this SqlToken token) =>
-        token.Type is TokenType.LineComment or TokenType.BlockComment;
-
-    /// <summary>
     /// Проверяет, является ли токен ключевым словом
     /// </summary>
     public static bool IsKeyword(this SqlToken token) =>
