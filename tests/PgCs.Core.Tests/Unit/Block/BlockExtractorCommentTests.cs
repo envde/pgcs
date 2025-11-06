@@ -67,9 +67,16 @@ public sealed class BlockExtractorCommentTests
         // Assert
         Assert.Single(blocks);
         Assert.NotNull(blocks[0].InlineComments);
+
+        if (blocks[0].InlineComments?.Count != 2)
+        {
+            var keys = string.Join(", ", blocks[0].InlineComments?.Select(c => $"{c.Key}") ?? []);
+            Assert.Fail($"Expected 2 inline comments, got {blocks[0].InlineComments?.Count}: {keys}");
+        }
+
         Assert.Equal(2, blocks[0].InlineComments?.Count);
-        Assert.True(blocks[0].InlineComments?.Any(c=>c.Key == "id"));
-        Assert.True(blocks[0].InlineComments?.Any(c=>c.Key == "name"));
+        Assert.True(blocks[0].InlineComments?.Any(c => c.Key == "id"));
+        Assert.True(blocks[0].InlineComments?.Any(c => c.Key == "name"));
         Assert.Contains("-- Уникальный идентификатор", blocks[0].RawContent);
         Assert.Contains("-- Имя пользователя", blocks[0].RawContent);
         Assert.Contains("-- Информация о пользователе", blocks[0].RawContent);

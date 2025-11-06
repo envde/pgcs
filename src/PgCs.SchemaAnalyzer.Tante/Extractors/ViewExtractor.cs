@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
-using PgCs.Core.Extraction.Parsing.SqlComment;
+using PgCs.Core.Parsing.CommentParsing.Metadata;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
 using PgCs.Core.Validation;
@@ -346,7 +346,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             // Пытаемся найти inline-комментарий для этой колонки
             // Нужно попробовать найти по полному выражению и по короткому имени
             var inlineComment = FindInlineCommentForColumnExpression(viewBlock, rawColumnExpression, columnName);
-            var parsedComment = SqlInlineCommentParser.Parse(inlineComment?.Comment);
+            var parsedComment = new InlineCommentMetadataParser().Parse(inlineComment?.Comment);
 
             string dataType = "unknown";
             string? renameTo = null;
@@ -359,7 +359,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
             if (parsedComment is not null)
             {
                 // Если есть распарсенный комментарий с метаданными, используем его данные
-                dataType = parsedComment.ToDateType ?? "unknown";
+                dataType = parsedComment.ToDataType ?? "unknown";
                 renameTo = parsedComment.ToName;
                 comment = parsedComment.Comment;
             }
@@ -520,7 +520,7 @@ public sealed partial class ViewExtractor : IExtractor<ViewDefinition>
     /// Ищет inline-комментарий для выражения колонки в блоке VIEW
     /// Пытается найти комментарий по полному выражению (например, "u.id") или по короткому имени ("id")
     /// </summary>
-    private static InlineComment? FindInlineCommentForColumnExpression(
+    private static BlockInlineComment? FindInlineCommentForColumnExpression(
         SqlBlock viewBlock, 
         string rawExpression, 
         string cleanedColumnName)

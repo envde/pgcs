@@ -13,4 +13,9 @@
     <PackageReference Include="Npgsql" Version="9.0.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Parsing\CommentParsing\" />
+    <Folder Include="Parsing\Common\" />
+  </ItemGroup>
+
 </Project>

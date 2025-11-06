@@ -1,5 +1,6 @@
 using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
+using PgCs.Core.Parsing.CommentParsing.Metadata;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
 using PgCs.SchemaAnalyzer.Tante.Extractors;
@@ -39,22 +40,30 @@ public sealed class TableExtractorTests
             var issues = string.Join(", ", result.ValidationIssues.Select(i => i.Message));
             Assert.Fail($"Extraction failed with issues: {issues}");
         }
-        
+
         Assert.True(result.IsSuccess);
         var table = result.Definition;
         Assert.NotNull(table);
         Assert.Equal("users", table.Name);
+
+        // Отладочный вывод, если колонок меньше ожидаемого
+        if (table.Columns.Count != 10)
+        {
+            var columnNames = string.Join(", ", table.Columns.Select(c => c.Name));
+            Assert.Fail($"Expected 10 columns, got {table.Columns.Count}: {columnNames}");
+        }
+
         Assert.Equal(10, table.Columns.Count);
 
         // Проверка комментариев
         var id = table.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(id);
         Assert.Equal("Уникальный идентификатор", id.SqlComment);
-        
+
         var email = table.Columns.FirstOrDefault(c => c.Name == "email");
         Assert.NotNull(email);
         Assert.Equal("Электронная почта", email.SqlComment);
-        
+
         var passwordHash = table.Columns.FirstOrDefault(c => c.Name == "password_hash");
         Assert.NotNull(passwordHash);
         Assert.Equal("Хеш пароля", passwordHash.SqlComment); // Проверка --- комментария
@@ -62,7 +71,7 @@ public sealed class TableExtractorTests
         // BIGSERIAL PRIMARY KEY
         Assert.Equal("BIGSERIAL", id.DataType);
         Assert.True(id.IsPrimaryKey);
-        
+
         // UUID UNIQUE NOT NULL
         var externalId = table.Columns.FirstOrDefault(c => c.Name == "external_id");
         Assert.NotNull(externalId);
@@ -93,7 +102,7 @@ public sealed class TableExtractorTests
         Assert.Equal(12, balance.NumericPrecision);
         Assert.Equal(2, balance.NumericScale);
         Assert.Equal("0.00", balance.DefaultValue);
-        
+
         // DEFAULT CURRENT_TIMESTAMP
         var createdAt = table.Columns.FirstOrDefault(c => c.Name == "created_at");
         Assert.NotNull(createdAt);
@@ -125,7 +134,7 @@ public sealed class TableExtractorTests
         Assert.Equal("sessions", tempTable.Name);
         Assert.Equal("public", tempTable.Schema);
         Assert.True(tempTable.IsTemporary);
-        
+
         // Проверка inline комментариев
         var tempId = tempTable.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(tempId);
@@ -161,7 +170,7 @@ public sealed class TableExtractorTests
         Assert.NotNull(unloggedTable);
         Assert.True(unloggedTable.IsUnlogged);
         Assert.False(unloggedTable.IsTemporary);
-        
+
         // Проверка комментария с тройным дефисом
         var cacheValue = unloggedTable.Columns.FirstOrDefault(c => c.Name == "value");
         Assert.NotNull(cacheValue);
@@ -193,12 +202,12 @@ public sealed class TableExtractorTests
         Assert.NotNull(rangeTable.PartitionInfo);
         Assert.Equal(PartitionStrategy.Range, rangeTable.PartitionInfo.Strategy);
         Assert.Contains("measured_at", rangeTable.PartitionInfo.PartitionKeys);
-        
+
         // Проверка inline комментариев
         var measuredAt = rangeTable.Columns.FirstOrDefault(c => c.Name == "measured_at");
         Assert.NotNull(measuredAt);
         Assert.Equal("Время измерения", measuredAt.SqlComment);
-        
+
         var value = rangeTable.Columns.FirstOrDefault(c => c.Name == "value");
         Assert.NotNull(value);
         Assert.Equal("Значение", value.SqlComment);
@@ -257,7 +266,7 @@ public sealed class TableExtractorTests
                 department VARCHAR(50) -- Отдел
             ) INHERITS (persons);
         ");
-        
+
         var inheritResult = _extractor.Extract(inheritBlocks);
         if (!inheritResult.IsSuccess)
         {
@@ -269,12 +278,12 @@ public sealed class TableExtractorTests
         Assert.NotNull(inheritTable.InheritsFrom);
         Assert.Single(inheritTable.InheritsFrom);
         Assert.Contains("persons", inheritTable.InheritsFrom);
-        
+
         // Проверка inline комментариев с разными форматами
         var empId = inheritTable.Columns.FirstOrDefault(c => c.Name == "id");
         Assert.NotNull(empId);
         Assert.Equal("ID сотрудника", empId.SqlComment);
-        
+
         var empName = inheritTable.Columns.FirstOrDefault(c => c.Name == "name");
         Assert.NotNull(empName);
         Assert.Equal("Имя", empName.SqlComment); // Тройной дефис
@@ -517,13 +526,67 @@ public sealed class TableExtractorTests
 
     private static IReadOnlyList<SqlBlock> CreateBlocks(string sql, string? comment = null)
     {
+        // Парсим inline комментарии из SQL и создаём чистый Content (как делает ContentBuilder)
+        var inlineComments = new List<BlockInlineComment>();
+        var cleanLines = new List<string>();
+        var lines = sql.Split(['\r', '\n'], StringSplitOptions.None);
+
+        foreach (var line in lines)
+        {
+            var commentIndex = line.IndexOf("--", StringComparison.Ordinal);
+
+            if (commentIndex != -1)
+            {
+                // Извлекаем текст до комментария
+                var beforeComment = line.Substring(0, commentIndex).Trim();
+
+                if (!string.IsNullOrWhiteSpace(beforeComment))
+                {
+                    // Ищем имя колонки - первое слово после запятой или первое слово в строке
+                    var parts = beforeComment.Split([' ', '\t', ',', '('], StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 0)
+                    {
+                        // Первая часть - имя колонки
+                        var columnName = parts[0].Trim();
+
+                        // Извлекаем комментарий
+                        var commentText = line.Substring(commentIndex + 2).TrimStart('-').Trim();
+
+                        if (!string.IsNullOrWhiteSpace(columnName) && !string.IsNullOrWhiteSpace(commentText))
+                        {
+                            inlineComments.Add(new BlockInlineComment
+                            {
+                                Key = columnName,
+                                Comment = commentText,
+                                Position = commentIndex
+                            });
+                        }
+                    }
+
+                    cleanLines.Add(beforeComment);
+                }
+            }
+            else
+            {
+                // Нет комментария, добавляем строку как есть
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    cleanLines.Add(line.Trim());
+                }
+            }
+        }
+
+        // Собираем чистый Content (без комментариев, одна строка - как делает ContentBuilder)
+        var cleanContent = string.Join(" ", cleanLines);
+
         return [new SqlBlock
         {
-            Content = sql,
+            Content = cleanContent,
             RawContent = sql,
             HeaderComment = comment,
+            InlineComments = inlineComments.Count > 0 ? inlineComments : null,
             StartLine = 1,
-            EndLine = sql.Split('\n').Length
+            EndLine = lines.Length
         }];
     }
 }

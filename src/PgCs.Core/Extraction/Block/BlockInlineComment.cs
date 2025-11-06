@@ -3,7 +3,7 @@ namespace PgCs.Core.Extraction.Block;
 /// <summary>
 /// Inline комментарий
 /// </summary>
-public sealed record InlineComment
+public sealed record BlockInlineComment
 {
     /// <summary>
     /// Ключ, к которому относится комментарий (поле, параметр запроса и т.д)

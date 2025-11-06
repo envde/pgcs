@@ -55,7 +55,9 @@ public sealed class BlockExtractorCreateFunctionTests
 
         // Assert
         Assert.True(blocks.Count >= 1);
-        Assert.Contains("get_user_orders(user_id_param INTEGER)", blocks[0].Content);
+        // ContentBuilder добавляет пробел между токенами для читаемости
+        Assert.Contains("get_user_orders", blocks[0].Content);
+        Assert.Contains("user_id_param INTEGER", blocks[0].Content);
         Assert.Contains("RETURNS TABLE", blocks[0].Content);
     }
 }

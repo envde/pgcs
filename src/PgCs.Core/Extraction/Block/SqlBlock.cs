@@ -38,7 +38,7 @@ public sealed record SqlBlock
     /// название параметра.
     /// </code>
     /// </summary>
-    public IReadOnlyList<InlineComment>? InlineComments { get; init; }
+    public IReadOnlyList<BlockInlineComment>? InlineComments { get; init; }
 
     /// <summary>
     /// Номер строки начала блока в исходном файле (нумерация с 1).

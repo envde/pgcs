@@ -1,7 +1,8 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using PgCs.Core.Extraction;
 using PgCs.Core.Extraction.Block;
-using PgCs.Core.Extraction.Parsing.SqlComment;
+using PgCs.Core.Parsing.CommentParsing.Metadata;
 using PgCs.Core.Schema.Common;
 using PgCs.Core.Schema.Definitions;
 using PgCs.Core.Validation;
@@ -116,7 +117,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
         }
 
         var block = blocks[0];
-        return CreateTablePattern().IsMatch(block.Content) || 
+        return CreateTablePattern().IsMatch(block.Content) ||
                PartitionOfPattern().IsMatch(block.Content);
     }
 
@@ -160,10 +161,10 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
 
         var schema = match.Groups[3].Success ? match.Groups[3].Value : null;
         var name = match.Groups[4].Value;
-        var isTemporary = match.Groups[1].Success && 
+        var isTemporary = match.Groups[1].Success &&
                          (match.Groups[1].Value.Equals("TEMPORARY", StringComparison.OrdinalIgnoreCase) ||
                           match.Groups[1].Value.Equals("TEMP", StringComparison.OrdinalIgnoreCase));
-        var isUnlogged = match.Groups[1].Success && 
+        var isUnlogged = match.Groups[1].Success &&
                         match.Groups[1].Value.Equals("UNLOGGED", StringComparison.OrdinalIgnoreCase);
 
         // Извлечение колонок
@@ -249,8 +250,8 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
     /// Извлекает определение таблицы-партиции (PARTITION OF)
     /// </summary>
     private ExtractionResult<TableDefinition> ExtractPartitionTable(
-        SqlBlock block, 
-        Match partitionOfMatch, 
+        SqlBlock block,
+        Match partitionOfMatch,
         List<ValidationIssue> issues)
     {
         var schema = partitionOfMatch.Groups[2].Success ? partitionOfMatch.Groups[2].Value : null;
@@ -388,9 +389,9 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
     /// Упрощенная версия - извлекает только базовую информацию
     /// </summary>
     private IReadOnlyList<TableColumn> ExtractColumns(
-        string sql, 
-        string tableName, 
-        SqlBlock block, 
+        string sql,
+        string tableName,
+        SqlBlock block,
         List<ValidationIssue> issues)
     {
         var columns = new List<TableColumn>();
@@ -406,63 +407,50 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
 
         var tableBody = sql.Substring(startIndex + 1, endIndex - startIndex - 1);
 
-        // Разделяем на строки и обрабатываем каждую
-        var lines = tableBody.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-        
-        foreach (var line in lines)
+        // Разбиваем по запятым, учитывая вложенные скобки
+        var columnDefinitions = SplitColumnDefinitions(tableBody);
+
+        foreach (var definition in columnDefinitions)
         {
-            var trimmedLine = line.Trim();
-            
+            var trimmedDef = definition.Trim();
+
             // Пропускаем CONSTRAINT строки
-            if (trimmedLine.StartsWith("CONSTRAINT", StringComparison.OrdinalIgnoreCase))
+            if (trimmedDef.StartsWith("CONSTRAINT", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            // Пропускаем пустые строки и комментарии
-            if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith("--"))
+            // Пропускаем пустые определения
+            if (string.IsNullOrWhiteSpace(trimmedDef))
             {
                 continue;
             }
 
-            // Сначала пытаемся удалить inline комментарий из строки (для unit тестов где комментарии в Content)
-            var lineWithoutComment = RemoveInlineComment(trimmedLine, out var inlineCommentFromLine);
-            
             // Попытка извлечь колонку
-            var column = TryExtractColumn(lineWithoutComment);
+            var column = TryExtractColumn(trimmedDef);
             if (column != null)
             {
-                // Ищем inline комментарий двумя способами:
-                // 1. Из block.InlineComments (для реального SchemaAnalyzer)
-                // 2. Из текущей строки (для unit тестов)
-                string commentText = inlineCommentFromLine;
-                
-                if (string.IsNullOrWhiteSpace(commentText) && block.InlineComments != null)
+                // Ищем inline комментарий в block.InlineComments
+                if (block.InlineComments != null)
                 {
-                    // Ищем комментарий по ключу (имени колонки) в block.InlineComments
-                    var inlineComment = block.InlineComments.FirstOrDefault(c => 
+                    var inlineComment = block.InlineComments.FirstOrDefault(c =>
                         c.Key.Equals(column.Name, StringComparison.OrdinalIgnoreCase));
-                    
+
                     if (inlineComment != null)
                     {
-                        commentText = inlineComment.Comment;
+                        var commentText = inlineComment.Comment;
+                        var parsedComment = new InlineCommentMetadataParser().Parse(commentText);
+                        if (parsedComment != null)
+                        {
+                            column = column with
+                            {
+                                SqlComment = parsedComment.Comment,
+                                ToName = parsedComment.ToName
+                            };
+                        }
                     }
                 }
-                
-                // Если был inline комментарий, парсим его для извлечения метаданных
-                if (!string.IsNullOrWhiteSpace(commentText))
-                {
-                    var parsedComment = SqlInlineCommentParser.Parse(commentText);
-                    if (parsedComment != null)
-                    {
-                        column = column with 
-                        { 
-                            SqlComment = parsedComment.Comment,
-                            ToName = parsedComment.ToName
-                            // parsedComment.DataType можно использовать для валидации или переопределения
-                        };
-                    }
-                }
+
                 columns.Add(column);
             }
             else
@@ -471,10 +459,10 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
                 issues.Add(ValidationIssue.Warning(
                     ValidationIssue.ValidationDefinitionType.Table,
                     "TABLE_INVALID_COLUMN",
-                    $"Failed to parse column definition in TABLE '{tableName}': '{lineWithoutComment.TrimEnd(',').Trim()}'",
+                    $"Failed to parse column definition in TABLE '{tableName}': '{trimmedDef}'",
                     new ValidationIssue.ValidationLocation
                     {
-                        Segment = trimmedLine,
+                        Segment = trimmedDef,
                         Line = block.StartLine,
                         Column = 0
                     }
@@ -483,6 +471,51 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
         }
 
         return columns;
+    }
+
+    /// <summary>
+    /// Разбивает определения колонок по запятым, учитывая вложенные скобки
+    /// Например: "id BIGSERIAL PRIMARY KEY, name VARCHAR(50), coords point[]"
+    /// </summary>
+    private static List<string> SplitColumnDefinitions(string tableBody)
+    {
+        var definitions = new List<string>();
+        var current = new StringBuilder();
+        var parenDepth = 0;
+
+        for (int i = 0; i < tableBody.Length; i++)
+        {
+            var ch = tableBody[i];
+
+            if (ch == '(')
+            {
+                parenDepth++;
+                current.Append(ch);
+            }
+            else if (ch == ')')
+            {
+                parenDepth--;
+                current.Append(ch);
+            }
+            else if (ch == ',' && parenDepth == 0)
+            {
+                // Запятая на верхнем уровне - разделитель колонок
+                definitions.Add(current.ToString());
+                current.Clear();
+            }
+            else
+            {
+                current.Append(ch);
+            }
+        }
+
+        // Добавляем последнее определение
+        if (current.Length > 0)
+        {
+            definitions.Add(current.ToString());
+        }
+
+        return definitions;
     }
 
     /// <summary>
@@ -501,7 +534,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
         }
 
         var name = parts[0].Trim();
-        
+
         // Проверка на ключевые слова (PRIMARY KEY, FOREIGN KEY и т.д.)
         if (IsKeyword(name))
         {
@@ -515,7 +548,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
         {
             var part = parts[i];
             // Проверяем, является ли часть началом ключевого слова или модификатора
-            if (IsKeyword(part) || 
+            if (IsKeyword(part) ||
                 part.Equals("NOT", StringComparison.OrdinalIgnoreCase) ||
                 part.Equals("NULL", StringComparison.OrdinalIgnoreCase) ||
                 part.Equals("DEFAULT", StringComparison.OrdinalIgnoreCase) ||
@@ -523,11 +556,11 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
             {
                 break;
             }
-            
+
             // Добавляем часть к типу (нужно для DECIMAL(10, 2) где пробел разделяет 10, и 2))
             dataTypeBuilder.Append(' ').Append(part);
         }
-        
+
         var dataType = dataTypeBuilder.ToString().Trim();
 
         // Извлечение параметров типа (VARCHAR(255), NUMERIC(12,2) и т.д.)
@@ -590,36 +623,6 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
     }
 
     /// <summary>
-    /// Удаляет inline комментарий из строки и возвращает текст комментария
-    /// Поддерживает: -- комментарий, --- комментарий, и специальный формат comment: ...
-    /// </summary>
-    /// <summary>
-    /// Удаляет inline комментарий из строки и возвращает текст комментария
-    /// </summary>
-    private static string RemoveInlineComment(string line, out string comment)
-    {
-        comment = string.Empty;
-        
-        // Ищем начало inline комментария (--)
-        var commentIndex = line.IndexOf("--", StringComparison.Ordinal);
-        if (commentIndex == -1)
-        {
-            return line;
-        }
-        
-        // Извлекаем текст комментария (всё после --)
-        var commentText = line.Substring(commentIndex + 2).Trim();
-        
-        // Удаляем дополнительные дефисы в начале (--- комментарий)
-        commentText = commentText.TrimStart('-').Trim();
-        
-        comment = commentText;
-        
-        // Возвращаем строку без комментария
-        return line.Substring(0, commentIndex).Trim();
-    }
-
-    /// <summary>
     /// Извлекает информацию о IDENTITY колонке
     /// Поддерживает: GENERATED ALWAYS AS IDENTITY, GENERATED BY DEFAULT AS IDENTITY
     /// </summary>
@@ -643,7 +646,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
         {
             return (true, "ALWAYS");
         }
-        
+
         if (upperLine.Contains("GENERATED BY DEFAULT AS IDENTITY"))
         {
             return (true, "BY DEFAULT");
@@ -658,10 +661,10 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
     private static (bool isGenerated, string? generationExpression) ExtractGeneratedInfo(string line)
     {
         // GENERATED ALWAYS AS (expression) STORED
-        var match = Regex.Match(line, 
-            @"GENERATED\s+ALWAYS\s+AS\s*\(([^)]+)\)\s*STORED", 
+        var match = Regex.Match(line,
+            @"GENERATED\s+ALWAYS\s+AS\s*\(([^)]+)\)\s*STORED",
             RegexOptions.IgnoreCase);
-        
+
         if (match.Success)
         {
             var expression = match.Groups[1].Value.Trim();
@@ -678,10 +681,10 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
     private static string? ExtractCollation(string line)
     {
         // COLLATE "en_US" или COLLATE en_US
-        var match = Regex.Match(line, 
-            @"COLLATE\s+(?:""([^""]+)""|(\w+))", 
+        var match = Regex.Match(line,
+            @"COLLATE\s+(?:""([^""]+)""|(\w+))",
             RegexOptions.IgnoreCase);
-        
+
         if (match.Success)
         {
             return match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
@@ -732,10 +735,10 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
     {
         // Убираем параметры в скобках
         var cleaned = Regex.Replace(dataType, @"\([^)]+\)", string.Empty);
-        
+
         // Убираем массивы []
         cleaned = cleaned.Replace("[]", string.Empty);
-        
+
         return cleaned.Trim().ToUpperInvariant();
     }
 
@@ -745,7 +748,7 @@ public sealed partial class TableExtractor : IExtractor<TableDefinition>
     private static string? ExtractDefaultValue(string line)
     {
         var match = Regex.Match(
-            line, 
+            line,
             @"DEFAULT\s+(.+?)(?:\s+(?:NOT\s+NULL|NULL|PRIMARY\s+KEY|UNIQUE|CHECK|,)|\s*$)",
             RegexOptions.IgnoreCase
         );
