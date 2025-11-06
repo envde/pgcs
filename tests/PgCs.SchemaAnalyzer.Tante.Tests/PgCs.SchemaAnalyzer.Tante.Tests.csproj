@@ -28,55 +28,18 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="SchemaScripts\FullSchema\Schema.sql">
+      <!-- FullSchema - полная схема для основного интеграционного теста -->
+      <None Update="Data\FullSchema\Schema.sql">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="SchemaScripts\SepatatedFiles\AddCommentToCompositeType.sql">
+      
+      <!-- MultiFile - несколько файлов для теста множественных файлов -->
+      <None Update="Data\MultiFile\*.sql">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="SchemaScripts\SepatatedFiles\AddCommentToDomain.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\AddCommentToEnum.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\AddCommentToFunction.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\AddCommentToIndex.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\AddCommentToTable.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\AddCommentToTrigger.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\AddCommentToView.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\CreateCompositeType.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\CreateDomain.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\CreateEnum.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\CreateFunction.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\CreateIndex.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\CreateTable.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\CreateTrigger.sql">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="SchemaScripts\SepatatedFiles\CreateView.sql">
+      
+      <!-- EdgeCases - граничные случаи (пустые файлы, ошибки, спецсимволы) -->
+      <None Update="Data\EdgeCases\*.sql">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>

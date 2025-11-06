@@ -3,7 +3,6 @@
   <Folder Name="/outline/">
     <File Path=".gitignore" />
     <File Path="NuGet.config" />
-    <File Path="PgCs.sln.DotSettings.user" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/PgCs.Cli/PgCs.Cli.csproj" />

@@ -96,6 +96,13 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
         }
 
         var sqlContent = await File.ReadAllTextAsync(schemaFilePath, cancellationToken);
+        
+        // Если файл пустой или содержит только пробелы, возвращаем пустые метаданные
+        if (string.IsNullOrWhiteSpace(sqlContent))
+        {
+            return CreateEmptyMetadata([schemaFilePath], schemaFilePath);
+        }
+        
         var blocks = BlockParser.Parse(sqlContent);
 
         // Добавляем информацию о файле-источнике к блокам
@@ -131,6 +138,14 @@ public sealed class SchemaAnalyzer : ISchemaAnalyzer
             cancellationToken.ThrowIfCancellationRequested();
 
             var sqlContent = await File.ReadAllTextAsync(filePath, cancellationToken);
+            
+            // Пропускаем пустые файлы или файлы только с пробелами
+            if (string.IsNullOrWhiteSpace(sqlContent))
+            {
+                sourcePaths.Add(filePath);
+                continue;
+            }
+            
             var blocks = BlockParser.Parse(sqlContent);
 
             // Добавляем информацию о файле-источнике

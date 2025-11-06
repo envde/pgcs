@@ -1,4 +1,5 @@
 using PgCs.Core.Schema.Common;
+using PgCs.Core.Validation;
 
 namespace PgCs.SchemaAnalyzer.Tante.Tests.Integration;
 
@@ -10,7 +11,7 @@ public sealed class SchemaAnalyzerIntegrationTests
 {
     private readonly SchemaAnalyzer _analyzer = new();
     private readonly string _testDataPath = Path.Combine(
-        AppContext.BaseDirectory, "SchemaScripts");
+        AppContext.BaseDirectory, "Data");
 
     /// <summary>
     /// Тест полной схемы: загружает Schema.sql из FullSchema папки и проверяет извлечение всех объектов
@@ -119,42 +120,42 @@ public sealed class SchemaAnalyzerIntegrationTests
         var address = metadata.Composites.FirstOrDefault(c => c.Name == "address");
         Assert.NotNull(address);
         Assert.Equal(5, address.Attributes.Count);
-        Assert.Contains(address.Attributes, a => a.Name == "street" && a.DataType?.Contains("VARCHAR") == true);
-        Assert.Contains(address.Attributes, a => a.Name == "city" && a.DataType?.Contains("VARCHAR") == true);
-        Assert.Contains(address.Attributes, a => a.Name == "state" && a.DataType?.Contains("VARCHAR") == true);
-        Assert.Contains(address.Attributes, a => a.Name == "zip_code" && a.DataType?.Contains("VARCHAR") == true);
-        Assert.Contains(address.Attributes, a => a.Name == "country" && a.DataType?.Contains("VARCHAR") == true);
+        Assert.Contains(address.Attributes, a => a.Name == "street" && a.DataType.Contains("VARCHAR"));
+        Assert.Contains(address.Attributes, a => a.Name == "city" && a.DataType.Contains("VARCHAR"));
+        Assert.Contains(address.Attributes, a => a.Name == "state" && a.DataType.Contains("VARCHAR"));
+        Assert.Contains(address.Attributes, a => a.Name == "zip_code" && a.DataType.Contains("VARCHAR"));
+        Assert.Contains(address.Attributes, a => a.Name == "country" && a.DataType.Contains("VARCHAR"));
 
         var contactInfo = metadata.Composites.FirstOrDefault(c => c.Name == "contact_info");
         Assert.NotNull(contactInfo);
         Assert.Equal(4, contactInfo.Attributes.Count);
-        Assert.Contains(contactInfo.Attributes, a => a.Name == "phone" && a.DataType?.Contains("VARCHAR") == true);
-        Assert.Contains(contactInfo.Attributes, a => a.Name == "email" && a.DataType?.Contains("VARCHAR") == true);
-        Assert.Contains(contactInfo.Attributes, a => a.Name == "telegram" && a.DataType?.Contains("VARCHAR") == true);
-        Assert.Contains(contactInfo.Attributes, a => a.Name == "preferred_method" && a.DataType?.Contains("VARCHAR") == true);
+        Assert.Contains(contactInfo.Attributes, a => a.Name == "phone" && a.DataType.Contains("VARCHAR"));
+        Assert.Contains(contactInfo.Attributes, a => a.Name == "email" && a.DataType.Contains("VARCHAR"));
+        Assert.Contains(contactInfo.Attributes, a => a.Name == "telegram" && a.DataType.Contains("VARCHAR"));
+        Assert.Contains(contactInfo.Attributes, a => a.Name == "preferred_method" && a.DataType.Contains("VARCHAR"));
 
         // Assert - Domain типы (4: email, positive_numeric, percentage, phone_number)
         var emailDomain = metadata.Domains.FirstOrDefault(d => d.Name == "email");
         Assert.NotNull(emailDomain);
-        Assert.Contains("VARCHAR", emailDomain.BaseType?.ToUpperInvariant() ?? "");
+        Assert.Contains("VARCHAR", emailDomain.BaseType.ToUpperInvariant());
         Assert.NotEmpty(emailDomain.CheckConstraints);
         Assert.Contains(emailDomain.CheckConstraints, c => c.Contains("~") || c.Contains("LIKE"));
 
         var positiveNumeric = metadata.Domains.FirstOrDefault(d => d.Name == "positive_numeric");
         Assert.NotNull(positiveNumeric);
-        Assert.Contains("NUMERIC", positiveNumeric.BaseType?.ToUpperInvariant() ?? "");
+        Assert.Contains("NUMERIC", positiveNumeric.BaseType.ToUpperInvariant());
         Assert.NotEmpty(positiveNumeric.CheckConstraints);
         Assert.Contains(positiveNumeric.CheckConstraints, c => c.Contains(">") && c.Contains("0"));
 
         var percentage = metadata.Domains.FirstOrDefault(d => d.Name == "percentage");
         Assert.NotNull(percentage);
-        Assert.Contains("NUMERIC", percentage.BaseType?.ToUpperInvariant() ?? "");
+        Assert.Contains("NUMERIC", percentage.BaseType.ToUpperInvariant());
         Assert.NotEmpty(percentage.CheckConstraints);
         Assert.Contains(percentage.CheckConstraints, c => c.Contains(">=") && c.Contains("0") && c.Contains("100"));
 
         var phoneNumber = metadata.Domains.FirstOrDefault(d => d.Name == "phone_number");
         Assert.NotNull(phoneNumber);
-        Assert.Contains("VARCHAR", phoneNumber.BaseType?.ToUpperInvariant() ?? "");
+        Assert.Contains("VARCHAR", phoneNumber.BaseType.ToUpperInvariant());
         Assert.NotEmpty(phoneNumber.CheckConstraints);
         Assert.Contains(phoneNumber.CheckConstraints, c => c.Contains("~") || c.Contains("LIKE"));
 
@@ -314,46 +315,46 @@ public sealed class SchemaAnalyzerIntegrationTests
         Assert.NotNull(updateSearchVector);
         Assert.Equal("TRIGGER", updateSearchVector.ReturnType?.ToUpperInvariant());
         // Language может быть sql или plpgsql в зависимости от парсера
-        Assert.True(updateSearchVector.Language?.ToLowerInvariant() == "sql" ||
-                    updateSearchVector.Language?.ToLowerInvariant() == "plpgsql",
+        Assert.True(updateSearchVector.Language.ToLowerInvariant() == "sql" ||
+                    updateSearchVector.Language.ToLowerInvariant() == "plpgsql",
                     $"Expected language 'sql' or 'plpgsql', got '{updateSearchVector.Language}'");
 
         var updateCategoryPath = metadata.Functions.FirstOrDefault(f => f.Name == "update_category_path");
         Assert.NotNull(updateCategoryPath);
         Assert.Equal("TRIGGER", updateCategoryPath.ReturnType?.ToUpperInvariant());
-        Assert.True(updateCategoryPath.Language?.ToLowerInvariant() == "sql" ||
-                    updateCategoryPath.Language?.ToLowerInvariant() == "plpgsql",
+        Assert.True(updateCategoryPath.Language.ToLowerInvariant() == "sql" ||
+                    updateCategoryPath.Language.ToLowerInvariant() == "plpgsql",
                     $"Expected language 'sql' or 'plpgsql', got '{updateCategoryPath.Language}'");
 
         var getCategoryPath = metadata.Functions.FirstOrDefault(f => f.Name == "get_category_path");
         Assert.NotNull(getCategoryPath);
         Assert.Equal("TEXT", getCategoryPath.ReturnType?.ToUpperInvariant());
-        Assert.True(getCategoryPath.Language?.ToLowerInvariant() == "sql" ||
-                    getCategoryPath.Language?.ToLowerInvariant() == "plpgsql",
+        Assert.True(getCategoryPath.Language.ToLowerInvariant() == "sql" ||
+                    getCategoryPath.Language.ToLowerInvariant() == "plpgsql",
                     $"Expected language 'sql' or 'plpgsql', got '{getCategoryPath.Language}'");
         Assert.NotEmpty(getCategoryPath.Parameters);
-        Assert.Contains(getCategoryPath.Parameters, p => p.Name == "category_id" && p.DataType?.Contains("INTEGER") == true);
+        Assert.Contains(getCategoryPath.Parameters, p => p.Name == "category_id" && p.DataType.Contains("INTEGER"));
 
         var getChildCategories = metadata.Functions.FirstOrDefault(f => f.Name == "get_child_categories");
         Assert.NotNull(getChildCategories);
         Assert.Contains("TABLE", getChildCategories.ReturnType?.ToUpperInvariant() ?? "");
-        Assert.True(getChildCategories.Language?.ToLowerInvariant() == "sql" ||
-                    getChildCategories.Language?.ToLowerInvariant() == "plpgsql",
+        Assert.True(getChildCategories.Language.ToLowerInvariant() == "sql" ||
+                    getChildCategories.Language.ToLowerInvariant() == "plpgsql",
                     $"Expected language 'sql' or 'plpgsql', got '{getChildCategories.Language}'");
         Assert.NotEmpty(getChildCategories.Parameters);
 
         var updateUpdatedAt = metadata.Functions.FirstOrDefault(f => f.Name == "update_updated_at_column");
         Assert.NotNull(updateUpdatedAt);
         Assert.Equal("TRIGGER", updateUpdatedAt.ReturnType?.ToUpperInvariant());
-        Assert.True(updateUpdatedAt.Language?.ToLowerInvariant() == "sql" ||
-                    updateUpdatedAt.Language?.ToLowerInvariant() == "plpgsql",
+        Assert.True(updateUpdatedAt.Language.ToLowerInvariant() == "sql" ||
+                    updateUpdatedAt.Language.ToLowerInvariant() == "plpgsql",
                     $"Expected language 'sql' or 'plpgsql', got '{updateUpdatedAt.Language}'");
 
         var addOrderStatusHistory = metadata.Functions.FirstOrDefault(f => f.Name == "add_order_status_history");
         Assert.NotNull(addOrderStatusHistory);
         Assert.Equal("TRIGGER", addOrderStatusHistory.ReturnType?.ToUpperInvariant());
-        Assert.True(addOrderStatusHistory.Language?.ToLowerInvariant() == "sql" ||
-                    addOrderStatusHistory.Language?.ToLowerInvariant() == "plpgsql",
+        Assert.True(addOrderStatusHistory.Language.ToLowerInvariant() == "sql" ||
+                    addOrderStatusHistory.Language.ToLowerInvariant() == "plpgsql",
                     $"Expected language 'sql' or 'plpgsql', got '{addOrderStatusHistory.Language}'");
 
         // Assert - Indexes (30 индексов с проверкой разных типов)
@@ -479,12 +480,12 @@ public sealed class SchemaAnalyzerIntegrationTests
         var userStatusComment = metadata.CommentDefinition.FirstOrDefault(c =>
             c.ObjectType == SchemaObjectType.Types && c.Name == "user_status");
         Assert.NotNull(userStatusComment);
-        Assert.Contains("статус", userStatusComment.Comment?.ToLowerInvariant() ?? "");
+        Assert.Contains("статус", userStatusComment.Comment.ToLowerInvariant());
 
         var usersTableComment = metadata.CommentDefinition.FirstOrDefault(c =>
             c.ObjectType == SchemaObjectType.Tables && c.Name == "users");
         Assert.NotNull(usersTableComment);
-        Assert.Contains("пользовател", usersTableComment.Comment?.ToLowerInvariant() ?? "");
+        Assert.Contains("пользовател", usersTableComment.Comment.ToLowerInvariant());
 
         // Проверяем комментарии к колонкам таблицы users
         var usersIdColumnComment = metadata.CommentDefinition.FirstOrDefault(c =>
@@ -499,20 +500,20 @@ public sealed class SchemaAnalyzerIntegrationTests
         var usersEmailIndexComment = metadata.CommentDefinition.FirstOrDefault(c =>
             c.ObjectType == SchemaObjectType.Indexes && c.Name == "idx_users_email");
         Assert.NotNull(usersEmailIndexComment);
-        Assert.Contains("индекс", usersEmailIndexComment.Comment?.ToLowerInvariant() ?? "");
+        Assert.Contains("индекс", usersEmailIndexComment.Comment.ToLowerInvariant());
 
         // Проверяем комментарии к функциям
         var updateSearchVectorComment = metadata.CommentDefinition.FirstOrDefault(c =>
             c.ObjectType == SchemaObjectType.Functions && c.Name == "update_category_search_vector");
         Assert.NotNull(updateSearchVectorComment);
-        Assert.Contains("автоматически", updateSearchVectorComment.Comment?.ToLowerInvariant() ?? "");
+        Assert.Contains("автоматически", updateSearchVectorComment.Comment.ToLowerInvariant());
 
         // Проверяем комментарии к триггерам
         var categorySearchTriggerComment = metadata.CommentDefinition.FirstOrDefault(c =>
             c.ObjectType == SchemaObjectType.Triggers && c.Name == "trigger_update_category_search_vector");
         if (categorySearchTriggerComment is not null)
         {
-            Assert.Contains("триггер", categorySearchTriggerComment.Comment?.ToLowerInvariant() ?? "");
+            Assert.Contains("триггер", categorySearchTriggerComment.Comment.ToLowerInvariant());
         }
 
         // Проверяем комментарии к VIEW
@@ -520,7 +521,7 @@ public sealed class SchemaAnalyzerIntegrationTests
             c.ObjectType == SchemaObjectType.Views && c.Name == "active_users_with_orders");
         if (activeUsersViewComment is not null)
         {
-            Assert.Contains("активн", activeUsersViewComment.Comment?.ToLowerInvariant() ?? "");
+            Assert.Contains("активн", activeUsersViewComment.Comment.ToLowerInvariant());
         }
 
         // Проверяем комментарии к партициям
@@ -528,7 +529,7 @@ public sealed class SchemaAnalyzerIntegrationTests
             c.ObjectType == SchemaObjectType.Tables && c.Name == "audit_logs_2024_q1");
         if (q1PartitionComment is not null)
         {
-            Assert.Contains("q1", q1PartitionComment.Comment?.ToLowerInvariant() ?? "");
+            Assert.Contains("q1", q1PartitionComment.Comment.ToLowerInvariant());
         }
 
         // Assert - Metadata
@@ -541,7 +542,7 @@ public sealed class SchemaAnalyzerIntegrationTests
         // В реальной схеме могут быть валидационные ошибки (COMMENT_PARSE_ERROR, TABLE_NO_COLUMNS и т.д.)
         // Это нормально для интеграционного теста - мы проверяем что анализатор работает, а не что схема идеальна
         var criticalErrors = metadata.ValidationIssues.Where(v =>
-            v.Severity == PgCs.Core.Validation.ValidationIssue.ValidationSeverity.Error &&
+            v.Severity == ValidationIssue.ValidationSeverity.Error &&
             !v.Code.Contains("COMMENT_PARSE_ERROR") &&
             !v.Code.Contains("TABLE_NO_COLUMNS")).ToList();
         // Можем проверить что нет других критических ошибок
@@ -550,137 +551,228 @@ public sealed class SchemaAnalyzerIntegrationTests
     }
 
     /// <summary>
-    /// Тест разделенных файлов: загружает все файлы из SepatatedFiles папки и проверяет извлечение
+    /// Тест множественных файлов: загружает все файлы из MultiFile папки и проверяет корректное извлечение
     /// </summary>
     [Fact]
-    public async Task AnalyzeSeparatedFiles_ExtractsAllObjectsCorrectly()
+    public async Task AnalyzeMultipleFiles_ExtractsAllObjectsCorrectly()
     {
         // Arrange
-        var separatedFilesPath = Path.Combine(_testDataPath, "SepatatedFiles");
-        Assert.True(Directory.Exists(separatedFilesPath), $"SepatatedFiles folder not found at {separatedFilesPath}");
+        var multiFilePath = Path.Combine(_testDataPath, "MultiFile");
+        Assert.True(Directory.Exists(multiFilePath), $"MultiFile folder not found at {multiFilePath}");
 
-        var sqlFiles = Directory.GetFiles(separatedFilesPath, "*.sql", SearchOption.TopDirectoryOnly);
+        var sqlFiles = Directory.GetFiles(multiFilePath, "*.sql", SearchOption.TopDirectoryOnly);
         Assert.NotEmpty(sqlFiles);
+        Assert.Equal(4, sqlFiles.Length); // 4 файла: 01_types, 02_tables, 03_indexes, 04_functions
 
         // Act
-        var metadata = await _analyzer.AnalyzeDirectoryAsync(separatedFilesPath);
+        var metadata = await _analyzer.AnalyzeDirectoryAsync(multiFilePath);
 
         // Assert - Основные проверки
         Assert.NotNull(metadata);
 
-        // Assert - ENUM (1 файл: CreateEnum.sql)
-        Assert.Single(metadata.Enums);
-        var userStatus = metadata.Enums[0];
-        Assert.Equal("user_status", userStatus.Name);
+        // Assert - ENUMs (2: user_status, order_status)
+        Assert.Equal(2, metadata.Enums.Count);
+        var userStatus = metadata.Enums.FirstOrDefault(e => e.Name == "user_status");
+        Assert.NotNull(userStatus);
         Assert.Contains("active", userStatus.Values);
         Assert.Contains("inactive", userStatus.Values);
+        Assert.Contains("suspended", userStatus.Values);
+        Assert.Contains("deleted", userStatus.Values);
 
-        // Assert - Composite (1 файл: CreateCompositeType.sql)
-        Assert.Single(metadata.Composites);
-        var address = metadata.Composites[0];
-        Assert.Equal("address", address.Name);
+        var orderStatus = metadata.Enums.FirstOrDefault(e => e.Name == "order_status");
+        Assert.NotNull(orderStatus);
+        Assert.Contains("pending", orderStatus.Values);
+        Assert.Contains("processing", orderStatus.Values);
+
+        // Assert - Composite Types (2: address, contact_info)
+        Assert.Equal(2, metadata.Composites.Count);
+        var address = metadata.Composites.FirstOrDefault(c => c.Name == "address");
+        Assert.NotNull(address);
         Assert.Contains(address.Attributes, a => a.Name == "street");
         Assert.Contains(address.Attributes, a => a.Name == "city");
+        Assert.Contains(address.Attributes, a => a.Name == "zip_code");
 
-        // Assert - Domain (1 файл: CreateDomain.sql)
-        Assert.Single(metadata.Domains);
-        var email = metadata.Domains[0];
-        Assert.Equal("email", email.Name);
-        Assert.Contains("VARCHAR", email.BaseType?.ToUpperInvariant() ?? "");
+        var contactInfo = metadata.Composites.FirstOrDefault(c => c.Name == "contact_info");
+        Assert.NotNull(contactInfo);
+        Assert.Contains(contactInfo.Attributes, a => a.Name == "phone");
+        Assert.Contains(contactInfo.Attributes, a => a.Name == "email");
 
-        // Assert - Table (1 файл: CreateTable.sql)
-        Assert.Single(metadata.Tables);
-        var users = metadata.Tables[0];
-        Assert.Equal("users", users.Name);
+        // Assert - Domains (4: email, positive_numeric, percentage, phone_number)
+        Assert.Equal(4, metadata.Domains.Count);
+        var email = metadata.Domains.FirstOrDefault(d => d.Name == "email");
+        Assert.NotNull(email);
+        Assert.Contains("VARCHAR", email.BaseType.ToUpperInvariant());
+
+        var positiveNumeric = metadata.Domains.FirstOrDefault(d => d.Name == "positive_numeric");
+        Assert.NotNull(positiveNumeric);
+        Assert.Contains("NUMERIC", positiveNumeric.BaseType.ToUpperInvariant());
+
+        // Assert - Tables (4: users, categories, orders, order_items)
+        Assert.Equal(4, metadata.Tables.Count);
+        
+        var users = metadata.Tables.FirstOrDefault(t => t.Name == "users");
+        Assert.NotNull(users);
         Assert.NotEmpty(users.Columns);
-        Assert.Contains(users.Columns, c => c.Name == "id");
+        Assert.Contains(users.Columns, c => c.Name == "id" && c.IsPrimaryKey);
         Assert.Contains(users.Columns, c => c.Name == "username");
         Assert.Contains(users.Columns, c => c.Name == "email");
 
-        // Assert - View (1 файл: CreateView.sql)
-        Assert.Single(metadata.Views);
-        var activeUsersView = metadata.Views[0];
-        Assert.Equal("active_users_with_orders", activeUsersView.Name);
-        Assert.NotNull(activeUsersView.Query);
+        var categories = metadata.Tables.FirstOrDefault(t => t.Name == "categories");
+        Assert.NotNull(categories);
+        Assert.Contains(categories.Columns, c => c.Name == "id" && c.IsPrimaryKey);
+        Assert.Contains(categories.Columns, c => c.Name == "name");
+        Assert.Contains(categories.Columns, c => c.Name == "slug");
+        Assert.Contains(categories.Columns, c => c.Name == "parent_id");
 
-        // Assert - Function (1 файл: CreateFunction.sql)
-        Assert.Single(metadata.Functions);
-        var updateSearchVector = metadata.Functions[0];
-        Assert.Equal("update_category_search_vector", updateSearchVector.Name);
-        // Language может быть null или "sql" - зависит от реализации
-        // Assert.Equal("plpgsql", updateSearchVector.Language?.ToLowerInvariant());
+        var orders = metadata.Tables.FirstOrDefault(t => t.Name == "orders");
+        Assert.NotNull(orders);
+        Assert.Contains(orders.Columns, c => c.Name == "id" && c.IsPrimaryKey);
+        Assert.Contains(orders.Columns, c => c.Name == "user_id");
+        Assert.Contains(orders.Columns, c => c.Name == "order_number");
+        Assert.Contains(orders.Columns, c => c.Name == "status");
 
-        // Assert - Index (1 файл: CreateIndex.sql)
-        Assert.Single(metadata.Indexes);
-        var usersEmailIndex = metadata.Indexes[0];
-        Assert.Equal("idx_users_email", usersEmailIndex.Name);
+        var orderItems = metadata.Tables.FirstOrDefault(t => t.Name == "order_items");
+        Assert.NotNull(orderItems);
+        Assert.Contains(orderItems.Columns, c => c.Name == "id" && c.IsPrimaryKey);
+        Assert.Contains(orderItems.Columns, c => c.Name == "order_id");
+        Assert.Contains(orderItems.Columns, c => c.Name == "category_id");
+
+        // Assert - Indexes (проверяем что все индексы загружены)
+        Assert.True(metadata.Indexes.Count >= 15, $"Expected at least 15 indexes, got {metadata.Indexes.Count}");
+        
+        var usersEmailIndex = metadata.Indexes.FirstOrDefault(i => i.Name == "idx_users_email");
+        Assert.NotNull(usersEmailIndex);
         Assert.Equal("users", usersEmailIndex.TableName);
 
-        // Assert - Trigger (1 файл: CreateTrigger.sql)
-        Assert.Single(metadata.Triggers);
-        var categorySearchTrigger = metadata.Triggers[0];
-        Assert.Equal("trigger_update_category_search", categorySearchTrigger.Name);
+        var categoriesSearchIndex = metadata.Indexes.FirstOrDefault(i => i.Name == "idx_categories_search");
+        Assert.NotNull(categoriesSearchIndex);
+        Assert.Equal("categories", categoriesSearchIndex.TableName);
+        Assert.Equal(IndexMethod.Gin, categoriesSearchIndex.Method);
+
+        // Assert - Functions (3: update_category_search_vector, update_updated_at_column, get_category_path)
+        Assert.Equal(3, metadata.Functions.Count);
+        
+        var updateSearchVector = metadata.Functions.FirstOrDefault(f => f.Name == "update_category_search_vector");
+        Assert.NotNull(updateSearchVector);
+        Assert.Equal("TRIGGER", updateSearchVector.ReturnType?.ToUpperInvariant());
+
+        var updateUpdatedAt = metadata.Functions.FirstOrDefault(f => f.Name == "update_updated_at_column");
+        Assert.NotNull(updateUpdatedAt);
+        Assert.Equal("TRIGGER", updateUpdatedAt.ReturnType?.ToUpperInvariant());
+
+        var getCategoryPath = metadata.Functions.FirstOrDefault(f => f.Name == "get_category_path");
+        Assert.NotNull(getCategoryPath);
+        Assert.Equal("TEXT", getCategoryPath.ReturnType?.ToUpperInvariant());
+
+        // Assert - Triggers (4 триггера)
+        Assert.Equal(4, metadata.Triggers.Count);
+        
+        var categorySearchTrigger = metadata.Triggers.FirstOrDefault(t => t.Name == "trigger_update_category_search_vector");
+        Assert.NotNull(categorySearchTrigger);
         Assert.Equal("categories", categorySearchTrigger.TableName);
+        Assert.Equal("update_category_search_vector", categorySearchTrigger.FunctionName);
 
-        // Assert - Comments (минимум 7 файлов: AddCommentTo*.sql, некоторые могут не извлечься)
-        Assert.True(metadata.CommentDefinition.Count >= 7,
-            $"Expected at least 7 Comments, got {metadata.CommentDefinition.Count}");
+        var usersUpdatedAtTrigger = metadata.Triggers.FirstOrDefault(t => t.Name == "trigger_users_updated_at");
+        Assert.NotNull(usersUpdatedAtTrigger);
+        Assert.Equal("users", usersUpdatedAtTrigger.TableName);
 
-        // Проверяем комментарии к каждому типу объектов
-        var enumComment = metadata.CommentDefinition.FirstOrDefault(c =>
+        // Assert - Comments (проверяем наличие комментариев)
+        Assert.True(metadata.CommentDefinition.Count >= 10,
+            $"Expected at least 10 comments, got {metadata.CommentDefinition.Count}");
+
+        var userStatusComment = metadata.CommentDefinition.FirstOrDefault(c =>
             c.ObjectType == SchemaObjectType.Types && c.Name == "user_status");
-        Assert.NotNull(enumComment);
-        Assert.Contains("Возможные статусы пользователя", enumComment.Comment);
+        Assert.NotNull(userStatusComment);
+        Assert.Contains("статус", userStatusComment.Comment.ToLowerInvariant());
 
-        var compositeComment = metadata.CommentDefinition.FirstOrDefault(c =>
-            c.ObjectType == SchemaObjectType.Types && c.Name == "address");
-        Assert.NotNull(compositeComment);
-        Assert.Contains("Структурированный тип данных для хранения адреса", compositeComment.Comment);
-
-        var domainComment = metadata.CommentDefinition.FirstOrDefault(c =>
-            c.ObjectType == SchemaObjectType.Types && c.Name == "email");
-        // Комментарий к domain может не извлечься - это нормально
-        if (domainComment is not null)
-        {
-            Assert.Contains("Email адрес с валидацией формата", domainComment.Comment);
-        }
-
-        var tableComment = metadata.CommentDefinition.FirstOrDefault(c =>
+        var usersTableComment = metadata.CommentDefinition.FirstOrDefault(c =>
             c.ObjectType == SchemaObjectType.Tables && c.Name == "users");
-        Assert.NotNull(tableComment);
-        Assert.Contains("Основная таблица пользователей", tableComment.Comment);
-
-        var viewComment = metadata.CommentDefinition.FirstOrDefault(c =>
-            c.ObjectType == SchemaObjectType.Views && c.Name == "active_users_with_orders");
-        Assert.NotNull(viewComment);
-        Assert.Contains("активных пользователей", viewComment.Comment);
-
-        var functionComment = metadata.CommentDefinition.FirstOrDefault(c =>
-            c.ObjectType == SchemaObjectType.Functions && c.Name == "update_category_search_vector");
-        Assert.NotNull(functionComment);
-        Assert.Contains("Автоматически обновляет поисковый вектор", functionComment.Comment);
-
-        var indexComment = metadata.CommentDefinition.FirstOrDefault(c =>
-            c.ObjectType == SchemaObjectType.Indexes && c.Name == "idx_users_email");
-        Assert.NotNull(indexComment);
-        Assert.Contains("Индекс для быстрого поиска", indexComment.Comment);
-
-        var triggerComment = metadata.CommentDefinition.FirstOrDefault(c =>
-            c.ObjectType == SchemaObjectType.Triggers && c.Name == "trigger_update_category_search");
-        Assert.NotNull(triggerComment);
-        Assert.Contains("Триггер для автоматического обновления", triggerComment.Comment);
+        Assert.NotNull(usersTableComment);
+        Assert.Contains("пользовател", usersTableComment.Comment.ToLowerInvariant());
 
         // Assert - Metadata
-        Assert.True(metadata.SourcePaths.Count >= sqlFiles.Length,
-            $"Expected at least {sqlFiles.Length} source paths, got {metadata.SourcePaths.Count}");
+        Assert.Equal(4, metadata.SourcePaths.Count); // 4 SQL файла
         Assert.True(metadata.AnalyzedAt <= DateTime.UtcNow);
 
         // Assert - ValidationIssues (не должно быть критических ошибок)
-        // COMMENT ON DOMAIN может не поддерживаться - это ожидаемое поведение
-        var errors = metadata.ValidationIssues.Where(v =>
-            v.Severity == PgCs.Core.Validation.ValidationIssue.ValidationSeverity.Error &&
-            v.Code != "COMMENT_PARSE_ERROR").ToList();
-        Assert.Empty(errors);
+        var criticalErrors = metadata.ValidationIssues.Where(v =>
+            v.Severity == ValidationIssue.ValidationSeverity.Error).ToList();
+        
+        // Игнорируем известные некритичные ошибки
+        criticalErrors = criticalErrors.Where(e => 
+            !e.Code.Contains("COMMENT_PARSE_ERROR") && 
+            !e.Code.Contains("TABLE_NO_COLUMNS")).ToList();
+            
+        Assert.Empty(criticalErrors);
+    }
+
+    /// <summary>
+    /// Тест граничных случаев: проверяет корректную обработку пустых файлов, только комментариев, ошибок синтаксиса
+    /// </summary>
+    [Fact]
+    public async Task AnalyzeEdgeCases_HandlesGracefully()
+    {
+        // Arrange
+        var edgeCasesPath = Path.Combine(_testDataPath, "EdgeCases");
+        Assert.True(Directory.Exists(edgeCasesPath), $"EdgeCases folder not found at {edgeCasesPath}");
+
+        // Act & Assert - EmptyFile.sql (только комментарии, нет определений)
+        var emptyFilePath = Path.Combine(edgeCasesPath, "EmptyFile.sql");
+        var emptyResult = await _analyzer.AnalyzeFileAsync(emptyFilePath);
+        Assert.NotNull(emptyResult);
+        // Пустой файл не должен содержать объектов
+        Assert.Empty(emptyResult.Enums);
+        Assert.Empty(emptyResult.Tables);
+        Assert.Empty(emptyResult.Functions);
+
+        // Act & Assert - OnlyComments.sql (только комментарии)
+        var onlyCommentsPath = Path.Combine(edgeCasesPath, "OnlyComments.sql");
+        var onlyCommentsResult = await _analyzer.AnalyzeFileAsync(onlyCommentsPath);
+        Assert.NotNull(onlyCommentsResult);
+        Assert.Empty(onlyCommentsResult.Enums);
+        Assert.Empty(onlyCommentsResult.Tables);
+
+        // Act & Assert - InvalidSyntax.sql (некорректный синтаксис)
+        var invalidSyntaxPath = Path.Combine(edgeCasesPath, "InvalidSyntax.sql");
+        var invalidResult = await _analyzer.AnalyzeFileAsync(invalidSyntaxPath);
+        Assert.NotNull(invalidResult);
+        // Анализатор должен пропустить некорректные блоки и не упасть
+        // ValidationIssues может содержать ошибки парсинга
+        Assert.NotNull(invalidResult.ValidationIssues);
+
+        // Act & Assert - SpecialCharacters.sql (спецсимволы и кодировки)
+        var specialCharsPath = Path.Combine(edgeCasesPath, "SpecialCharacters.sql");
+        var specialCharsResult = await _analyzer.AnalyzeFileAsync(specialCharsPath);
+        Assert.NotNull(specialCharsResult);
+        // Должна быть извлечена таблица special_chars
+        Assert.Single(specialCharsResult.Tables);
+        var specialTable = specialCharsResult.Tables[0];
+        Assert.Equal("special_chars", specialTable.Name);
+        
+        // Проверяем что колонки с DEFAULT значениями извлечены
+        Assert.Contains(specialTable.Columns, c => c.Name == "name_ru");
+        Assert.Contains(specialTable.Columns, c => c.Name == "emoji_col");
+        Assert.Contains(specialTable.Columns, c => c.Name == "special");
+        Assert.Contains(specialTable.Columns, c => c.Name == "unicode_col");
+
+        // Проверяем что комментарий с emoji извлечен
+        var tableComment = specialCharsResult.CommentDefinition.FirstOrDefault(c =>
+            c.ObjectType == SchemaObjectType.Tables && c.Name == "special_chars");
+        Assert.NotNull(tableComment);
+        Assert.Contains("спецсимвол", tableComment.Comment.ToLowerInvariant());
+
+        // Act & Assert - Анализ всей директории EdgeCases
+        var edgeCasesResult = await _analyzer.AnalyzeDirectoryAsync(edgeCasesPath);
+        Assert.NotNull(edgeCasesResult);
+        
+        // Должна быть извлечена только одна таблица (из SpecialCharacters.sql)
+        Assert.Single(edgeCasesResult.Tables);
+        
+        // Проверяем что все 4 файла были обработаны
+        Assert.Equal(4, edgeCasesResult.SourcePaths.Count);
+        
+        // ValidationIssues могут содержать предупреждения о пустых файлах и ошибках синтаксиса
+        // Это ожидаемое поведение, не проверяем на отсутствие ошибок
     }
 
     /// <summary>
@@ -705,12 +797,9 @@ public sealed class SchemaAnalyzerIntegrationTests
 
         // Полная схема должна анализироваться быстро (менее 5 секунд)
         Assert.True(stopwatch.ElapsedMilliseconds < 5000,
-            $"Analysis took {stopwatch.ElapsedMilliseconds}ms, expected < 5000ms");
-
-        // Для информации выводим в консоль
-        Console.WriteLine($"Full schema analysis completed in {stopwatch.ElapsedMilliseconds}ms");
-        Console.WriteLine($"Extracted: {metadata.Tables.Count} tables, {metadata.Views.Count} views, " +
-                         $"{metadata.Enums.Count} enums, {metadata.Functions.Count} functions");
+            $"Analysis took {stopwatch.ElapsedMilliseconds}ms, expected < 5000ms. " +
+            $"Extracted: {metadata.Tables.Count} tables, {metadata.Views.Count} views, " +
+            $"{metadata.Enums.Count} enums, {metadata.Functions.Count} functions");
     }
 
     /// <summary>
@@ -755,9 +844,8 @@ public sealed class SchemaAnalyzerIntegrationTests
         {
             if (!string.IsNullOrEmpty(trigger.TableName))
             {
-                var table = metadata.Tables.FirstOrDefault(t => t.Name == trigger.TableName);
                 // Таблица может не быть извлечена - это нормально для интеграционного теста
-                // Assert.NotNull(table);
+                _ = metadata.Tables.FirstOrDefault(t => t.Name == trigger.TableName);
             }
         }
 
@@ -766,9 +854,8 @@ public sealed class SchemaAnalyzerIntegrationTests
         {
             if (!string.IsNullOrEmpty(index.TableName))
             {
-                var table = metadata.Tables.FirstOrDefault(t => t.Name == index.TableName);
                 // Таблица может не быть извлечена - это нормально для интеграционного теста
-                // Assert.NotNull(table);
+                _ = metadata.Tables.FirstOrDefault(t => t.Name == index.TableName);
             }
         }
 
@@ -779,9 +866,8 @@ public sealed class SchemaAnalyzerIntegrationTests
 
         foreach (var comment in tableComments)
         {
-            var table = metadata.Tables.FirstOrDefault(t => t.Name == comment.Name);
             // Таблица может не быть извлечена - это нормально для интеграционного теста
-            // Assert.NotNull(table);
+            _ = metadata.Tables.FirstOrDefault(t => t.Name == comment.Name);
         }
     }
 }

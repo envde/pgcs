@@ -1,1 +1,0 @@
-COMMENT ON INDEX idx_users_email IS 'Индекс для быстрого поиска по email активных пользователей';
