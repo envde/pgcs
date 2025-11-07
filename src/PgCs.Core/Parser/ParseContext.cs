@@ -1,14 +1,14 @@
-using PgCs.Core.Tokenization;
+using PgCs.Core.Lexer;
 
-namespace PgCs.Core.Parsing;
+namespace PgCs.Core.Parser;
 
 /// <summary>
 /// Контекст для парсинга SQL токенов
 /// Обеспечивает навигацию по токенам и управление состоянием
 /// </summary>
-public sealed class ParserContext
+public sealed class ParseContext
 {
-    private readonly IReadOnlyList<SqlToken> _tokens;
+    private readonly IReadOnlyList<Token> _tokens;
     private int _position;
 
     /// <summary>
@@ -29,7 +29,7 @@ public sealed class ParserContext
     /// <summary>
     /// Текущий токен (или default если достигнут конец)
     /// </summary>
-    public SqlToken Current => IsAtEnd ? default : _tokens[_position];
+    public Token Current => IsAtEnd ? default : _tokens[_position];
 
     /// <summary>
     /// Исходный SQL текст
@@ -40,7 +40,7 @@ public sealed class ParserContext
     /// Инициализирует новый экземпляр контекста парсера
     /// </summary>
     /// <param name="tokens">Список SQL токенов для обработки</param>
-    public ParserContext(IReadOnlyList<SqlToken> tokens)
+    public ParseContext(IReadOnlyList<Token> tokens)
     {
         _tokens = tokens;
         _position = 0;
@@ -50,7 +50,7 @@ public sealed class ParserContext
     /// Переходит к следующему токену
     /// </summary>
     /// <returns>Предыдущий текущий токен</returns>
-    public SqlToken Advance()
+    public Token Advance()
     {
         var current = Current;
         if (!IsAtEnd)
@@ -63,7 +63,7 @@ public sealed class ParserContext
     /// </summary>
     /// <param name="offset">Смещение от текущей позиции (по умолчанию 1)</param>
     /// <returns>Токен на указанном смещении или default если выход за границы</returns>
-    public SqlToken Peek(int offset = 1)
+    public Token Peek(int offset = 1)
     {
         var index = _position + offset;
         return index >= 0 && index < _tokens.Count ? _tokens[index] : default;
@@ -74,14 +74,14 @@ public sealed class ParserContext
     /// </summary>
     /// <param name="type">Ожидаемый тип токена</param>
     /// <returns>true если текущий токен соответствует типу, иначе false</returns>
-    public bool Check(TokenType type) => !IsAtEnd && Current.Type == type;
+    public bool Check(TokenKind type) => !IsAtEnd && Current.Kind == type;
 
     /// <summary>
     /// Потребляет текущий токен, если он соответствует ожидаемому типу
     /// </summary>
     /// <param name="type">Ожидаемый тип токена</param>
     /// <returns>true если токен был потреблён, иначе false</returns>
-    public bool Match(TokenType type)
+    public bool Match(TokenKind type)
     {
         if (!Check(type))
             return false;
@@ -94,7 +94,7 @@ public sealed class ParserContext
     /// </summary>
     /// <param name="types">Массив ожидаемых типов токенов</param>
     /// <returns>true если токен был потреблён, иначе false</returns>
-    public bool Match(params TokenType[] types)
+    public bool Match(params TokenKind[] types)
     {
         foreach (var type in types)
         {
@@ -119,7 +119,7 @@ public sealed class ParserContext
     /// </summary>
     /// <param name="token">Токен, текст которого требуется получить</param>
     /// <returns>Текст указанного токена</returns>
-    public ReadOnlySpan<char> GetTokenText(SqlToken token) =>
+    public ReadOnlySpan<char> GetTokenText(Token token) =>
         Source.Span.Slice(token.Span.Start, token.Span.Length);
 
     /// <summary>

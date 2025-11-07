@@ -1,9 +1,9 @@
-namespace PgCs.Core.Tokenization;
+namespace PgCs.Core.Lexer;
 
 /// <summary>
 /// Типы SQL токенов PostgreSQL
 /// </summary>
-public enum TokenType
+public enum TokenKind
 {
     // === Trivia (не влияют на парсинг) ===
     /// <summary>Пробелы, табы, переносы строк</summary>

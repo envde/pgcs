@@ -1,6 +1,6 @@
 using PgCs.Core.Types;
 
-namespace PgCs.Core.Parsing;
+namespace PgCs.Core.Parser;
 
 /// <summary>
 /// Результат операции парсинга

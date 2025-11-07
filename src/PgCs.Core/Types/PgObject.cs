@@ -1,4 +1,4 @@
-using PgCs.Core.Parsing.SqlMetadata;
+using PgCs.Core.Parser.Metadata;
 
 namespace PgCs.Core.Types;
 
@@ -40,5 +40,5 @@ public abstract record PgObject
     /// <summary>
     /// Комментарий к объекту PostgreSQL
     /// </summary>
-    public SqlComment? SqlComment { get; init; }
+    public Comment? Comment { get; init; }
 }

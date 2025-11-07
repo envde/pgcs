@@ -9,10 +9,10 @@ namespace PgCs.Core.Types;
 /// Представляет команду COMMENT ON в PostgreSQL, которая добавляет описание к объектам БД.
 /// 
 /// <para>
-/// <b>НЕ путать с SqlComment:</b>
+/// <b>НЕ путать с Comment:</b>
 /// <list type="bullet">
 /// <item><description>PgComment - это PostgreSQL объект (COMMENT ON TABLE ... IS '...')</description></item>
-/// <item><description>SqlComment - это служебный комментарий в SQL коде (-- comment: ...)</description></item>
+/// <item><description>Comment - это служебный комментарий в SQL коде (-- comment: ...)</description></item>
 /// </list>
 /// </para>
 /// 

@@ -1,4 +1,4 @@
-using PgCs.Core.Parsing.SqlMetadata;
+using PgCs.Core.Parser.Metadata;
 
 namespace PgCs.Core.Types.Base;
 
@@ -72,7 +72,7 @@ public sealed record PgColumn
     /// <summary>
     /// SQL комментарий к колонке (может содержать служебные метаданные)
     /// </summary>
-    public SqlComment? Comment { get; init; }
+    public Comment? Comment { get; init; }
 
     /// <summary>
     /// Является ли колонка автоинкрементной

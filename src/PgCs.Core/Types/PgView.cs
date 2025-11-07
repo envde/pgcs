@@ -1,4 +1,4 @@
-using PgCs.Core.Parsing.SqlMetadata;
+using PgCs.Core.Parser.Metadata;
 using PgCs.Core.Types.Base;
 
 namespace PgCs.Core.Types;

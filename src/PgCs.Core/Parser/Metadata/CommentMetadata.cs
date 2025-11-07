@@ -1,4 +1,4 @@
-namespace PgCs.Core.Parsing.SqlMetadata;
+namespace PgCs.Core.Parser.Metadata;
 
 /// <summary>
 /// Метаданные из SQL комментария
@@ -14,7 +14,7 @@ namespace PgCs.Core.Parsing.SqlMetadata;
 /// -- comment(User identifier); to_name(UserId); to_type(long)
 /// </code>
 /// </remarks>
-public sealed record SqlCommentMetadata
+public sealed record CommentMetadata
 {
     /// <summary>
     /// Текст комментария (значение поля "comment")
@@ -46,7 +46,7 @@ public sealed record SqlCommentMetadata
     /// <summary>
     /// Пустые метаданные (нет служебных полей)
     /// </summary>
-    public static SqlCommentMetadata Empty { get; } = new();
+    public static CommentMetadata Empty { get; } = new();
 
     /// <summary>
     /// Проверяет, содержит ли метаданные какую-либо информацию

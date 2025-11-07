@@ -1,8 +1,8 @@
-namespace PgCs.Core.Tokenization;
+namespace PgCs.Core.Lexer;
 
 /// <summary>
 /// Сканеры для различных типов SQL токенов PostgreSQL
-/// Все сканеры возвращают (TokenType, Length) tuple
+/// Все сканеры возвращают (TokenKind, Length) tuple
 /// </summary>
 public static class SqlScanners
 {
@@ -13,8 +13,8 @@ public static class SqlScanners
     /// Читает до конца строки
     /// </summary>
     /// <param name="cursor">Курсор текста</param>
-    /// <returns>(TokenType.LineComment, длина токена)</returns>
-    public static (TokenType Type, int Length) ScanLineComment(TextCursor cursor)
+    /// <returns>(TokenKind.LineComment, длина токена)</returns>
+    public static (TokenKind Type, int Length) ScanLineComment(TextCursor cursor)
     {
         var start = cursor.Position;
 
@@ -27,7 +27,7 @@ public static class SqlScanners
             cursor.Advance();
         }
 
-        return (TokenType.LineComment, cursor.Position - start);
+        return (TokenKind.LineComment, cursor.Position - start);
     }
 
     /// <summary>
@@ -35,8 +35,8 @@ public static class SqlScanners
     /// Поддерживает вложенные комментарии (PostgreSQL расширение)
     /// </summary>
     /// <param name="cursor">Курсор текста</param>
-    /// <returns>(TokenType.BlockComment, длина токена)</returns>
-    public static (TokenType Type, int Length) ScanBlockComment(TextCursor cursor)
+    /// <returns>(TokenKind.BlockComment, длина токена)</returns>
+    public static (TokenKind Type, int Length) ScanBlockComment(TextCursor cursor)
     {
         var start = cursor.Position;
         var nestLevel = 1; // Уровень вложенности
@@ -67,7 +67,7 @@ public static class SqlScanners
             cursor.Advance();
         }
 
-        return (TokenType.BlockComment, cursor.Position - start);
+        return (TokenKind.BlockComment, cursor.Position - start);
     }
 
     // ==================== ЧИСЛА ====================
@@ -77,8 +77,8 @@ public static class SqlScanners
     /// Форматы: 123, 123.456, 1.23e10, 0x1A (hex), 0b101 (binary), 0o17 (octal)
     /// </summary>
     /// <param name="cursor">Курсор текста</param>
-    /// <returns>(TokenType.NumericLiteral, длина токена)</returns>
-    public static (TokenType Type, int Length) ScanNumber(TextCursor cursor)
+    /// <returns>(TokenKind.NumericLiteral, длина токена)</returns>
+    public static (TokenKind Type, int Length) ScanNumber(TextCursor cursor)
     {
         var start = cursor.Position;
 
@@ -98,7 +98,7 @@ public static class SqlScanners
                     cursor.Advance();
                 }
 
-                return (TokenType.NumericLiteral, cursor.Position - start);
+                return (TokenKind.NumericLiteral, cursor.Position - start);
             }
 
             // Binary: 0b101
@@ -112,7 +112,7 @@ public static class SqlScanners
                     cursor.Advance();
                 }
 
-                return (TokenType.NumericLiteral, cursor.Position - start);
+                return (TokenKind.NumericLiteral, cursor.Position - start);
             }
 
             // Octal: 0o17
@@ -126,7 +126,7 @@ public static class SqlScanners
                     cursor.Advance();
                 }
 
-                return (TokenType.NumericLiteral, cursor.Position - start);
+                return (TokenKind.NumericLiteral, cursor.Position - start);
             }
         }
 
@@ -164,7 +164,7 @@ public static class SqlScanners
             }
         }
 
-        return (TokenType.NumericLiteral, cursor.Position - start);
+        return (TokenKind.NumericLiteral, cursor.Position - start);
     }
 
     private static bool IsHexDigit(char ch) =>
@@ -183,15 +183,15 @@ public static class SqlScanners
     /// PostgreSQL поддерживает многосимвольные операторы: <=, >=, <>, !=, ||, &&, etc.
     /// </summary>
     /// <param name="cursor">Курсор текста</param>
-    /// <returns>(TokenType.Operator, длина токена)</returns>
-    public static (TokenType Type, int Length) ScanOperator(TextCursor cursor)
+    /// <returns>(TokenKind.Operator, длина токена)</returns>
+    public static (TokenKind Type, int Length) ScanOperator(TextCursor cursor)
     {
         var first = cursor.Current;
         cursor.Advance();
 
         if (cursor.IsAtEnd())
         {
-            return (TokenType.Operator, 1);
+            return (TokenKind.Operator, 1);
         }
 
         var second = cursor.Current;
@@ -201,7 +201,7 @@ public static class SqlScanners
         if (IsTwoCharOperator(twoCharOp))
         {
             cursor.Advance();
-            return (TokenType.Operator, 2);
+            return (TokenKind.Operator, 2);
         }
 
         // Проверяем трёхсимвольные операторы
@@ -214,11 +214,11 @@ public static class SqlScanners
             {
                 cursor.Advance();
                 cursor.Advance();
-                return (TokenType.Operator, 3);
+                return (TokenKind.Operator, 3);
             }
         }
 
-        return (TokenType.Operator, 1);
+        return (TokenKind.Operator, 1);
     }
 
     private static bool IsTwoCharOperator(string op) => op switch
@@ -244,8 +244,8 @@ public static class SqlScanners
     /// Поддерживает экранирование через двойные кавычки: 'don''t'
     /// </summary>
     /// <param name="cursor">Курсор текста</param>
-    /// <returns>(TokenType.StringLiteral, длина токена)</returns>
-    public static (TokenType Type, int Length) ScanStringLiteral(TextCursor cursor)
+    /// <returns>(TokenKind.StringLiteral, длина токена)</returns>
+    public static (TokenKind Type, int Length) ScanStringLiteral(TextCursor cursor)
     {
         var start = cursor.Position;
 
@@ -272,7 +272,7 @@ public static class SqlScanners
             cursor.Advance();
         }
 
-        return (TokenType.StringLiteral, cursor.Position - start);
+        return (TokenKind.StringLiteral, cursor.Position - start);
     }
 
     /// <summary>
@@ -280,8 +280,8 @@ public static class SqlScanners
     /// PostgreSQL поддерживает произвольные теги между $
     /// </summary>
     /// <param name="cursor">Курсор текста</param>
-    /// <returns>(TokenType.DollarQuotedString или TokenType.Operator, длина токена)</returns>
-    public static (TokenType Type, int Length) ScanDollarQuotedString(TextCursor cursor)
+    /// <returns>(TokenKind.DollarQuotedString или TokenKind.Operator, длина токена)</returns>
+    public static (TokenKind Type, int Length) ScanDollarQuotedString(TextCursor cursor)
     {
         var start = cursor.Position;
 
@@ -302,7 +302,7 @@ public static class SqlScanners
         if (cursor.Current != '$')
         {
             // Это не dollar-quoted string, а просто оператор $
-            return (TokenType.Operator, 1);
+            return (TokenKind.Operator, 1);
         }
 
         cursor.Advance(); // Закрывающий $ тега
@@ -336,7 +336,7 @@ public static class SqlScanners
             cursor.Advance();
         }
 
-        return (TokenType.DollarQuotedString, cursor.Position - start);
+        return (TokenKind.DollarQuotedString, cursor.Position - start);
     }
 
     /// <summary>
@@ -344,8 +344,8 @@ public static class SqlScanners
     /// PostgreSQL не поддерживает экранирование внутри quoted identifiers
     /// </summary>
     /// <param name="cursor">Курсор текста</param>
-    /// <returns>(TokenType.QuotedIdentifier, длина токена)</returns>
-    public static (TokenType Type, int Length) ScanQuotedIdentifier(TextCursor cursor)
+    /// <returns>(TokenKind.QuotedIdentifier, длина токена)</returns>
+    public static (TokenKind Type, int Length) ScanQuotedIdentifier(TextCursor cursor)
     {
         var start = cursor.Position;
 
@@ -362,6 +362,6 @@ public static class SqlScanners
             cursor.Advance(); // Закрывающая кавычка
         }
 
-        return (TokenType.QuotedIdentifier, cursor.Position - start);
+        return (TokenKind.QuotedIdentifier, cursor.Position - start);
     }
 }

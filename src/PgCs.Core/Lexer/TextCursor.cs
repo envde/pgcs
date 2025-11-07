@@ -1,4 +1,4 @@
-namespace PgCs.Core.Tokenization;
+namespace PgCs.Core.Lexer;
 
 /// <summary>
 /// Снимок позиции курсора для возможности отката

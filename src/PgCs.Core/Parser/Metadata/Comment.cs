@@ -1,4 +1,4 @@
-namespace PgCs.Core.Parsing.SqlMetadata;
+namespace PgCs.Core.Parser.Metadata;
 
 /// <summary>
 /// Представляет SQL комментарий с возможными служебными метаданными
@@ -8,10 +8,10 @@ namespace PgCs.Core.Parsing.SqlMetadata;
 /// для кодогенерации, такую как: comment, to_name, to_type и другие.
 /// 
 /// НЕ путать с PostgreSQL COMMENT ON - это разные концепции:
-/// - SqlComment: служебный комментарий в коде SQL (-- ...)
+/// - Comment: служебный комментарий в коде SQL (-- ...)
 /// - COMMENT ON: команда PostgreSQL для добавления описания объекта
 /// </remarks>
-public sealed record SqlComment
+public sealed record Comment
 {
     /// <summary>
     /// Чистый текст комментария (без префикса --)
@@ -25,7 +25,7 @@ public sealed record SqlComment
     /// Для комментария: "-- comment: User ID; to_name: UserId; to_type: string"
     /// Метаданные: { Comment = "User ID", ToName = "UserId", ToType = "string" }
     /// </example>
-    public SqlCommentMetadata? Metadata { get; init; }
+    public CommentMetadata? Metadata { get; init; }
 
     /// <summary>
     /// Является ли комментарий header-комментарием (расположен перед объектом)

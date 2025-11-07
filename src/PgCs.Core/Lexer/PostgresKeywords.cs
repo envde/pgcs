@@ -1,4 +1,4 @@
-namespace PgCs.Core.Tokenization;
+namespace PgCs.Core.Lexer;
 
 /// <summary>
 /// PostgreSQL ключевые слова

@@ -1,4 +1,4 @@
-using PgCs.Core.Parsing.SqlMetadata;
+using PgCs.Core.Parser.Metadata;
 
 namespace PgCs.Core.Types.Base;
 
@@ -53,7 +53,7 @@ public sealed record PgCompositeTypeAttribute
     /// <summary>
     /// SQL комментарий к атрибуту (может содержать служебные метаданные)
     /// </summary>
-    public SqlComment? Comment { get; init; }
+    public Comment? Comment { get; init; }
 
     /// <summary>
     /// Порядковый номер атрибута в композитном типе (начиная с 1)

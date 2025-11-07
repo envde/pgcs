@@ -1,4 +1,4 @@
-using PgCs.Core.Parsing.SqlMetadata;
+using PgCs.Core.Parser.Metadata;
 
 namespace PgCs.Core.Types.Base;
 
@@ -42,7 +42,7 @@ public sealed record PgFunctionParameter
     /// <summary>
     /// SQL комментарий к параметру (может содержать служебные метаданные)
     /// </summary>
-    public SqlComment? Comment { get; init; }
+    public Comment? Comment { get; init; }
 
     /// <summary>
     /// Порядковый номер параметра (начиная с 1)
