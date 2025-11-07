@@ -40,7 +40,6 @@
     "chat.agent.todoList.position": "default",
     "omnisharp.enableRoslynAnalyzers": true,
     "omnisharp.enableEditorConfigSupport": true,
-    "omnisharp.enableImportCompletion": true,
     "csharp.format.enable": true,
     "editor.formatOnSave": true,
     "editor.formatOnType": true,
@@ -56,5 +55,6 @@
     },
     "git.autofetch": true,
     "git.confirmSync": false,
-    "terminal.integrated.defaultProfile.osx": "zsh"
+    "terminal.integrated.defaultProfile.osx": "zsh",
+    "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true
 }
