@@ -1,6 +1,19 @@
 namespace PgCs.Core.Tokenization;
 
 /// <summary>
+/// Диапазон текста с начальной позицией и длиной
+/// </summary>
+/// <param name="Start">Начальная позиция в тексте (0-based)</param>
+/// <param name="Length">Длина диапазона в символах</param>
+public readonly record struct TextSpan(int Start, int Length)
+{
+    /// <summary>
+    /// Конечная позиция диапазона (эксклюзивная)
+    /// </summary>
+    public int End => Start + Length;
+}
+
+/// <summary>
 /// SQL токен - минимальная синтаксическая единица PostgreSQL кода
 /// </summary>
 /// <remarks>
@@ -48,6 +61,8 @@ public readonly record struct SqlToken
     /// </summary>
     public required int Column { get; init; }
 
+    // === Методы для проверки типа токена ===
+
     /// <summary>
     /// Проверяет, является ли токен тривиальным (whitespace или комментарий)
     /// </summary>
@@ -56,4 +71,34 @@ public readonly record struct SqlToken
     /// Trivia токены не влияют на семантику кода, но важны для форматирования и сохранения комментариев.
     /// </remarks>
     public bool IsTrivia => Type is TokenType.Whitespace or TokenType.LineComment or TokenType.BlockComment;
+
+    /// <summary>
+    /// Проверяет, является ли токен значащим (не trivia)
+    /// </summary>
+    /// <returns>true если токен не является trivia</returns>
+    public bool IsSignificant => !IsTrivia;
+
+    /// <summary>
+    /// Проверяет, является ли токен ключевым словом PostgreSQL
+    /// </summary>
+    /// <returns>true если тип токена = Keyword</returns>
+    public bool IsKeyword => Type == TokenType.Keyword;
+
+    /// <summary>
+    /// Проверяет, является ли токен идентификатором (обычным или quoted)
+    /// </summary>
+    /// <returns>true если тип токена = Identifier или QuotedIdentifier</returns>
+    public bool IsIdentifier => Type is TokenType.Identifier or TokenType.QuotedIdentifier;
+
+    /// <summary>
+    /// Проверяет, является ли токен литералом (строка, число)
+    /// </summary>
+    /// <returns>true если тип токена = StringLiteral, DollarQuotedString или NumericLiteral</returns>
+    public bool IsLiteral => Type is TokenType.StringLiteral or TokenType.DollarQuotedString or TokenType.NumericLiteral;
+
+    /// <summary>
+    /// Проверяет, является ли токен оператором
+    /// </summary>
+    /// <returns>true если тип токена = Operator</returns>
+    public bool IsOperator => Type == TokenType.Operator;
 }

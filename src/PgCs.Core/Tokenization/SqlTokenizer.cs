@@ -1,6 +1,3 @@
-
-using PgCs.Core.Tokenization.Scanners;
-
 namespace PgCs.Core.Tokenization;
 
 /// <summary>
@@ -82,20 +79,20 @@ public sealed class SqlTokenizer
             ' ' or '\t' or '\r' or '\n' => ScanWhitespace(cursor, sourceText, startPos, startLine, startColumn),
 
             // Comments
-            '-' when cursor.Current == '-' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlCommentScanner.ScanLineComment),
-            '/' when cursor.Current == '*' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlCommentScanner.ScanBlockComment),
+            '-' when cursor.Current == '-' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlScanners.ScanLineComment),
+            '/' when cursor.Current == '*' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlScanners.ScanBlockComment),
 
             // Dollar-quoted strings or operator $
-            '$' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlStringScanner.ScanDollarQuotedString),
+            '$' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlScanners.ScanDollarQuotedString),
 
             // String literals
-            '\'' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlStringScanner.ScanStringLiteral),
+            '\'' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlScanners.ScanStringLiteral),
 
             // Quoted identifiers
-            '"' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlStringScanner.ScanQuotedIdentifier),
+            '"' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlScanners.ScanQuotedIdentifier),
 
             // Numbers
-            >= '0' and <= '9' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlNumberScanner.ScanNumber),
+            >= '0' and <= '9' => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlScanners.ScanNumber),
 
             // Punctuation
             '(' => CreateToken(TokenType.OpenParen, sourceText.AsMemory(startPos, 1), startPos, startLine, startColumn),
@@ -108,7 +105,7 @@ public sealed class SqlTokenizer
 
             // Operators
             _ when SqlCharClassifier.IsOperatorChar(ch)
-                => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlOperatorScanner.ScanOperator),
+                => ScanWithRewind(cursor, sourceText, startPos, startLine, startColumn, SqlScanners.ScanOperator),
 
             // Identifiers & Keywords
             _ when SqlCharClassifier.IsIdentifierStart(ch)
@@ -121,8 +118,8 @@ public sealed class SqlTokenizer
     }
 
     /// <summary>
-    /// Универсальный метод сканирования с откатом курсора.
-    /// Устраняет дублирование кода во всех Scan* методах.
+    /// Универсальный метод сканирования с откатом курсора
+    /// Устраняет дублирование кода во всех Scan* методах
     /// </summary>
     /// <param name="cursor">Курсор текста</param>
     /// <param name="sourceText">Исходный текст</param>
@@ -137,17 +134,17 @@ public sealed class SqlTokenizer
         int start,
         int line,
         int column,
-        Func<TextCursor, ScanResult> scanFunc)
+        Func<TextCursor, (TokenType Type, int Length)> scanFunc)
     {
         // Откатываем курсор к начальной позиции
         cursor.RestoreSnapshot(new CursorPosition(start, line, column));
 
         // Сканируем токен
-        var result = scanFunc(cursor);
+        var (type, length) = scanFunc(cursor);
 
         // Создаем токен с zero-allocation через Memory
-        var valueMemory = sourceText.AsMemory(start, result.Length);
-        return CreateToken(result.Type, valueMemory, start, line, column);
+        var valueMemory = sourceText.AsMemory(start, length);
+        return CreateToken(type, valueMemory, start, line, column);
     }
 
     private static SqlToken ScanWhitespace(TextCursor cursor, string text, int start, int line, int column)
