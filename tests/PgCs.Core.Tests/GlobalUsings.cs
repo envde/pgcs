@@ -1,1 +1,9 @@
+global using System;
+global using System.Linq;
+global using System.Collections.Generic;
 global using Xunit;
+global using PgCs.Core.Lexer;
+global using PgCs.Core.Parser;
+global using PgCs.Core.Parser.Metadata;
+global using PgCs.Core.Types.Base;
+global using PgCs.Core.Types.Schema;
