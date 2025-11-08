@@ -10,6 +10,7 @@ public sealed record PgSelectItem
 {
     /// <summary>
     /// Выражение для выбора
+    /// Для wildcard (*) используется специальное выражение
     /// </summary>
     public required PgExpression Expression { get; init; }
 

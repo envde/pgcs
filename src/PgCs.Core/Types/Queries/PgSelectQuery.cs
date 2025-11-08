@@ -1,5 +1,7 @@
 using PgCs.Core.Types.Base;
 using PgCs.Core.Types.Queries.Components;
+using PgCs.Core.Types.Queries.Components.FromItems;
+using PgCs.Core.Types.Queries.Components.GroupBy;
 using PgCs.Core.Types.Queries.Expressions;
 
 namespace PgCs.Core.Types.Queries;
@@ -53,12 +55,8 @@ public sealed record PgSelectQuery : PgQuery
     public IReadOnlyList<PgNamedWindowClause> WindowClauses { get; init; } = [];
 
     /// <summary>
-    /// Операции над множествами (UNION, INTERSECT, EXCEPT)
-    /// </summary>
-    public IReadOnlyList<PgSetOperation> SetOperations { get; init; } = [];
-
-    /// <summary>
     /// ORDER BY клауза сортировки результата
+    /// Для операций над множествами (UNION/INTERSECT/EXCEPT) используйте PgSetOperationQuery
     /// </summary>
     public IReadOnlyList<PgOrderByItem> OrderByClause { get; init; } = [];
 

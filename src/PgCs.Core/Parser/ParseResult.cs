@@ -1,4 +1,4 @@
-using PgCs.Core.Types;
+using PgCs.Core.Types.Schema;
 
 namespace PgCs.Core.Parser;
 

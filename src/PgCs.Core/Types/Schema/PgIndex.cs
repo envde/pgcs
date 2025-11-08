@@ -1,7 +1,7 @@
 using PgCs.Core.Parser.Metadata;
 using PgCs.Core.Types.Base;
 
-namespace PgCs.Core.Types;
+namespace PgCs.Core.Types.Schema;
 
 /// <summary>
 /// PostgreSQL index definition (CREATE INDEX).

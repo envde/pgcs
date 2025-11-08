@@ -1,5 +1,6 @@
 using PgCs.Core.Types.Base;
 using PgCs.Core.Types.Queries.Components;
+using PgCs.Core.Types.Queries.Components.FromItems;
 using PgCs.Core.Types.Queries.Expressions;
 
 namespace PgCs.Core.Types.Queries;

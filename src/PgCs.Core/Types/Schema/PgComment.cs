@@ -1,6 +1,6 @@
 using PgCs.Core.Types.Base;
 
-namespace PgCs.Core.Types;
+namespace PgCs.Core.Types.Schema;
 
 /// <summary>
 /// PostgreSQL комментарий к объекту базы данных (COMMENT ON)

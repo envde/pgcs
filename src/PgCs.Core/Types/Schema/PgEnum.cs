@@ -1,6 +1,6 @@
 using PgCs.Core.Parser.Metadata;
 
-namespace PgCs.Core.Types;
+namespace PgCs.Core.Types.Schema;
 
 /// <summary>
 /// PostgreSQL enumeration type (CREATE TYPE ... AS ENUM).

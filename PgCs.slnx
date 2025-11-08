@@ -14,10 +14,10 @@
     <Project Path="src\PgCs.SchemaAnalyzer.Tante\PgCs.SchemaAnalyzer.Tante.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests\PgCs.Core.Tests\PgCs.Core.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\PgCs.Core.Tests\PgCs.Core.Tests.csproj" Type="C#" />
     <Project Path="tests\PgCs.QueryAnalyzer.Tests\PgCs.QueryAnalyzer.Tests.csproj" />
-    <Project Path="tests\PgCs.QueryGenerator.Tests\PgCs.QueryGenerator.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\PgCs.SchemaAnalyzer.Tante.Tests\PgCs.SchemaAnalyzer.Tante.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\PgCs.SchemaGenerator.Tests\PgCs.SchemaGenerator.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\PgCs.QueryGenerator.Tests\PgCs.QueryGenerator.Tests.csproj" Type="C#" />
+    <Project Path="tests\PgCs.SchemaAnalyzer.Tante.Tests\PgCs.SchemaAnalyzer.Tante.Tests.csproj" Type="C#" />
+    <Project Path="tests\PgCs.SchemaGenerator.Tests\PgCs.SchemaGenerator.Tests.csproj" Type="C#" />
   </Folder>
 </Solution>

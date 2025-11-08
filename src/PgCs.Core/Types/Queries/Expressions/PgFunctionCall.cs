@@ -4,13 +4,14 @@ namespace PgCs.Core.Types.Queries.Expressions;
 
 /// <summary>
 /// Вызов функции в SQL выражении
-/// Примеры: UPPER(name), COALESCE(price, 0), now(), COUNT(*)
+/// Поддерживает обычные, агрегатные и оконные функции
+/// Примеры: UPPER(name), COUNT(*), SUM(amount) OVER (...)
 /// </summary>
 public sealed record PgFunctionCall : PgExpression
 {
     /// <summary>
     /// Имя функции
-    /// Примеры: "upper", "coalesce", "now", "json_agg"
+    /// Примеры: "upper", "coalesce", "count", "sum"
     /// </summary>
     public required string FunctionName { get; init; }
 
@@ -36,7 +37,7 @@ public sealed record PgFunctionCall : PgExpression
     /// ORDER BY клауза внутри агрегатной функции
     /// Пример: STRING_AGG(name, ',' ORDER BY name)
     /// </summary>
-    public IReadOnlyList<PgOrderByItem>? OrderBy { get; init; }
+    public IReadOnlyList<PgOrderByItem> OrderBy { get; init; } = [];
 
     /// <summary>
     /// FILTER клауза для агрегатных функций

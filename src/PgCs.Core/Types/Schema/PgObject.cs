@@ -1,6 +1,6 @@
 using PgCs.Core.Parser.Metadata;
 
-namespace PgCs.Core.Types;
+namespace PgCs.Core.Types.Schema;
 
 /// <summary>
 /// Базовый класс для всех объектов PostgreSQL
