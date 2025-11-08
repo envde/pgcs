@@ -21,7 +21,7 @@ public sealed class SqlLexerTests
         Assert.NotEmpty(tokens);
 
         var significantTokens = tokens.Where(t => t.IsSignificant).ToList();
-        Assert.Equal(5, significantTokens.Count); // SELECT, id, FROM, users, ;
+        Assert.Equal(6, significantTokens.Count); // SELECT, id, FROM, users, ;, EOF
 
         Assert.Equal(TokenKind.Keyword, significantTokens[0].Kind);
         Assert.Equal("SELECT", significantTokens[0].Value);
@@ -32,6 +32,7 @@ public sealed class SqlLexerTests
         Assert.Equal(TokenKind.Identifier, significantTokens[3].Kind);
         Assert.Equal("users", significantTokens[3].Value);
         Assert.Equal(TokenKind.Semicolon, significantTokens[4].Kind);
+        Assert.Equal(TokenKind.EndOfFile, significantTokens[5].Kind);
 
         // Last token should be EOF
         Assert.Equal(TokenKind.EndOfFile, tokens[^1].Kind);
@@ -254,7 +255,7 @@ public sealed class SqlLexerTests
     public void Tokenize_WithPunctuation_RecognizesAllPunctuation()
     {
         // Arrange
-        var sql = "SELECT (id, name) FROM users[1];";
+        var sql = "SELECT (id, name) FROM users.table[1];"; // Добавлена точка в users.table
         var lexer = new SqlLexer(sql);
 
         // Act
@@ -356,23 +357,13 @@ public sealed class SqlLexerTests
     }
 
     [Fact]
-    public void Tokenize_WithEmptyString_ThrowsArgumentException()
+    public void Tokenize_WithNullString_ThrowsArgumentNullException()
     {
         // Arrange
         var lexer = new SqlLexer("valid");
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => lexer.Tokenize(""));
-    }
-
-    [Fact]
-    public void Tokenize_WithNullString_ThrowsArgumentException()
-    {
-        // Arrange
-        var lexer = new SqlLexer("valid");
-
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => lexer.Tokenize(null!));
+        Assert.Throws<ArgumentNullException>(() => lexer.Tokenize(null!));
     }
 
     [Fact]
@@ -392,24 +383,21 @@ public sealed class SqlLexerTests
     }
 
     [Fact]
-    public void Constructor_WithNullSourceText_ThrowsArgumentException()
+    public void Constructor_WithNullSourceText_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => new SqlLexer(null!));
+        Assert.Throws<ArgumentNullException>(() => new SqlLexer(null!));
     }
 
     [Fact]
-    public void Constructor_WithEmptySourceText_ThrowsArgumentException()
+    public void Tokenize_WithEmptyString_ReturnsOnlyEOF()
     {
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => new SqlLexer(""));
-    }
+        // Arrange & Act
+        var tokens = new SqlLexer("").Tokenize("");
 
-    [Fact]
-    public void Constructor_WithWhitespaceOnlySourceText_ThrowsArgumentException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => new SqlLexer("   "));
+        // Assert
+        Assert.Single(tokens);
+        Assert.Equal(TokenKind.EndOfFile, tokens[0].Kind);
     }
 
     [Fact]

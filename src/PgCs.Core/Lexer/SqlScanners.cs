@@ -196,15 +196,7 @@ public static class SqlScanners
 
         var second = cursor.Current;
 
-        // Двухсимвольные операторы
-        var twoCharOp = $"{first}{second}";
-        if (IsTwoCharOperator(twoCharOp))
-        {
-            cursor.Advance();
-            return (TokenKind.Operator, 2);
-        }
-
-        // Проверяем трёхсимвольные операторы
+        // Проверяем трёхсимвольные операторы СНАЧАЛА
         if (!cursor.IsAtEnd())
         {
             var third = cursor.Peek();
@@ -216,6 +208,14 @@ public static class SqlScanners
                 cursor.Advance();
                 return (TokenKind.Operator, 3);
             }
+        }
+
+        // Двухсимвольные операторы
+        var twoCharOp = $"{first}{second}";
+        if (IsTwoCharOperator(twoCharOp))
+        {
+            cursor.Advance();
+            return (TokenKind.Operator, 2);
         }
 
         return (TokenKind.Operator, 1);
@@ -291,7 +291,8 @@ public static class SqlScanners
         var tagStart = cursor.Position;
 
         // Читаем тег (может быть пустым)
-        while (!cursor.IsAtEnd() && SqlCharClassifier.IsIdentifierPart(cursor.Current))
+        // Тег может содержать только буквы, цифры и подчёркивание, НЕ включая $
+        while (!cursor.IsAtEnd() && (char.IsLetterOrDigit(cursor.Current) || cursor.Current == '_'))
         {
             cursor.Advance();
         }

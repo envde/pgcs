@@ -38,5 +38,5 @@ public static class SqlCharClassifier
     public static bool IsOperatorChar(char ch) =>
         ch is '+' or '-' or '*' or '/' or '%' or '^'
             or '<' or '>' or '=' or '!' or '|' or '&'
-            or '~' or '#';
+            or '~' or '#' or '@' or '?' or ':';
 }

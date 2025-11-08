@@ -91,6 +91,12 @@ public sealed class TextCursor
     /// <returns>Span с указанным участком текста</returns>
     public ReadOnlySpan<char> GetTextSpan(int start, int length)
     {
+        // Проверка на выход за границы текста
+        if (start < 0 || start >= _text.Length)
+        {
+            return ReadOnlySpan<char>.Empty;
+        }
+
         if (start + length > _text.Length)
         {
             length = _text.Length - start;

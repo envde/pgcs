@@ -283,10 +283,15 @@ public sealed class TokenKindTests
     [Fact]
     public void TokenKind_CanBeCompared()
     {
+        // Arrange
+        var kind1 = TokenKind.Whitespace;
+        var kind2 = TokenKind.Whitespace;
+        var kind3 = TokenKind.LineComment;
+
         // Act & Assert
-        Assert.True(TokenKind.Whitespace == TokenKind.Whitespace);
-        Assert.False(TokenKind.Whitespace == TokenKind.LineComment);
-        Assert.True(TokenKind.Keyword != TokenKind.Identifier);
+        Assert.Equal(kind1, kind2);
+        Assert.NotEqual(kind1, kind3);
+        Assert.NotEqual(TokenKind.Keyword, TokenKind.Identifier);
     }
 
     [Fact]
@@ -312,7 +317,7 @@ public sealed class TokenKindTests
             };
 
             Assert.True(token.IsTrivia);
-            Assert.True(kind.ToString().Contains("Comment"));
+            Assert.Contains("Comment", kind.ToString());
         }
     }
 

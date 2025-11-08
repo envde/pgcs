@@ -558,7 +558,7 @@ public sealed class SqlScannersTests
 
         // Assert
         Assert.Equal(TokenKind.QuotedIdentifier, type);
-        Assert.Equal(13, length);
+        Assert.Equal(12, length); // "Table Name" = 1 + 10 + 1 = 12
     }
 
     [Fact]

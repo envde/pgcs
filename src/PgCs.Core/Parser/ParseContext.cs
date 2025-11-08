@@ -61,12 +61,15 @@ public sealed class ParseContext
     /// <summary>
     /// Просматривает следующий токен без перехода к нему
     /// </summary>
-    /// <param name="offset">Смещение от текущей позиции (по умолчанию 1)</param>
-    /// <returns>Токен на указанном смещении или default если выход за границы</returns>
+    /// <param name="offset">Смещение от текущей позиции (по умолчанию 1). Должно быть положительным или нулём.</param>
+    /// <returns>Токен на указанном смещении или default если выход за границы или отрицательный offset</returns>
     public Token Peek(int offset = 1)
     {
+        if (offset < 0)
+            return default;
+
         var index = _position + offset;
-        return index >= 0 && index < _tokens.Count ? _tokens[index] : default;
+        return index < _tokens.Count ? _tokens[index] : default;
     }
 
     /// <summary>

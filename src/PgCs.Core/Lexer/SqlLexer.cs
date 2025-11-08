@@ -22,10 +22,10 @@ public sealed class SqlLexer
     /// Создает новый экземпляр лексера для указанного SQL текста
     /// </summary>
     /// <param name="sourceText">Исходный SQL текст для лексического анализа</param>
-    /// <exception cref="ArgumentException">Если sourceText null или пустой</exception>
+    /// <exception cref="ArgumentNullException">Если sourceText null</exception>
     public SqlLexer(string sourceText)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceText);
+        ArgumentNullException.ThrowIfNull(sourceText);
         _sourceText = sourceText;
     }
 
@@ -34,14 +34,14 @@ public sealed class SqlLexer
     /// </summary>
     /// <param name="sql">SQL текст для анализа</param>
     /// <returns>Список токенов, включая завершающий EOF токен</returns>
-    /// <exception cref="ArgumentException">Если sql null или пустой</exception>
+    /// <exception cref="ArgumentNullException">Если sql null</exception>
     /// <remarks>
     /// Метод всегда возвращает как минимум один токен (EOF).
     /// Все whitespace и комментарии сохраняются как trivia токены для точного воспроизведения оригинального текста.
     /// </remarks>
     public IReadOnlyList<Token> Tokenize(string sql)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sql);
+        ArgumentNullException.ThrowIfNull(sql);
 
         var cursor = new TextCursor(sql);
         var tokens = new List<Token>();
